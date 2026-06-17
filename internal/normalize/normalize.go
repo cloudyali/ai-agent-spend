@@ -1,0 +1,404 @@
+// Package normalize converts a provider's RawRecord into a versioned
+// event.AgentEvent with source provenance filled in. Pricing is applied
+// separately by internal/pricing, so a re-price never requires a re-read.
+//
+// See design-documents/phase-0A-trusted-explainable-ledger.md §Normalization.
+package normalize
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/agentspend/ai-agent-spend/internal/platform"
+	"github.com/agentspend/ai-agent-spend/internal/provider"
+)
+
+// ErrNotBillable signals a well-formed record that is not a billable assistant
+// turn (a user message, a summary, an assistant turn with no usage). Callers skip
+// these — they are not events and not errors.
+var ErrNotBillable = errors.New("normalize: record is not a billable assistant turn")
+
+// Normalizer converts a RawRecord into an AgentEvent (pricing applied separately).
+type Normalizer interface {
+	Normalize(provider.RawRecord) (event.AgentEvent, error)
+}
+
+// ClaudeCode normalizes Claude Code session JSONL. GOOS and IdentityHash are
+// injected so output is deterministic (golden tests) and platform-correct.
+// Attribute (optional) resolves a working directory to (project, cost_tag) from
+// the nearest .aispend.toml; nil falls back to the directory's base name.
+type ClaudeCode struct {
+	GOOS         string                                     // for path hashing; runtime.GOOS in production
+	IdentityHash string                                     // hashed identity, computed once per scan
+	Attribute    func(cwd string) (project, costTag string) // optional; from internal/config
+	RepoRoot     func(filePath string) string               // optional; resolves a file to its repo root dir (.git/.aispend.toml). Attributes Cowork sessions whose cwd is the desktop outputs dir.
+}
+
+const (
+	parserName    = "claude_code"
+	parserVersion = "v1"
+)
+
+// dateSuffix matches a trailing model snapshot date, e.g. "-20250514".
+var dateSuffix = regexp.MustCompile(`-[0-9]{8}$`)
+
+// ccContent is one item in a message's content array (text, tool_use, ...).
+type ccContent struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
+}
+
+// ccLine is the subset of a Claude Code JSONL record we read.
+type ccLine struct {
+	Type      string    `json:"type"`
+	UUID      string    `json:"uuid"`
+	SessionID string    `json:"sessionId"`
+	RequestID string    `json:"requestId"` // pairs with message.id for the dedupe key
+	CostUSD   *float64  `json:"costUSD"`   // a cost Claude Code sometimes writes itself; pointer so absent ≠ 0
+	Timestamp time.Time `json:"timestamp"`
+	CWD       string    `json:"cwd"`
+	Message   struct {
+		ID      string      `json:"id"`
+		Role    string      `json:"role"`
+		Model   string      `json:"model"`
+		Content []ccContent `json:"content"`
+		Usage   *struct {
+			InputTokens              int64 `json:"input_tokens"`
+			OutputTokens             int64 `json:"output_tokens"`
+			CacheReadInputTokens     int64 `json:"cache_read_input_tokens"`
+			CacheCreationInputTokens int64 `json:"cache_creation_input_tokens"`
+			// Claude's per-TTL cache-creation split. When present it equals the
+			// legacy flat total above; the 1-hour tier is priced at 2× input.
+			CacheCreation *struct {
+				Ephemeral5m int64 `json:"ephemeral_5m_input_tokens"`
+				Ephemeral1h int64 `json:"ephemeral_1h_input_tokens"`
+			} `json:"cache_creation"`
+		} `json:"usage"`
+	} `json:"message"`
+}
+
+// Normalize implements Normalizer for Claude Code records.
+func (n ClaudeCode) Normalize(rec provider.RawRecord) (event.AgentEvent, error) {
+	var line ccLine
+	if err := json.Unmarshal(rec.Raw, &line); err != nil {
+		return event.AgentEvent{}, fmt.Errorf("normalize: unrecognized record format: %w", err)
+	}
+	if line.Type != "assistant" || line.Message.Usage == nil {
+		return event.AgentEvent{}, ErrNotBillable
+	}
+
+	u := line.Message.Usage
+	tools, mcp := toolsAndServers(line.Message.Content)
+
+	var fiveMin, oneHour int64
+	if cc := u.CacheCreation; cc != nil {
+		fiveMin, oneHour = cc.Ephemeral5m, cc.Ephemeral1h
+	}
+	cacheWriteTotal, cacheWrite1h := cacheCreation(u.CacheCreationInputTokens, fiveMin, oneHour)
+
+	// The dedupe key is the semantic identity of one API response:
+	// message.id + requestId. Claude Code streams a response as several JSONL
+	// lines that share this pair (most carrying input_tokens of 0 or 1), so the
+	// EventID is derived from the key — not the source line — letting the keep-max
+	// Dedupe pass collapse the placeholders into the one true turn. With no
+	// message.id we fall back to a per-line key so unrelated turns never merge.
+	key := line.Message.ID + "|" + line.RequestID
+	if line.Message.ID == "" {
+		key = fmt.Sprintf("%s|%d|%s", rec.Source.PathHash, rec.Line, line.SessionID)
+	}
+	id := eventIDFromKey(key)
+	repo, project, costTag := "", "", ""
+	if line.CWD != "" {
+		repo = filepath.Base(line.CWD)
+		project = repo // default; .aispend.toml may override
+		if n.Attribute != nil {
+			if p, c := n.Attribute(line.CWD); p != "" {
+				project, costTag = p, c
+			} else {
+				costTag = c
+			}
+		}
+	}
+
+	ev := event.AgentEvent{
+		SchemaVersion: event.SchemaVersion,
+		EventID:       id,
+		SessionID:     line.SessionID,
+		PromptID:      line.Message.ID,
+		Provider:      parserName,
+		Surface:       "coding_agent",
+		IdentityHash:  n.IdentityHash,
+		Project:       project,
+		Repo:          repo,
+		CostTag:       costTag,
+		CWDHash:       hashCWD(line.CWD, n.GOOS),
+		Model:         canonicalModel(line.Message.Model),
+		Mode:          "agent",
+		Tokens: event.Tokens{
+			Input:        u.InputTokens,
+			Output:       u.OutputTokens,
+			CacheRead:    u.CacheReadInputTokens,
+			CacheWrite:   cacheWriteTotal,
+			CacheWrite1h: cacheWrite1h,
+		},
+		Tools:      tools,
+		MCPServers: mcp,
+		TSStart:    line.Timestamp,
+		TSEnd:      line.Timestamp,
+		Evidence: event.Evidence{
+			SourceType:           "local_file",
+			SourceRecordID:       line.UUID,
+			SourcePathHash:       rec.Source.PathHash,
+			SourceLine:           rec.Line,
+			ParserName:           parserName,
+			ParserVersion:        parserVersion,
+			DedupeKey:            key,
+			ReconciliationStatus: "local_only",
+		},
+	}
+
+	// A cost the tool itself wrote to disk is captured as the Reported view (the
+	// pricing engine then prefers it — ccusage's "Auto"). Only when present and
+	// positive: a nil/zero costUSD must never become a misleading $0.
+	if line.CostUSD != nil && *line.CostUSD > 0 {
+		ev.CostViews.Reported = &event.Money{
+			Micros:   int64(math.Round(*line.CostUSD * 1e6)),
+			Currency: "USD",
+		}
+	}
+	return ev, nil
+}
+
+func hashCWD(cwd, goos string) string {
+	if cwd == "" {
+		return ""
+	}
+	return platform.HashPath(cwd, goos)
+}
+
+// canonicalModel strips a trailing snapshot date so "claude-opus-4-20250514"
+// groups and prices as "claude-opus-4".
+func canonicalModel(m string) string { return dateSuffix.ReplaceAllString(m, "") }
+
+// cacheCreation resolves total cache-creation tokens and the 1-hour-tier subset
+// from Claude's two representations: the legacy flat cache_creation_input_tokens
+// and the per-TTL split (ephemeral_5m + ephemeral_1h). A valid record reports the
+// two as equal; we keep the larger so a partial split never drops tokens, and
+// clamp the 1-hour count to the total. Mirrors CodeBurn's extractClaudeCacheCreation.
+func cacheCreation(legacy, fiveMin, oneHour int64) (total, oneHourTotal int64) {
+	total = legacy
+	if split := fiveMin + oneHour; split > 0 {
+		if split > total {
+			total = split
+		}
+		oneHourTotal = oneHour
+		if oneHourTotal > total {
+			oneHourTotal = total
+		}
+	}
+	return total, oneHourTotal
+}
+
+// toolsAndServers collects tool-use names and the MCP servers among them
+// (mcp__<server>__<tool>), de-duplicating servers and preserving order.
+func toolsAndServers(content []ccContent) (tools, servers []string) {
+	seen := map[string]bool{}
+	for _, c := range content {
+		if c.Type != "tool_use" || c.Name == "" {
+			continue
+		}
+		tools = append(tools, c.Name)
+		if strings.HasPrefix(c.Name, "mcp__") {
+			if parts := strings.Split(c.Name, "__"); len(parts) >= 2 && !seen[parts[1]] {
+				seen[parts[1]] = true
+				servers = append(servers, parts[1])
+			}
+		}
+	}
+	return tools, servers
+}
+
+// eventIDFromKey hashes a dedupe key into a stable id. 16 hex chars (64 bits)
+// keeps collisions negligible across a large local ledger while staying readable
+// for `explain`. Entries sharing a key share an EventID, so the idempotent Upsert
+// and the keep-max Dedupe agree on identity.
+func eventIDFromKey(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return "evt_" + hex.EncodeToString(sum[:])[:16]
+}
+
+// eventID derives an id from a source reference (the no-message-id fallback).
+// It is eventIDFromKey over the same "pathHash|line|sessionID" bytes, so this
+// fallback id is stable and line-sensitive.
+func eventID(pathHash string, line int, sessionID string) string {
+	return eventIDFromKey(fmt.Sprintf("%s|%d|%s", pathHash, line, sessionID))
+}
+
+// Deduper collapses normalized events that share a dedupe key. A Normalizer may
+// implement it; the scan pipeline applies it per provider before pricing. Keeping
+// the dedup strategy inside each adapter is deliberate — every agent double-counts
+// differently, so there is no single global rule (see design-documents §1.5).
+type Deduper interface {
+	Dedupe(events []event.AgentEvent) []event.AgentEvent
+}
+
+// Dedupe implements the Claude Code keep-max rule. The CLI writes a response as
+// several JSONL lines sharing one (message.id, requestId); roughly 75% carry
+// input_tokens of 0 or 1 (streaming placeholders), and the same message can also
+// reappear across files during branch/resume. Summing them overcounts wildly, so
+// among entries sharing a dedupe key we keep the single one with the largest token
+// total. First-appearance order is preserved for determinism.
+//
+// Sidechain/subagent replay (a subagent re-emitting a parent's usage under a new
+// request id) is a separate double-count handled when subagent attribution lands
+// in 0B; 0A has one provider and the placeholder undercount is the live bug.
+func (ClaudeCode) Dedupe(events []event.AgentEvent) []event.AgentEvent {
+	pos := make(map[string]int, len(events)) // dedupe key -> index in out
+	out := make([]event.AgentEvent, 0, len(events))
+	for _, ev := range events {
+		if i, seen := pos[ev.Evidence.DedupeKey]; seen {
+			if tokenTotal(ev.Tokens) > tokenTotal(out[i].Tokens) {
+				out[i] = ev
+			}
+			continue
+		}
+		pos[ev.Evidence.DedupeKey] = len(out)
+		out = append(out, ev)
+	}
+	return out
+}
+
+// tokenTotal is the keep-max yardstick: the same sum ccusage uses to pick the
+// winning entry (fresh input + output + cache read + cache write).
+func tokenTotal(t event.Tokens) int64 {
+	return t.Input + t.Output + t.CacheRead + t.CacheWrite
+}
+
+// Attributor (optional) refines project/repo using signal that isn't on a single
+// line. ClaudeCode implements it for Cowork desktop sessions, whose cwd is the
+// app's outputs dir (no project) — the real project is inferred from the files the
+// session edited. The scan pipeline applies it after dedup; providers without it
+// pass through unchanged.
+type Attributor interface {
+	AttributeProjects(events []event.AgentEvent, recs []provider.RawRecord) []event.AgentEvent
+}
+
+// AttributeProjects fills in project/repo that normalize could not resolve. Cowork
+// desktop turns arrive as "outputs" (cwd is the app's outputs dir) and many turns
+// carry neither cwd nor sessionId, so attribution is keyed on the transcript FILE
+// (one .jsonl = one session's log = one project), NOT sessionId — keying on a blank
+// sessionId would collapse every session-less turn into one bucket (the real-data
+// bug: 34,737 MISSING-session turns dumped into a single repo). Per file: tally tool
+// file paths by repo root (RepoRoot), pick the dominant root, stamp its base name on
+// that file's placeholder events, and let .aispend.toml there override. A real repo
+// from a genuine cwd is never overwritten; a file with no inferable edits is left as-is.
+func (n ClaudeCode) AttributeProjects(events []event.AgentEvent, recs []provider.RawRecord) []event.AgentEvent {
+	// A defensive, attribution-only shape: only this pass needs tool file paths, so
+	// parsing them here (not in the shared ccContent) keeps the main Normalize
+	// unmarshal strict and unaffected. A record that doesn't fit is simply skipped.
+	type attrLine struct {
+		Message struct {
+			Content []struct {
+				Type  string `json:"type"`
+				Input struct {
+					FilePath     string `json:"file_path"`
+					Path         string `json:"path"`
+					NotebookPath string `json:"notebook_path"`
+				} `json:"input"`
+			} `json:"content"`
+		} `json:"message"`
+	}
+	roots := map[string]map[string]int{} // transcript file (pathHash) -> repoRoot -> hits
+	for _, r := range recs {
+		key := r.Source.PathHash
+		if key == "" {
+			continue
+		}
+		var line attrLine
+		if json.Unmarshal(r.Raw, &line) != nil {
+			continue
+		}
+		for _, c := range line.Message.Content {
+			if c.Type != "tool_use" {
+				continue
+			}
+			p := c.Input.FilePath
+			if p == "" {
+				p = c.Input.Path
+			}
+			if p == "" {
+				p = c.Input.NotebookPath
+			}
+			if p == "" {
+				continue
+			}
+			root := n.repoRootOf(p)
+			if root == "" {
+				continue
+			}
+			if roots[key] == nil {
+				roots[key] = map[string]int{}
+			}
+			roots[key][root]++
+		}
+	}
+	if len(roots) == 0 {
+		return events
+	}
+
+	// Dominant root per transcript file (ties broken by path for determinism).
+	dominant := map[string]string{}
+	for file, tally := range roots {
+		best, bestN := "", 0
+		for root, hits := range tally {
+			if hits > bestN || (hits == bestN && root < best) {
+				best, bestN = root, hits
+			}
+		}
+		if best != "" {
+			dominant[file] = best
+		}
+	}
+
+	for i := range events {
+		// Only fill placeholders normalize left behind — never overwrite a real repo
+		// resolved from a genuine cwd. Cowork turns arrive as "outputs"; cwd/session-
+		// less turns arrive empty.
+		if r := events[i].Repo; r != "" && r != "outputs" {
+			continue
+		}
+		root, ok := dominant[events[i].Evidence.SourcePathHash]
+		if !ok {
+			continue
+		}
+		name := filepath.Base(root)
+		events[i].Project, events[i].Repo = name, name
+		if n.Attribute != nil {
+			if p, c := n.Attribute(root); p != "" {
+				events[i].Project, events[i].CostTag = p, c
+			} else if c != "" {
+				events[i].CostTag = c
+			}
+		}
+	}
+	return events
+}
+
+// repoRootOf resolves a file to its repo root via the injected RepoRoot hook. With
+// no hook (or no repo found) it returns "", leaving the session's attribution as-is
+// rather than guessing from a bare directory.
+func (n ClaudeCode) repoRootOf(filePath string) string {
+	if n.RepoRoot == nil {
+		return ""
+	}
+	return n.RepoRoot(filePath)
+}
