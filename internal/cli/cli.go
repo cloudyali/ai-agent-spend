@@ -62,6 +62,8 @@ func (a *App) dispatch(args []string) int {
 		return a.cmdToday(rest)
 	case "top":
 		return a.cmdTop(rest)
+	case "tui":
+		return a.cmdTui(rest)
 	case "explain":
 		return a.cmdExplain(rest)
 	case "doctor":
@@ -984,6 +986,7 @@ Usage: aispend <command>
   report [--period P] [flags]   spend over a calendar window (default: this week)
   today                         arbitrage-first daily glance: ROI, cache savings, hourly spikes
   top [--period P] [--sessions] priciest turns (or sessions) in a window → ids to explain
+  tui [--period P]              interactive explorer: arrow through sessions, ↵ to drill (not in offline build)
   explain <event-id>            open any number to its full evidence
   explain session:<id|max|last> the session receipt: window, composition, arbitrage, top turns
   doctor [--network] [--paths]  prove the trust promise / show data locations
