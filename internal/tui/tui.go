@@ -34,11 +34,16 @@ const (
 	modeReceipt
 )
 
+// metered cost views the explorer can cycle with `v` (effective_allocated is a
+// period-level allocation, not a per-session number, so it is intentionally out).
+var views = []string{"api_equivalent", "reported", "estimated", "billed", "marginal"}
+
 // Model is the Bubble Tea model. Update/View are pure over messages, so the whole
 // interaction is testable by feeding tea.KeyMsg values — no terminal required.
 type Model struct {
 	periods []Period
 	pIdx    int
+	vIdx    int
 	eng     *pricing.Engine
 	rows    []sessionStat
 	cursor  int
@@ -47,7 +52,7 @@ type Model struct {
 	w, h    int
 }
 
-// sessionStat is one list row: a session rolled up.
+// sessionStat is one list row: a session rolled up under the active view.
 type sessionStat struct {
 	id       string
 	micros   int64
@@ -56,31 +61,23 @@ type sessionStat struct {
 	last     time.Time
 	repo     string
 	provider string
-	byModel  map[string]int64 // model → api-equivalent micros (for the dominant model)
+	byModel  map[string]int64
 	evs      []event.AgentEvent
 }
 
 // --- color language: a muted, low-saturation palette via AdaptiveColor, so it
-// stays legible and easy on the eyes on BOTH light and dark terminal backgrounds
-// (bright 16-color ANSI — especially yellow — glares on a light background). The
-// 256-color codes are deliberately desaturated. lipgloss degrades to plain under
-// NO_COLOR / dumb terminals via termenv.
+// stays legible and easy on the eyes on BOTH light and dark terminal backgrounds.
 var (
-	// Secondary text: a calm mid-grey (not lipgloss Faint, which washes out
-	// inconsistently across terminals).
 	stFaint = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"})
 	stBold  = lipgloss.NewStyle().Bold(true)
-	// Spend bar: one calm teal accent (filled); the empty track is rendered grey.
-	stBar = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"})
-	// Selected row: a subtle grey wash + bold, never a loud full-width fill.
-	stSel = lipgloss.NewStyle().Bold(true).
+	stBar   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"})
+	stSel   = lipgloss.NewStyle().Bold(true).
 		Foreground(lipgloss.AdaptiveColor{Light: "232", Dark: "231"}).
 		Background(lipgloss.AdaptiveColor{Light: "251", Dark: "238"})
-	// Token classes — muted, distinguishable, adaptive.
-	stRead   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "110"})  // blue
-	stWrite  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "179"}) // amber
-	stOutput = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "29", Dark: "108"})  // teal/green
-	stInput  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "97", Dark: "139"})  // purple
+	stRead   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "110"})
+	stWrite  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "179"})
+	stOutput = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "29", Dark: "108"})
+	stInput  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "97", Dark: "139"})
 )
 
 func New(periods []Period, startIdx int, eng *pricing.Engine) Model {
@@ -88,7 +85,7 @@ func New(periods []Period, startIdx int, eng *pricing.Engine) Model {
 		startIdx = 0
 	}
 	m := Model{periods: periods, pIdx: startIdx, eng: eng, mode: modeList}
-	m.rows = groupSessions(m.events())
+	m.rows = groupSessions(m.events(), m.view())
 	return m
 }
 
@@ -104,6 +101,13 @@ func (m Model) label() string {
 		return ""
 	}
 	return m.periods[m.pIdx].Label
+}
+
+func (m Model) view() string {
+	if m.vIdx < 0 || m.vIdx >= len(views) {
+		return views[0]
+	}
+	return views[m.vIdx]
 }
 
 func (m Model) Init() tea.Cmd { return nil }
@@ -137,15 +141,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "left", "h":
 			if m.pIdx > 0 {
 				m.pIdx--
-				m.rows = groupSessions(m.events())
+				m.rows = groupSessions(m.events(), m.view())
 				m.cursor = 0
 			}
 		case "right", "l":
 			if m.pIdx < len(m.periods)-1 {
 				m.pIdx++
-				m.rows = groupSessions(m.events())
+				m.rows = groupSessions(m.events(), m.view())
 				m.cursor = 0
 			}
+		case "v":
+			m.vIdx = (m.vIdx + 1) % len(views)
+			m.rows = groupSessions(m.events(), m.view())
+			m.cursor = 0
 		case "enter":
 			if len(m.rows) > 0 {
 				m.sel = m.rows[m.cursor].evs
@@ -170,35 +178,43 @@ func (m Model) listView() string {
 	if width <= 0 {
 		width = 100
 	}
+	view := m.view()
 	var b strings.Builder
 
-	// Header: period + arbitrage-forward total / cache saved.
-	var total, without int64
+	var total, apiTotal, without int64
+	viewPriced := 0
 	for _, e := range m.events() {
-		if mny := e.CostViews.APIEquivalent; mny != nil {
-			total += mny.Micros
+		if mic, ok := viewMicros(e, view); ok {
+			total += mic
+			viewPriced++
+		}
+		if a := e.CostViews.APIEquivalent; a != nil {
+			apiTotal += a.Micros
 		}
 		if w, ok := m.eng.WithoutCache(e.Model, e.Tokens); ok {
 			without += w.Micros
 		}
 	}
-	b.WriteString(stBold.Render("aispend") + stFaint.Render(" · "+m.label()))
-	b.WriteString(stFaint.Render(fmt.Sprintf("   ·   %d sessions\n", len(m.rows))))
-	head2 := stBold.Render(money(total)) + stFaint.Render(" api-equivalent")
-	if without > total {
-		head2 += stFaint.Render(fmt.Sprintf("   ·   cache saved %s (%.0f%%)", money(without-total), pct(without-total, without)))
+
+	// Header.
+	b.WriteString(stBold.Render("aispend") + stFaint.Render(fmt.Sprintf(" · %s   ·   %d sessions", m.label(), len(m.rows))) + "\n")
+	if viewPriced == 0 {
+		b.WriteString(stFaint.Render("no "+viewLabel(view)+" cost for these sessions — press v to switch view") + "\n")
+	} else {
+		head := stBold.Render(money(total)) + stFaint.Render(" "+viewLabel(view))
+		if view == "api_equivalent" && without > apiTotal {
+			head += stFaint.Render(fmt.Sprintf("   ·   cache saved %s (%.0f%%)", money(without-apiTotal), pct(without-apiTotal, without)))
+		}
+		b.WriteString(head + "\n")
 	}
-	b.WriteString(head2 + "\n")
-	b.WriteString(stFaint.Render("←/→ period · ↑/↓ move · ↵ open receipt · q quit") + "\n\n")
+	b.WriteString(stFaint.Render("←/→ period · v view · ↑/↓ move · ↵ open receipt · q quit") + "\n\n")
 
 	if len(m.rows) == 0 {
 		b.WriteString(stFaint.Render("  no sessions in "+m.label()) + "\n")
 		return b.String()
 	}
 
-	// Column widths; the spend bar flexes with the terminal.
-	maxMicros := m.rows[0].micros // rows are sorted desc
-	barW := width - 9 - 14 - 20 - 9 - 12 - 8
+	barW := width - 72
 	if barW < 8 {
 		barW = 8
 	}
@@ -206,23 +222,24 @@ func (m Model) listView() string {
 		barW = 28
 	}
 
+	// Column header — so the columns are self-explanatory (no cryptic "t").
+	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%9s  %-*s  %-15s  %-18s  %6s  %s",
+		"COST", barW, "SHARE", "WHEN", "PROJECT", "TURNS", "MODEL")) + "\n")
+
+	maxMicros := m.rows[0].micros
 	start, end := m.windowRange(len(m.rows))
 	for i := start; i < end; i++ {
 		r := m.rows[i]
-		cost := fmt.Sprintf("%9s", money(r.micros))
+		cost := money(r.micros)
 		bar := spendBar(r.micros, maxMicros, barW)
-		when := fmt.Sprintf("%-14s", r.first.Format("Jan 02 15:04"))
-		repo := fmt.Sprintf("%-20s", trunc(orDash(r.repo), 19))
-		turns := fmt.Sprintf("%8s", comma(int64(r.turns))+"t")
-		model := trunc(humanModel(r.dominant()), 12)
+		meta := fmt.Sprintf("%-15s  %-18s  %6s  %s",
+			fmtTime(r.first), trunc(orDash(r.repo), 18), comma(int64(r.turns)), trunc(humanModel(r.dominant()), 12))
 
 		if i == m.cursor {
-			plain := fmt.Sprintf("▶ %s  %s  %s  %s %s  %s", cost, bar, when, repo, turns, model)
-			b.WriteString(stSel.Render(plain) + "\n")
+			b.WriteString(stSel.Render(fmt.Sprintf("▶ %9s  %s  %s", cost, bar, meta)) + "\n")
 			continue
 		}
-		b.WriteString("  " + stBold.Render(cost) + "  " + styleBar(bar) + "  " +
-			stFaint.Render(when+"  "+repo+" "+turns+"  "+model) + "\n")
+		b.WriteString("  " + stBold.Render(fmt.Sprintf("%9s", cost)) + "  " + styleBar(bar) + "  " + stFaint.Render(meta) + "\n")
 	}
 	if end < len(m.rows) {
 		b.WriteString(stFaint.Render(fmt.Sprintf("  … +%d more ↓", len(m.rows)-end)) + "\n")
@@ -233,7 +250,7 @@ func (m Model) listView() string {
 // windowRange returns the slice of rows to show so the cursor stays visible,
 // accounting for header/footer chrome. With no known height (tests) it shows all.
 func (m Model) windowRange(n int) (int, int) {
-	visible := m.h - 6 // header(3) + blank + "more" + margin
+	visible := m.h - 7 // header(3) + blank + column header + "more" + margin
 	if m.h <= 0 || visible >= n {
 		return 0, n
 	}
@@ -256,14 +273,16 @@ func (m Model) windowRange(n int) (int, int) {
 func (m Model) receiptView() string {
 	var b strings.Builder
 	evs := m.sel
+	view := m.view()
 	if len(evs) == 0 {
 		return "  (no turns)\n" + stFaint.Render("  esc back · q quit")
 	}
 
 	first, last := evs[0].TSStart, evs[0].TSStart
-	var total, without int64
+	var total int64
+	var without int64
 	var comp pricing.CostComponents
-	priced := 0
+	priced, viewPriced := 0, 0
 	repo, provider := "", evs[0].Provider
 	for _, e := range evs {
 		if e.TSStart.Before(first) {
@@ -279,8 +298,9 @@ func (m Model) receiptView() string {
 		if repo == "" {
 			repo = sessionRepo(e)
 		}
-		if mny := e.CostViews.APIEquivalent; mny != nil {
-			total += mny.Micros
+		if mic, ok := viewMicros(e, view); ok {
+			total += mic
+			viewPriced++
 		}
 		if c, ok := m.eng.Components(e.Model, e.Tokens); ok {
 			comp = addComp(comp, c)
@@ -291,33 +311,31 @@ func (m Model) receiptView() string {
 		}
 	}
 
-	// Title: where · who · when→when · N turns over <elapsed> elapsed (honest: the
-	// span is wall-clock across a possibly-resumed session, not active time).
-	where := orDash(repo)
 	title := fmt.Sprintf("%s · %s · %s → %s",
-		stBold.Render(where), providerLabel(provider),
-		first.Format("Jan 02 15:04"), last.Format("Jan 02 15:04"))
+		stBold.Render(orDash(repo)), providerLabel(provider),
+		fmtTime(first), fmtTime(last))
 	b.WriteString(title + "\n")
 	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed", len(evs), turnsWord(len(evs)), elapsed(last.Sub(first)))) + "\n\n")
 
-	if priced == 0 {
-		b.WriteString("  total   " + stBold.Render("not computable") + " (no priced turns)\n")
-		b.WriteString("\n" + stFaint.Render("  esc back · q quit"))
-		return b.String()
+	if viewPriced == 0 {
+		b.WriteString("  total       " + stBold.Render("not computable") + stFaint.Render(" (no "+viewLabel(view)+" cost)") + "\n")
+	} else {
+		b.WriteString("  total       " + stBold.Render(money(total)) + stFaint.Render(" "+viewLabel(view)) + "\n")
 	}
-
-	b.WriteString("  total       " + stBold.Render(money(total)) + "\n")
-	b.WriteString("  composition " + compositionStripe(comp, 28) + "\n")
-	b.WriteString("              " + compositionLegend(comp) + "\n")
-	if without > 0 {
-		b.WriteString("  arbitrage   " + stFaint.Render(fmt.Sprintf("without cache ≈ %s · saved %.0f%%", money(without), pct(without-total, without))) + "\n")
+	if priced > 0 {
+		b.WriteString("  composition " + compositionStripe(comp, 28) + "\n")
+		b.WriteString("              " + compositionLegend(comp) + "\n")
+		if without > 0 {
+			apiTotal := comp.Total().Micros
+			b.WriteString("  arbitrage   " + stFaint.Render(fmt.Sprintf("without cache ≈ %s · saved %.0f%%", money(without), pct(without-apiTotal, without))) + "\n")
+		}
 	}
 
 	b.WriteString("\n  top turns\n")
-	for _, e := range topTurns(evs, 5) {
+	for _, e := range topTurns(evs, 5, view) {
 		amt := "—"
-		if mny := e.CostViews.APIEquivalent; mny != nil {
-			amt = money(mny.Micros)
+		if mic, ok := viewMicros(e, view); ok {
+			amt = money(mic)
 		}
 		b.WriteString(fmt.Sprintf("    %8s  %s  %-9s %s\n",
 			amt, stFaint.Render(shortID(e.EventID)), humanModel(e.Model), tokenSummary(e.Tokens)))
@@ -335,7 +353,7 @@ func Run(periods []Period, startIdx int, eng *pricing.Engine, out io.Writer) err
 
 // --- aggregation + helpers -------------------------------------------------
 
-func groupSessions(events []event.AgentEvent) []sessionStat {
+func groupSessions(events []event.AgentEvent, view string) []sessionStat {
 	byID := map[string]*sessionStat{}
 	var order []string
 	for _, e := range events {
@@ -363,10 +381,7 @@ func groupSessions(events []event.AgentEvent) []sessionStat {
 		if g.repo == "" {
 			g.repo = sessionRepo(e)
 		}
-		var mic int64
-		if mny := e.CostViews.APIEquivalent; mny != nil {
-			mic = mny.Micros
-		}
+		mic, _ := viewMicros(e, view)
 		g.micros += mic
 		if e.Model != "" {
 			g.byModel[e.Model] += mic
@@ -380,7 +395,6 @@ func groupSessions(events []event.AgentEvent) []sessionStat {
 	return out
 }
 
-// dominant returns the model with the most spend in the session (ties: any).
 func (s sessionStat) dominant() string {
 	best, bestM := "", int64(-1)
 	for model, mic := range s.byModel {
@@ -398,8 +412,31 @@ func sessionRepo(e event.AgentEvent) string {
 	return e.Project
 }
 
-// spendBar renders a proportion bar (share of the largest row) so the eye sees
-// where the money went without reading every number.
+// viewMicros reads one cost lens from an event; ok is false when that lens is not
+// computable for the event (a nil view is never a $0).
+func viewMicros(e event.AgentEvent, view string) (int64, bool) {
+	cv := e.CostViews
+	var m *event.Money
+	switch view {
+	case "reported":
+		m = cv.Reported
+	case "estimated":
+		m = cv.Estimated
+	case "billed":
+		m = cv.Billed
+	case "marginal":
+		m = cv.Marginal
+	default:
+		m = cv.APIEquivalent
+	}
+	if m == nil {
+		return 0, false
+	}
+	return m.Micros, true
+}
+
+func viewLabel(view string) string { return strings.ReplaceAll(view, "_", "-") }
+
 func spendBar(micros, max int64, width int) string {
 	if max <= 0 || width <= 0 {
 		return strings.Repeat("░", maxInt(width, 0))
@@ -455,7 +492,6 @@ func compositionStripe(c pricing.CostComponents, width int) string {
 	return out.String()
 }
 
-// compositionLegend names each non-zero class with its share and amount, colored.
 func compositionLegend(c pricing.CostComponents) string {
 	type cl struct {
 		name   string
@@ -482,21 +518,18 @@ func compositionLegend(c pricing.CostComponents) string {
 	return strings.Join(parts, stFaint.Render(" · "))
 }
 
-func topTurns(evs []event.AgentEvent, n int) []event.AgentEvent {
+func topTurns(evs []event.AgentEvent, n int, view string) []event.AgentEvent {
 	cp := make([]event.AgentEvent, len(evs))
 	copy(cp, evs)
-	sort.SliceStable(cp, func(i, j int) bool { return apiMicros(cp[i]) > apiMicros(cp[j]) })
+	sort.SliceStable(cp, func(i, j int) bool {
+		mi, _ := viewMicros(cp[i], view)
+		mj, _ := viewMicros(cp[j], view)
+		return mi > mj
+	})
 	if len(cp) > n {
 		cp = cp[:n]
 	}
 	return cp
-}
-
-func apiMicros(e event.AgentEvent) int64 {
-	if m := e.CostViews.APIEquivalent; m != nil {
-		return m.Micros
-	}
-	return 0
 }
 
 func addComp(a, b pricing.CostComponents) pricing.CostComponents {
@@ -528,6 +561,9 @@ func money(micros int64) string {
 	}
 	whole := int64(v)
 	frac := int64((v-float64(whole))*100 + 0.5)
+	if frac == 100 {
+		whole, frac = whole+1, 0
+	}
 	return neg + "$" + comma(whole) + "." + fmt.Sprintf("%02d", frac)
 }
 
@@ -538,8 +574,6 @@ func pct(part, whole int64) float64 {
 	return float64(part) / float64(whole) * 100
 }
 
-// humanModel trims the vendor prefix and turns the unknown-model placeholder into
-// a readable word, so rows read "opus-4-8" / "other" not "claude-…" / "<synthetic>".
 func humanModel(m string) string {
 	if m == "" {
 		return "—"
@@ -565,8 +599,6 @@ func providerLabel(p string) string {
 	}
 }
 
-// shortID renders an event id as a short, dim-friendly token (drops the evt_
-// prefix, keeps 8 chars) — the full hash lives in the evidence ledger, not here.
 func shortID(id string) string {
 	id = strings.TrimPrefix(id, "evt_")
 	if r := []rune(id); len(r) > 8 {
@@ -575,7 +607,13 @@ func shortID(id string) string {
 	return id
 }
 
-// elapsed renders a wall-clock span compactly (labelled "elapsed" by the caller).
+// timeLayout renders a 12-hour wall-clock with an am/pm marker (e.g. "Jun 17
+// 7:42am"); fmtTime converts to the viewer's LOCAL zone first, since the stored
+// timestamps come from logs in UTC and "when did I work on this" means local.
+const timeLayout = "Jan 02 3:04pm"
+
+func fmtTime(t time.Time) string { return t.Local().Format(timeLayout) }
+
 func elapsed(d time.Duration) string {
 	if d < 0 {
 		d = 0

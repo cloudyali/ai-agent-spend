@@ -171,6 +171,54 @@ func TestModel_ScrollWindow(t *testing.T) {
 	}
 }
 
+// `v` cycles the cost view; the header names it and totals/ranking follow it.
+func TestModel_ViewSwitch(t *testing.T) {
+	api := event.USD(5_000_000)
+	rep := event.USD(4_000_000)
+	e := event.AgentEvent{EventID: "e1", SessionID: "s1", Provider: "claude_code", Model: "claude-opus-4-8",
+		TSStart:   time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC),
+		CostViews: event.CostViews{APIEquivalent: &api, Reported: &rep}}
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{e}}}, 0, pricing.NewEngine())
+
+	if m.view() != "api_equivalent" {
+		t.Fatalf("default view = %q", m.view())
+	}
+	if v := m.View(); !strings.Contains(v, "api-equivalent") || !strings.Contains(v, "$5.00") {
+		t.Errorf("api-equivalent view should show $5.00 and name itself:\n%s", v)
+	}
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	m = nm.(Model)
+	if m.view() != "reported" {
+		t.Fatalf("after v, view = %q, want reported", m.view())
+	}
+	if v := m.View(); !strings.Contains(v, "reported") || !strings.Contains(v, "$4.00") {
+		t.Errorf("reported view should show $4.00:\n%s", v)
+	}
+}
+
+func TestListColumnHeader(t *testing.T) {
+	eng := pricing.NewEngine()
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "repo", "claude-opus-4-8", time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC), event.Tokens{Input: 1_000_000}),
+	}}}, 0, eng)
+	v := m.View()
+	for _, h := range []string{"COST", "SHARE", "WHEN", "PROJECT", "TURNS", "MODEL"} {
+		if !strings.Contains(v, h) {
+			t.Errorf("list missing column header %q:\n%s", h, v)
+		}
+	}
+}
+
+func TestTimeLayout(t *testing.T) {
+	// the layout itself (am/pm); fmtTime additionally converts to local zone.
+	if got := time.Date(2026, 6, 17, 15, 4, 0, 0, time.UTC).Format(timeLayout); got != "Jun 17 3:04pm" {
+		t.Errorf("pm layout = %q, want 'Jun 17 3:04pm'", got)
+	}
+	if got := time.Date(2026, 6, 17, 7, 42, 0, 0, time.UTC).Format(timeLayout); got != "Jun 17 7:42am" {
+		t.Errorf("am layout = %q, want 'Jun 17 7:42am'", got)
+	}
+}
+
 func TestModel_Empty(t *testing.T) {
 	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {
