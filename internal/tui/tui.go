@@ -20,11 +20,14 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
 )
 
-// Period is one selectable window: a label plus the events that fall in it. The
-// CLI pre-filters so this package needs no period parsing.
+// Period is one selectable window: a label, the events that fall in it, and the
+// period's prorated subscription fee (Amortized) when a plan is configured — the
+// CLI computes that allocation basis so this package needs no plan/period parsing.
 type Period struct {
-	Label  string
-	Events []event.AgentEvent
+	Label     string
+	Events    []event.AgentEvent
+	Amortized int64 // prorated plan fee for this window (micros); 0 if no plan
+	HasPlan   bool  // a subscription plan is configured (enables the amortized lens)
 }
 
 type mode int
@@ -34,11 +37,14 @@ const (
 	modeReceipt
 )
 
-// cycleViews are the distinct cost lenses `v` can rotate through. estimated mirrors
-// api-equivalent in 0A so it is omitted; effective_allocated is a period-level
-// allocation, not a per-session number, so it is out too. Crucially, `v` only
-// offers the views actually PRESENT in the current data (see availableViews), so
-// it never lands on an all-$0 screen — and the hint hides when there's only one.
+// amortizedView is the period-level allocation lens (the subscription-arbitrage
+// half): the prorated plan fee distributed across sessions by api-equivalent
+// share. It is offered only when a plan is configured (see availableViews).
+const amortizedView = "amortized"
+
+// cycleViews are the distinct per-event cost lenses `v` can rotate through.
+// estimated mirrors api-equivalent in 0A so it is omitted; only views actually
+// present in the data are offered, so `v` never lands on an all-$0 screen.
 var cycleViews = []string{"api_equivalent", "reported", "billed", "marginal"}
 
 // Model is the Bubble Tea model. Update/View are pure over messages, so the whole
@@ -46,28 +52,28 @@ var cycleViews = []string{"api_equivalent", "reported", "billed", "marginal"}
 type Model struct {
 	periods []Period
 	pIdx    int
-	curView string   // active cost lens
-	avail   []string // views with data in the current period (what `v` rotates through)
+	curView string
+	avail   []string
 	eng     *pricing.Engine
 	rows    []sessionStat
 	cursor  int
 	mode    mode
-	sel     []event.AgentEvent // events of the drilled session
+	sel     sessionStat // the drilled session
 	w, h    int
 }
 
-// sessionStat is one list row: a session rolled up under the active view.
 type sessionStat struct {
-	id       string
-	micros   int64
-	hasView  bool // at least one turn carries the active cost lens (else cost is "—", not $0)
-	turns    int
-	first    time.Time
-	last     time.Time
-	repo     string
-	provider string
-	byModel  map[string]int64
-	evs      []event.AgentEvent
+	id        string
+	micros    int64 // cost in the active lens (allocated share when amortized)
+	apiMicros int64 // api-equivalent (always; the amortized allocation basis)
+	hasView   bool  // at least one turn carries the active lens (else cost is "—")
+	turns     int
+	first     time.Time
+	last      time.Time
+	repo      string
+	provider  string
+	byModel   map[string]int64
+	evs       []event.AgentEvent
 }
 
 // --- color language: a muted, low-saturation palette via AdaptiveColor, so it
@@ -94,29 +100,47 @@ func New(periods []Period, startIdx int, eng *pricing.Engine) Model {
 	return m
 }
 
-// refresh recomputes the available views + rows for the current period, keeping
-// the active view valid. Called on construction and whenever the period changes.
+// refresh recomputes the available lenses + rows for the current period, keeping
+// the active lens valid. Called on construction and whenever the period changes.
 func (m *Model) refresh() {
-	m.avail = availableViews(m.events())
+	m.avail = availableViews(m.events(), m.period().HasPlan)
 	m.curView = ensureView(m.curView, m.avail)
-	m.rows = groupSessions(m.events(), m.curView)
+	m.rows = m.buildRows()
 }
 
-func (m Model) events() []event.AgentEvent {
+func (m Model) period() Period {
 	if m.pIdx < 0 || m.pIdx >= len(m.periods) {
-		return nil
+		return Period{}
 	}
-	return m.periods[m.pIdx].Events
+	return m.periods[m.pIdx]
 }
 
-func (m Model) label() string {
-	if m.pIdx < 0 || m.pIdx >= len(m.periods) {
-		return ""
-	}
-	return m.periods[m.pIdx].Label
-}
+func (m Model) events() []event.AgentEvent { return m.period().Events }
+
+func (m Model) label() string { return m.period().Label }
 
 func (m Model) view() string { return m.curView }
+
+// buildRows groups the current period into session rows for the active lens. For
+// the amortized lens it allocates the period's prorated plan fee across sessions
+// by api-equivalent share (pricing.Allocate → exact integer split).
+func (m Model) buildRows() []sessionStat {
+	rows := groupSessions(m.events(), m.curView)
+	if m.curView == amortizedView {
+		per := m.period()
+		basis := make(map[string]int64, len(rows))
+		for _, r := range rows {
+			basis[r.id] = r.apiMicros
+		}
+		alloc := pricing.Allocate(event.Money{Micros: per.Amortized, Currency: "USD"}, basis)
+		for i := range rows {
+			rows[i].micros = alloc[rows[i].id].Micros
+			rows[i].hasView = per.HasPlan && rows[i].apiMicros > 0
+		}
+		sort.SliceStable(rows, func(i, j int) bool { return rows[i].micros > rows[j].micros })
+	}
+	return rows
+}
 
 func (m Model) Init() tea.Cmd { return nil }
 
@@ -159,14 +183,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 		case "v":
-			if len(m.avail) > 1 { // only switch when there's another populated view
+			if len(m.avail) > 1 {
 				m.curView = nextView(m.avail, m.curView)
-				m.rows = groupSessions(m.events(), m.curView)
+				m.rows = m.buildRows()
 				m.cursor = 0
 			}
 		case "enter":
 			if len(m.rows) > 0 {
-				m.sel = m.rows[m.cursor].evs
+				m.sel = m.rows[m.cursor]
 				m.mode = modeReceipt
 			}
 		}
@@ -191,33 +215,9 @@ func (m Model) listView() string {
 	view := m.view()
 	var b strings.Builder
 
-	var total, apiTotal, without int64
-	viewPriced := 0
-	for _, e := range m.events() {
-		if mic, ok := viewMicros(e, view); ok {
-			total += mic
-			viewPriced++
-		}
-		if a := e.CostViews.APIEquivalent; a != nil {
-			apiTotal += a.Micros
-		}
-		if w, ok := m.eng.WithoutCache(e.Model, e.Tokens); ok {
-			without += w.Micros
-		}
-	}
-
-	// Header.
 	b.WriteString(stBold.Render("aispend") + stFaint.Render(fmt.Sprintf(" · %s   ·   %d sessions", m.label(), len(m.rows))) + "\n")
-	if viewPriced == 0 {
-		b.WriteString(stFaint.Render("no "+viewLabel(view)+" cost recorded for these sessions") + "\n")
-	} else {
-		head := stBold.Render(money(total)) + stFaint.Render(" "+viewLabel(view))
-		if view == "api_equivalent" && without > apiTotal {
-			head += stFaint.Render(fmt.Sprintf("   ·   cache saved %s (%.0f%%)", money(without-apiTotal), pct(without-apiTotal, without)))
-		}
-		b.WriteString(head + "\n")
-	}
-	// Offer `v` only when there's actually another populated view to switch to.
+	b.WriteString(m.headerLine(view) + "\n")
+
 	hint := "←/→ period · ↑/↓ move · ↵ open receipt · q quit"
 	if len(m.avail) > 1 {
 		hint = "←/→ period · v view (" + viewLabel(view) + ") · ↑/↓ move · ↵ open receipt · q quit"
@@ -236,8 +236,6 @@ func (m Model) listView() string {
 	if barW > 28 {
 		barW = 28
 	}
-
-	// Column header — so the columns are self-explanatory (no cryptic "t").
 	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%9s  %-*s  %-15s  %-18s  %6s  %s",
 		"COST", barW, "SHARE", "WHEN", "PROJECT", "TURNS", "MODEL")) + "\n")
 
@@ -246,13 +244,12 @@ func (m Model) listView() string {
 	for i := start; i < end; i++ {
 		r := m.rows[i]
 		cost := money(r.micros)
-		if !r.hasView { // session carries no cost in this lens — say so, never a phantom $0
+		if !r.hasView {
 			cost = "—"
 		}
 		bar := spendBar(r.micros, maxMicros, barW)
 		meta := fmt.Sprintf("%-15s  %-18s  %6s  %s",
 			fmtTime(r.first), trunc(orDash(r.repo), 18), comma(int64(r.turns)), trunc(humanModel(r.dominant()), 12))
-
 		if i == m.cursor {
 			b.WriteString(stSel.Render(fmt.Sprintf("▶ %9s  %s  %s", cost, bar, meta)) + "\n")
 			continue
@@ -265,10 +262,46 @@ func (m Model) listView() string {
 	return b.String()
 }
 
-// windowRange returns the slice of rows to show so the cursor stays visible,
-// accounting for header/footer chrome. With no known height (tests) it shows all.
+// headerLine is the second header row: the period total in the active lens, and
+// — for amortized — the arbitrage comparison (plan vs api-equivalent + ROI).
+func (m Model) headerLine(view string) string {
+	if view == amortizedView {
+		per := m.period()
+		var api int64
+		for _, e := range m.events() {
+			api += apiMicros(e)
+		}
+		head := stBold.Render(money(per.Amortized)) + stFaint.Render(" amortized (plan)")
+		if api > 0 && per.Amortized > 0 {
+			head += stFaint.Render(fmt.Sprintf("   ·   api-equivalent %s   ·   %s ROI", money(api), roiStr(float64(api)/float64(per.Amortized))))
+		}
+		return head
+	}
+
+	var total, apiTotal, without int64
+	viewPriced := 0
+	for _, e := range m.events() {
+		if mic, ok := viewMicros(e, view); ok {
+			total += mic
+			viewPriced++
+		}
+		apiTotal += apiMicros(e)
+		if w, ok := m.eng.WithoutCache(e.Model, e.Tokens); ok {
+			without += w.Micros
+		}
+	}
+	if viewPriced == 0 {
+		return stFaint.Render("no " + viewLabel(view) + " cost recorded for these sessions")
+	}
+	head := stBold.Render(money(total)) + stFaint.Render(" "+viewLabel(view))
+	if view == "api_equivalent" && without > apiTotal {
+		head += stFaint.Render(fmt.Sprintf("   ·   cache saved %s (%.0f%%)", money(without-apiTotal), pct(without-apiTotal, without)))
+	}
+	return head
+}
+
 func (m Model) windowRange(n int) (int, int) {
-	visible := m.h - 7 // header(3) + blank + column header + "more" + margin
+	visible := m.h - 7
 	if m.h <= 0 || visible >= n {
 		return 0, n
 	}
@@ -289,37 +322,16 @@ func (m Model) windowRange(n int) (int, int) {
 // --- receipt view ----------------------------------------------------------
 
 func (m Model) receiptView() string {
-	var b strings.Builder
-	evs := m.sel
+	s := m.sel
 	view := m.view()
-	if len(evs) == 0 {
+	if len(s.evs) == 0 {
 		return "  (no turns)\n" + stFaint.Render("  esc back · q quit")
 	}
 
-	first, last := evs[0].TSStart, evs[0].TSStart
-	var total int64
 	var without int64
 	var comp pricing.CostComponents
-	priced, viewPriced := 0, 0
-	repo, provider := "", evs[0].Provider
-	for _, e := range evs {
-		if e.TSStart.Before(first) {
-			first = e.TSStart
-		}
-		te := e.TSEnd
-		if te.IsZero() {
-			te = e.TSStart
-		}
-		if te.After(last) {
-			last = te
-		}
-		if repo == "" {
-			repo = sessionRepo(e)
-		}
-		if mic, ok := viewMicros(e, view); ok {
-			total += mic
-			viewPriced++
-		}
+	priced := 0
+	for _, e := range s.evs {
 		if c, ok := m.eng.Components(e.Model, e.Tokens); ok {
 			comp = addComp(comp, c)
 			priced++
@@ -329,31 +341,30 @@ func (m Model) receiptView() string {
 		}
 	}
 
-	title := fmt.Sprintf("%s · %s · %s → %s",
-		stBold.Render(orDash(repo)), providerLabel(provider),
-		fmtTime(first), fmtTime(last))
-	b.WriteString(title + "\n")
-	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed", len(evs), turnsWord(len(evs)), elapsed(last.Sub(first)))) + "\n\n")
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("%s · %s · %s → %s\n",
+		stBold.Render(orDash(s.repo)), providerLabel(s.provider), fmtTime(s.first), fmtTime(s.last)))
+	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed", len(s.evs), turnsWord(len(s.evs)), elapsed(s.last.Sub(s.first)))) + "\n\n")
 
-	if viewPriced == 0 {
-		b.WriteString("  total       " + stBold.Render("not computable") + stFaint.Render(" (no "+viewLabel(view)+" cost)") + "\n")
+	if s.hasView {
+		b.WriteString("  total       " + stBold.Render(money(s.micros)) + stFaint.Render(" "+viewLabel(view)) + "\n")
 	} else {
-		b.WriteString("  total       " + stBold.Render(money(total)) + stFaint.Render(" "+viewLabel(view)) + "\n")
+		b.WriteString("  total       " + stBold.Render("not computable") + stFaint.Render(" (no "+viewLabel(view)+" cost)") + "\n")
 	}
 	if priced > 0 {
 		b.WriteString("  composition " + compositionStripe(comp, 28) + "\n")
 		b.WriteString("              " + compositionLegend(comp) + "\n")
 		if without > 0 {
-			apiTotal := comp.Total().Micros
-			b.WriteString("  arbitrage   " + stFaint.Render(fmt.Sprintf("without cache ≈ %s · saved %.0f%%", money(without), pct(without-apiTotal, without))) + "\n")
+			api := comp.Total().Micros
+			b.WriteString("  arbitrage   " + stFaint.Render(fmt.Sprintf("without cache ≈ %s · saved %.0f%%", money(without), pct(without-api, without))) + "\n")
 		}
 	}
 
-	b.WriteString("\n  top turns\n")
-	for _, e := range topTurns(evs, 5, view) {
+	b.WriteString("\n  top turns" + stFaint.Render("  (api-equivalent)") + "\n")
+	for _, e := range topTurns(s.evs, 5) {
 		amt := "—"
-		if mic, ok := viewMicros(e, view); ok {
-			amt = money(mic)
+		if a := apiMicros(e); a > 0 {
+			amt = money(a)
 		}
 		b.WriteString(fmt.Sprintf("    %8s  %s  %-9s %s\n",
 			amt, stFaint.Render(shortID(e.EventID)), humanModel(e.Model), tokenSummary(e.Tokens)))
@@ -404,6 +415,7 @@ func groupSessions(events []event.AgentEvent, view string) []sessionStat {
 			g.hasView = true
 		}
 		g.micros += mic
+		g.apiMicros += apiMicros(e)
 		if e.Model != "" {
 			g.byModel[e.Model] += mic
 		}
@@ -433,21 +445,27 @@ func sessionRepo(e event.AgentEvent) string {
 	return e.Project
 }
 
-// viewMicros reads one cost lens from an event; ok is false when that lens is not
-// computable for the event (a nil view is never a $0).
+func apiMicros(e event.AgentEvent) int64 {
+	if m := e.CostViews.APIEquivalent; m != nil {
+		return m.Micros
+	}
+	return 0
+}
+
+// viewMicros reads one per-event cost lens; ok is false when that lens is not
+// computable for the event (a nil view is never a $0). The amortized lens is not
+// a per-event field — it is allocated at the period level in buildRows.
 func viewMicros(e event.AgentEvent, view string) (int64, bool) {
 	cv := e.CostViews
 	var m *event.Money
 	switch view {
 	case "reported":
 		m = cv.Reported
-	case "estimated":
-		m = cv.Estimated
 	case "billed":
 		m = cv.Billed
 	case "marginal":
 		m = cv.Marginal
-	default:
+	default: // api_equivalent (and the amortized basis)
 		m = cv.APIEquivalent
 	}
 	if m == nil {
@@ -458,10 +476,9 @@ func viewMicros(e event.AgentEvent, view string) (int64, bool) {
 
 func viewLabel(view string) string { return strings.ReplaceAll(view, "_", "-") }
 
-// availableViews returns the cost lenses actually present in the events, in
-// canonical order — so `v` only rotates through views that have data. Always
-// returns at least api-equivalent.
-func availableViews(events []event.AgentEvent) []string {
+// availableViews returns the lenses present in the data, in canonical order, plus
+// the amortized lens when a plan is configured — so `v` only offers real views.
+func availableViews(events []event.AgentEvent, hasPlan bool) []string {
 	has := map[string]bool{}
 	for _, e := range events {
 		for _, v := range cycleViews {
@@ -470,14 +487,17 @@ func availableViews(events []event.AgentEvent) []string {
 			}
 		}
 	}
-	out := make([]string, 0, len(cycleViews))
+	out := make([]string, 0, len(cycleViews)+1)
 	for _, v := range cycleViews {
 		if has[v] {
 			out = append(out, v)
 		}
 	}
 	if len(out) == 0 {
-		return []string{"api_equivalent"}
+		out = []string{"api_equivalent"}
+	}
+	if hasPlan {
+		out = append(out, amortizedView)
 	}
 	return out
 }
@@ -514,16 +534,12 @@ func spendBar(micros, max int64, width int) string {
 	return strings.Repeat("█", fill) + strings.Repeat("░", width-fill)
 }
 
-// styleBar colors a "██░░" proportion bar: the filled run in the calm accent, the
-// empty track in grey — so the eye tracks length, not glare.
 func styleBar(bar string) string {
 	fill := strings.Count(bar, "█")
 	total := len([]rune(bar))
 	return stBar.Render(strings.Repeat("█", fill)) + stFaint.Render(strings.Repeat("░", total-fill))
 }
 
-// compositionStripe is a single width-N bar split into colored segments by token
-// class proportion (the "composition stripe" — cache dominance visible at a glance).
 func compositionStripe(c pricing.CostComponents, width int) string {
 	type seg struct {
 		micros int64
@@ -581,14 +597,10 @@ func compositionLegend(c pricing.CostComponents) string {
 	return strings.Join(parts, stFaint.Render(" · "))
 }
 
-func topTurns(evs []event.AgentEvent, n int, view string) []event.AgentEvent {
+func topTurns(evs []event.AgentEvent, n int) []event.AgentEvent {
 	cp := make([]event.AgentEvent, len(evs))
 	copy(cp, evs)
-	sort.SliceStable(cp, func(i, j int) bool {
-		mi, _ := viewMicros(cp[i], view)
-		mj, _ := viewMicros(cp[j], view)
-		return mi > mj
-	})
+	sort.SliceStable(cp, func(i, j int) bool { return apiMicros(cp[i]) > apiMicros(cp[j]) })
 	if len(cp) > n {
 		cp = cp[:n]
 	}
@@ -635,6 +647,13 @@ func pct(part, whole int64) float64 {
 		return 0
 	}
 	return float64(part) / float64(whole) * 100
+}
+
+func roiStr(roi float64) string {
+	if roi >= 10 {
+		return fmt.Sprintf("%.0f×", roi)
+	}
+	return fmt.Sprintf("%.1f×", roi)
 }
 
 func humanModel(m string) string {

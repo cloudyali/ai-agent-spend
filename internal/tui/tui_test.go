@@ -254,6 +254,57 @@ func TestModel_UnpricedSessionShowsDash(t *testing.T) {
 	}
 }
 
+func TestAvailableViews_Amortized(t *testing.T) {
+	api := event.USD(5_000_000)
+	evs := []event.AgentEvent{{CostViews: event.CostViews{APIEquivalent: &api}}}
+	if got := availableViews(evs, false); len(got) != 1 || got[0] != "api_equivalent" {
+		t.Errorf("no plan should offer only api-equivalent: %v", got)
+	}
+	if got := availableViews(evs, true); len(got) != 2 || got[1] != "amortized" {
+		t.Errorf("a plan should append the amortized lens: %v", got)
+	}
+}
+
+// The amortized lens: the period's prorated plan fee allocated across sessions by
+// api-equivalent share, with a plan-vs-api ROI headline.
+func TestModel_AmortizedLens(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	evs := []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 3_000_000}), // api $15
+		priced(t, eng, "e2", "s2", "web", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),      // api $5
+	}
+	per := Period{Label: "this month", Events: evs, Amortized: 200_000_000, HasPlan: true} // $200 plan
+	m := New([]Period{per}, 0, eng)
+
+	found := false
+	for _, v := range m.avail {
+		if v == amortizedView {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("amortized should be available with a plan: %v", m.avail)
+	}
+	for m.view() != amortizedView { // cycle to it
+		nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+		m = nm.(Model)
+	}
+	v := m.View()
+	if !strings.Contains(v, "amortized") || !strings.Contains(v, "ROI") || !strings.Contains(v, "$200.00") {
+		t.Errorf("amortized header should show plan total + ROI:\n%s", v)
+	}
+	if len(m.rows) != 2 {
+		t.Fatalf("want 2 rows, got %d", len(m.rows))
+	}
+	if m.rows[0].micros+m.rows[1].micros != 200_000_000 {
+		t.Errorf("allocated rows must sum to the plan total, got %d", m.rows[0].micros+m.rows[1].micros)
+	}
+	if m.rows[0].micros != 150_000_000 { // 75% api share → $150 of $200
+		t.Errorf("top session (75%% share) should get $150.00, got %d", m.rows[0].micros)
+	}
+}
+
 func TestModel_Empty(t *testing.T) {
 	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {

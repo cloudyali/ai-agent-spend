@@ -13,6 +13,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/store"
 	"github.com/agentspend/ai-agent-spend/internal/tui"
@@ -25,8 +26,6 @@ func (a *App) cmdTui(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	// An interactive UI in a pipe or non-terminal would hang or garble; bail with a
-	// pointer to the static surfaces instead.
 	if !isTTY(a.Out) {
 		fmt.Fprintln(a.Err, "aispend tui needs an interactive terminal; try `aispend top` or `aispend report`")
 		return 1
@@ -43,9 +42,11 @@ func (a *App) cmdTui(args []string) int {
 		return 1
 	}
 	now := a.Now()
+	plans := a.planSet()
 
-	// Pre-filter the scrubbable windows here so the tui package needs no period
-	// parsing (and stays free of the store/sqlite import graph).
+	// Pre-filter the scrubbable windows here (so the tui needs no period parsing or
+	// store/sqlite), and pre-compute each window's prorated plan fee so the tui can
+	// allocate the amortized lens across sessions.
 	reqWin, _ := parsePeriod(*periodSpec, now)
 	periods := make([]tui.Period, 0, 4)
 	startIdx := 0
@@ -57,7 +58,9 @@ func (a *App) cmdTui(args []string) int {
 		if win.Label == reqWin.Label {
 			startIdx = len(periods)
 		}
-		periods = append(periods, tui.Period{Label: win.Label, Events: eventsInWindow(all, win)})
+		evs := eventsInWindow(all, win)
+		amort, hasPlan := a.amortizedTotal(evs, win, plans)
+		periods = append(periods, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan})
 	}
 
 	if err := tui.Run(periods, startIdx, a.pricingEngine(), a.Out); err != nil {
@@ -81,4 +84,34 @@ func eventsInWindow(all []event.AgentEvent, win window) []event.AgentEvent {
 		out = append(out, e)
 	}
 	return out
+}
+
+// amortizedTotal sums each present provider's prorated subscription fee for the
+// window — the same per-provider proration `report --view effective_allocated`
+// uses. Returns (0, false) when no provider has an amortizable plan.
+func (a *App) amortizedTotal(events []event.AgentEvent, win window, plans config.PlanSet) (int64, bool) {
+	provs := map[string]bool{}
+	for _, e := range events {
+		if e.Provider != "" {
+			provs[e.Provider] = true
+		}
+	}
+	winSince := win.Since
+	legacyDays := 0
+	if win.Since.IsZero() { // --all: amortize over the data's own span
+		legacyDays = spanDays(events)
+		winSince = spanStart(events)
+	} else if d := int(win.Until.Sub(win.Since).Hours() / 24); d > 0 {
+		legacyDays = d
+	}
+	var total int64
+	hasPlan := false
+	for prov := range provs {
+		plan := toPricingPlan(plans.For(prov))
+		if prorated, ok := proratePlan(plan, winSince, win.Until, legacyDays); ok {
+			total += prorated.Micros
+			hasPlan = true
+		}
+	}
+	return total, hasPlan
 }
