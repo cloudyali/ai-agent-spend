@@ -1,0 +1,54 @@
+[
+  {
+    "schema_version": 1,
+    "event_id": "evt_e1a5c2f3165cf77b",
+    "session_id": "sess_reported_01",
+    "prompt_id": "msg_rc1",
+    "provider": "claude_code",
+    "surface": "coding_agent",
+    "identity_hash": "id_demo",
+    "project": "payments",
+    "repo": "payments",
+    "cwd_hash": "1b215c62825d4698c4170aa07cfbdee626823aafb4ee2be21a65e6b8ad56c514",
+    "model": "claude-opus-4",
+    "mode": "agent",
+    "tokens": {
+      "input": 12400,
+      "output": 3100,
+      "cache_read": 8900,
+      "cache_write": 0
+    },
+    "cost_views": {
+      "reported": {
+        "micros": 432500,
+        "currency": "USD"
+      },
+      "api_equivalent": {
+        "micros": 431850,
+        "currency": "USD"
+      },
+      "estimated": {
+        "micros": 431850,
+        "currency": "USD"
+      }
+    },
+    "evidence": {
+      "source_type": "local_file",
+      "source_record_id": "a1",
+      "source_path_hash": "02f4378219588c526a4e737f330a770ca522e216311b57cffb7d85cf258016e6",
+      "source_line": 1,
+      "parser_name": "claude_code",
+      "parser_version": "v1",
+      "pricing_table_version": "pricing-2026-06",
+      "priced_at": "2026-06-14T00:00:00Z",
+      "currency": "USD",
+      "cost_method": "reported",
+      "confidence_score": 0.98,
+      "confidence_reason": "cost reported by the tool on disk (costUSD)",
+      "dedupe_key": "msg_rc1|req_rc1",
+      "reconciliation_status": "local_only"
+    },
+    "ts_start": "2026-06-14T10:00:05Z",
+    "ts_end": "2026-06-14T10:00:05Z"
+  }
+]

@@ -1,0 +1,105 @@
+[
+  {
+    "schema_version": 1,
+    "event_id": "evt_60bbece344156584",
+    "session_id": "sess_payments_01",
+    "prompt_id": "msg_1",
+    "provider": "claude_code",
+    "surface": "coding_agent",
+    "identity_hash": "id_demo",
+    "project": "payments",
+    "repo": "payments",
+    "cwd_hash": "1b215c62825d4698c4170aa07cfbdee626823aafb4ee2be21a65e6b8ad56c514",
+    "model": "claude-opus-4",
+    "mode": "agent",
+    "tokens": {
+      "input": 12400,
+      "output": 3100,
+      "cache_read": 8900,
+      "cache_write": 0
+    },
+    "cost_views": {
+      "api_equivalent": {
+        "micros": 431850,
+        "currency": "USD"
+      },
+      "estimated": {
+        "micros": 431850,
+        "currency": "USD"
+      }
+    },
+    "evidence": {
+      "source_type": "local_file",
+      "source_record_id": "a1",
+      "source_path_hash": "cecfc4b7d0ec54ea8d6b7127b047645dcf0ecb87e9e15d5dd98baaf50786f2d5",
+      "source_line": 2,
+      "parser_name": "claude_code",
+      "parser_version": "v1",
+      "pricing_table_version": "pricing-2026-06",
+      "priced_at": "2026-06-14T00:00:00Z",
+      "currency": "USD",
+      "cost_method": "token_priced",
+      "confidence_score": 0.95,
+      "confidence_reason": "tokens × public API rate (cache-read at reduced rate)",
+      "dedupe_key": "msg_1|",
+      "reconciliation_status": "local_only"
+    },
+    "tools": [
+      "Edit",
+      "mcp__github__create_issue"
+    ],
+    "mcp_servers": [
+      "github"
+    ],
+    "ts_start": "2026-06-14T10:00:05Z",
+    "ts_end": "2026-06-14T10:00:05Z"
+  },
+  {
+    "schema_version": 1,
+    "event_id": "evt_7c70c62b6f973623",
+    "session_id": "sess_payments_01",
+    "prompt_id": "msg_2",
+    "provider": "claude_code",
+    "surface": "coding_agent",
+    "identity_hash": "id_demo",
+    "project": "payments",
+    "repo": "payments",
+    "cwd_hash": "1b215c62825d4698c4170aa07cfbdee626823aafb4ee2be21a65e6b8ad56c514",
+    "model": "claude-sonnet-4",
+    "mode": "agent",
+    "tokens": {
+      "input": 2000,
+      "output": 500,
+      "cache_read": 0,
+      "cache_write": 1000
+    },
+    "cost_views": {
+      "api_equivalent": {
+        "micros": 17250,
+        "currency": "USD"
+      },
+      "estimated": {
+        "micros": 17250,
+        "currency": "USD"
+      }
+    },
+    "evidence": {
+      "source_type": "local_file",
+      "source_record_id": "a2",
+      "source_path_hash": "cecfc4b7d0ec54ea8d6b7127b047645dcf0ecb87e9e15d5dd98baaf50786f2d5",
+      "source_line": 3,
+      "parser_name": "claude_code",
+      "parser_version": "v1",
+      "pricing_table_version": "pricing-2026-06",
+      "priced_at": "2026-06-14T00:00:00Z",
+      "currency": "USD",
+      "cost_method": "token_priced",
+      "confidence_score": 0.95,
+      "confidence_reason": "tokens × public API rate (cache-read at reduced rate)",
+      "dedupe_key": "msg_2|",
+      "reconciliation_status": "local_only"
+    },
+    "ts_start": "2026-06-14T10:01:00Z",
+    "ts_end": "2026-06-14T10:01:00Z"
+  }
+]
