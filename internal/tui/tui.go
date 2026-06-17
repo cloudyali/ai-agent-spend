@@ -60,17 +60,27 @@ type sessionStat struct {
 	evs      []event.AgentEvent
 }
 
-// --- color language (shared with the web/CLI surfaces); lipgloss degrades under
-// NO_COLOR / dumb terminals automatically via termenv.
+// --- color language: a muted, low-saturation palette via AdaptiveColor, so it
+// stays legible and easy on the eyes on BOTH light and dark terminal backgrounds
+// (bright 16-color ANSI — especially yellow — glares on a light background). The
+// 256-color codes are deliberately desaturated. lipgloss degrades to plain under
+// NO_COLOR / dumb terminals via termenv.
 var (
-	stInput  = lipgloss.NewStyle().Foreground(lipgloss.Color("13")) // purple
-	stOutput = lipgloss.NewStyle().Foreground(lipgloss.Color("14")) // teal
-	stRead   = lipgloss.NewStyle().Foreground(lipgloss.Color("12")) // blue
-	stWrite  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // amber
-	stBar    = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // green (spend bar)
-	stBold   = lipgloss.NewStyle().Bold(true)
-	stFaint  = lipgloss.NewStyle().Faint(true)
-	stSel    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("10"))
+	// Secondary text: a calm mid-grey (not lipgloss Faint, which washes out
+	// inconsistently across terminals).
+	stFaint = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"})
+	stBold  = lipgloss.NewStyle().Bold(true)
+	// Spend bar: one calm teal accent (filled); the empty track is rendered grey.
+	stBar = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"})
+	// Selected row: a subtle grey wash + bold, never a loud full-width fill.
+	stSel = lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.AdaptiveColor{Light: "232", Dark: "231"}).
+		Background(lipgloss.AdaptiveColor{Light: "251", Dark: "238"})
+	// Token classes — muted, distinguishable, adaptive.
+	stRead   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "25", Dark: "110"})  // blue
+	stWrite  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "179"}) // amber
+	stOutput = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "29", Dark: "108"})  // teal/green
+	stInput  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "97", Dark: "139"})  // purple
 )
 
 func New(periods []Period, startIdx int, eng *pricing.Engine) Model {
@@ -211,7 +221,7 @@ func (m Model) listView() string {
 			b.WriteString(stSel.Render(plain) + "\n")
 			continue
 		}
-		b.WriteString("  " + stBold.Render(cost) + "  " + stBar.Render(bar) + "  " +
+		b.WriteString("  " + stBold.Render(cost) + "  " + styleBar(bar) + "  " +
 			stFaint.Render(when+"  "+repo+" "+turns+"  "+model) + "\n")
 	}
 	if end < len(m.rows) {
@@ -402,6 +412,14 @@ func spendBar(micros, max int64, width int) string {
 		fill = width
 	}
 	return strings.Repeat("█", fill) + strings.Repeat("░", width-fill)
+}
+
+// styleBar colors a "██░░" proportion bar: the filled run in the calm accent, the
+// empty track in grey — so the eye tracks length, not glare.
+func styleBar(bar string) string {
+	fill := strings.Count(bar, "█")
+	total := len([]rune(bar))
+	return stBar.Render(strings.Repeat("█", fill)) + stFaint.Render(strings.Repeat("░", total-fill))
 }
 
 // compositionStripe is a single width-N bar split into colored segments by token
