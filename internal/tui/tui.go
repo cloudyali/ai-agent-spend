@@ -35,6 +35,7 @@ type mode int
 const (
 	modeList mode = iota
 	modeReceipt
+	modePlan // the in-explorer plan picker (set the subscription without leaving the TUI)
 )
 
 // amortizedView is the period-level allocation lens (the subscription-arbitrage
@@ -60,6 +61,24 @@ type Model struct {
 	mode    mode
 	sel     sessionStat // the drilled session
 	w, h    int
+
+	// in-explorer plan picker (optional; enabled via WithPlanPicker). setPlan
+	// persists the choice and returns recomputed periods so the amortized lens
+	// updates live without leaving the TUI.
+	plans   []PlanChoice
+	today   time.Time
+	setPlan func(planID string, start time.Time) []Period
+	picker  planPicker
+}
+
+// WithPlanPicker enables the in-explorer plan picker (the `p` key): plans is the
+// selectable list, today seeds the start-date default, and setPlan persists the
+// choice (id + start) and returns the recomputed periods.
+func (m Model) WithPlanPicker(plans []PlanChoice, today time.Time, setPlan func(string, time.Time) []Period) Model {
+	m.plans = plans
+	m.today = today
+	m.setPlan = setPlan
+	return m
 }
 
 type sessionStat struct {
@@ -152,46 +171,69 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if m.mode == modeReceipt {
+		switch m.mode {
+		case modeReceipt:
 			switch msg.String() {
 			case "esc", "q", "left", "h", "backspace":
 				m.mode = modeList
 			}
 			return m, nil
-		}
-		switch msg.String() {
-		case "q":
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+		case modePlan:
+			pk, finished := m.picker.step(msg)
+			m.picker = pk
+			if finished {
+				m.mode = modeList
+				if m.picker.done && m.setPlan != nil { // confirmed → persist + recompute live
+					m.periods = m.setPlan(m.picker.chosen, m.picker.start)
+					if m.pIdx >= len(m.periods) {
+						m.pIdx = 0
+					}
+					m.curView = amortizedView // jump to the result (clamped to api-equivalent if no plan)
+					m.refresh()
+					m.cursor = 0
+				}
 			}
-		case "down", "j":
-			if m.cursor < len(m.rows)-1 {
-				m.cursor++
-			}
-		case "left", "h":
-			if m.pIdx > 0 {
-				m.pIdx--
-				m.refresh()
-				m.cursor = 0
-			}
-		case "right", "l":
-			if m.pIdx < len(m.periods)-1 {
-				m.pIdx++
-				m.refresh()
-				m.cursor = 0
-			}
-		case "v":
-			if len(m.avail) > 1 {
-				m.curView = nextView(m.avail, m.curView)
-				m.rows = m.buildRows()
-				m.cursor = 0
-			}
-		case "enter":
-			if len(m.rows) > 0 {
-				m.sel = m.rows[m.cursor]
-				m.mode = modeReceipt
+			return m, nil
+		default: // modeList
+			switch msg.String() {
+			case "q":
+				return m, tea.Quit
+			case "up", "k":
+				if m.cursor > 0 {
+					m.cursor--
+				}
+			case "down", "j":
+				if m.cursor < len(m.rows)-1 {
+					m.cursor++
+				}
+			case "left", "h":
+				if m.pIdx > 0 {
+					m.pIdx--
+					m.refresh()
+					m.cursor = 0
+				}
+			case "right", "l":
+				if m.pIdx < len(m.periods)-1 {
+					m.pIdx++
+					m.refresh()
+					m.cursor = 0
+				}
+			case "v":
+				if len(m.avail) > 1 {
+					m.curView = nextView(m.avail, m.curView)
+					m.rows = m.buildRows()
+					m.cursor = 0
+				}
+			case "p":
+				if m.setPlan != nil {
+					m.picker = newPlanPicker(m.plans, m.today)
+					m.mode = modePlan
+				}
+			case "enter":
+				if len(m.rows) > 0 {
+					m.sel = m.rows[m.cursor]
+					m.mode = modeReceipt
+				}
 			}
 		}
 	}
@@ -199,10 +241,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	if m.mode == modeReceipt {
+	switch m.mode {
+	case modeReceipt:
 		return m.receiptView()
+	case modePlan:
+		return m.picker.View()
+	default:
+		return m.listView()
 	}
-	return m.listView()
 }
 
 // --- list view -------------------------------------------------------------
@@ -218,11 +264,16 @@ func (m Model) listView() string {
 	b.WriteString(stBold.Render("aispend") + stFaint.Render(fmt.Sprintf(" · %s   ·   %d sessions", m.label(), len(m.rows))) + "\n")
 	b.WriteString(m.headerLine(view) + "\n")
 
-	hint := "←/→ period · ↑/↓ move · ↵ open receipt · q quit"
+	parts := []string{"←/→ period"}
 	if len(m.avail) > 1 {
-		hint = "←/→ period · v view (" + viewLabel(view) + ") · ↑/↓ move · ↵ open receipt · q quit"
+		parts = append(parts, "v view ("+viewLabel(view)+")")
 	}
-	b.WriteString(stFaint.Render(hint) + "\n\n")
+	parts = append(parts, "↑/↓ move", "↵ receipt")
+	if m.setPlan != nil {
+		parts = append(parts, "p set plan")
+	}
+	parts = append(parts, "q quit")
+	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n\n")
 
 	if len(m.rows) == 0 {
 		b.WriteString(stFaint.Render("  no sessions in "+m.label()) + "\n")
@@ -373,10 +424,11 @@ func (m Model) receiptView() string {
 	return b.String()
 }
 
-// Run starts the interactive program on the alt screen.
-func Run(periods []Period, startIdx int, eng *pricing.Engine, out io.Writer) error {
-	p := tea.NewProgram(New(periods, startIdx, eng), tea.WithAltScreen(), tea.WithOutput(out))
-	_, err := p.Run()
+// RunModel starts a (possibly picker-enabled) model on the alt screen. The cli
+// builds the model via New(...).WithPlanPicker(...) so the in-explorer plan picker
+// can persist to config and recompute amortization live.
+func RunModel(m Model, out io.Writer) error {
+	_, err := tea.NewProgram(m, tea.WithAltScreen(), tea.WithOutput(out)).Run()
 	return err
 }
 

@@ -98,13 +98,17 @@ func parsePeriod(spec string, now time.Time) (window, error) {
 		return window{Since: startOfMonth(now).AddDate(0, -1, 0), Until: lastInstantBefore(startOfMonth(now)), Label: "last month"}, nil
 	case "quarter", "this quarter":
 		return window{Since: startOfQuarter(now), Until: now, Label: "this quarter"}, nil
+	case "last quarter":
+		return window{Since: startOfQuarter(now).AddDate(0, -3, 0), Until: lastInstantBefore(startOfQuarter(now)), Label: "last quarter"}, nil
 	case "year", "this year":
 		return window{Since: startOfYear(now), Until: now, Label: "this year"}, nil
+	case "last year":
+		return window{Since: startOfYear(now).AddDate(-1, 0, 0), Until: lastInstantBefore(startOfYear(now)), Label: "last year"}, nil
 	case "all", "all time":
 		return window{Since: time.Time{}, Until: now, Label: "all time"}, nil
 	}
 
-	return window{}, fmt.Errorf("unknown --period %q (try: today, yesterday, week, month, \"last week\", \"last month\", quarter, \"this year\", \"90 days\", \"since 2026-01-01\", 2026-01-01..2026-03-31, or all)", spec)
+	return window{}, fmt.Errorf("unknown --period %q (try: today, yesterday, week, month, \"last week\", \"last month\", quarter, \"last quarter\", \"this year\", \"last year\", \"90 days\", \"since 2026-01-01\", 2026-01-01..2026-03-31, or all)", spec)
 }
 
 // parseDayCount recognizes "N days", "N day", and "Nd"; returns (n, true) on a

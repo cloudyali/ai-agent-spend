@@ -305,6 +305,67 @@ func TestModel_AmortizedLens(t *testing.T) {
 	}
 }
 
+// The in-explorer plan picker: `p` opens it, choosing a plan + start date calls
+// setPlan and lands live on the amortized lens.
+func TestModel_InTUIPlanPicker(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	base := []Period{{Label: "today", Events: []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),
+	}}}
+	withPlan := []Period{{Label: "today", Events: base[0].Events, Amortized: 100_000_000, HasPlan: true}}
+	var gotID string
+	var gotStart time.Time
+	setPlan := func(id string, start time.Time) []Period { gotID, gotStart = id, start; return withPlan }
+
+	m := New(base, 0, eng).WithPlanPicker(planChoices(), ts, setPlan)
+	for _, v := range m.avail {
+		if v == amortizedView {
+			t.Fatal("no plan yet → amortized must not be available")
+		}
+	}
+	if !strings.Contains(m.View(), "p set plan") {
+		t.Errorf("list hint should advertise the picker:\n%s", m.View())
+	}
+
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	m = nm.(Model)
+	if m.mode != modePlan || !strings.Contains(m.View(), "Set your subscription plan") {
+		t.Fatalf("p should open the picker:\n%s", m.View())
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // pick the current plan → date step
+	m = nm.(Model)
+	if m.mode != modePlan {
+		t.Fatal("a real plan should advance to the date step (still in picker)")
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // confirm the date
+	m = nm.(Model)
+	wantStart := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC) // start date defaults to today (midnight)
+	if gotID != "claude-max-20x" || !gotStart.Equal(wantStart) {
+		t.Errorf("setPlan called with (%q, %v), want (claude-max-20x, %v)", gotID, gotStart, wantStart)
+	}
+	if m.mode != modeList {
+		t.Error("after confirm should return to the list")
+	}
+	if m.view() != amortizedView {
+		t.Errorf("should land on the amortized lens, got %q", m.view())
+	}
+}
+
+func TestModel_PlanPickerDisabled(t *testing.T) {
+	eng := pricing.NewEngine()
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "r", "claude-opus-4-8", time.Now(), event.Tokens{Input: 1_000_000}),
+	}}}, 0, eng) // no WithPlanPicker
+	if strings.Contains(m.View(), "p set plan") {
+		t.Error("hint must not advertise p when the picker is disabled")
+	}
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	if nm.(Model).mode != modeList {
+		t.Error("p should be a no-op when the picker is disabled")
+	}
+}
+
 func TestModel_Empty(t *testing.T) {
 	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {

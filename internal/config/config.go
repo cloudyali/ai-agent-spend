@@ -171,11 +171,19 @@ func resolvePlan(name, feeStr, currency, startStr string) (Plan, error) {
 }
 
 // SetDefaultPlan writes the default `plan = "<id>"` into ~/.aispend/config.toml,
-// preserving every other line (comments, other keys). An empty id sets `plan = ""`
-// (treated as api / no subscription). This backs the interactive plan picker so a
-// user never has to hand-edit TOML.
-func SetDefaultPlan(appHome, planID string) error {
-	return setConfigKey(appHome, "plan", strconv.Quote(planID))
+// preserving every other line. For a real subscription it also writes
+// `plan_start` (the billing-cycle anchor used for monthly-cycle amortization) when
+// a non-zero start is given. An empty/"api" id sets `plan = ""`-equivalent (no
+// subscription) and leaves the date untouched. Backs the interactive plan picker
+// so a user never has to hand-edit TOML.
+func SetDefaultPlan(appHome, planID string, start time.Time) error {
+	if err := setConfigKey(appHome, "plan", strconv.Quote(planID)); err != nil {
+		return err
+	}
+	if planID != "" && planID != "api" && !start.IsZero() {
+		return setConfigKey(appHome, "plan_start", strconv.Quote(start.Format(planStartLayout)))
+	}
+	return nil
 }
 
 // setConfigKey sets one flat top-level key in config.toml (replacing it in place if

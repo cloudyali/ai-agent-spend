@@ -1000,9 +1000,9 @@ Usage: aispend <command>
   version                       print version
 
   report flags: --period P  --by G  --view V  --json
-  P (period): today | yesterday | week | month | "last week" | "last month" | quarter |
-              "this year" | "N days" (e.g. "90 days") | "since YYYY-MM-DD" |
-              YYYY-MM-DD..YYYY-MM-DD | all      (always calendar time, never rolling)
+  P (period): today | yesterday | week | month | "last week" | "last month" |
+              quarter | "last quarter" | "this year" | "last year" | "N days" (e.g. "90 days") |
+              "since YYYY-MM-DD" | YYYY-MM-DD..YYYY-MM-DD | all   (always calendar time, never rolling)
   G (group):  model | repo | provider | cost_tag | session
   V (view):   api_equivalent | reported | estimated | billed | effective_allocated | marginal
   --json:     emit the report as JSON instead of a table (metered views only)

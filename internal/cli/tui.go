@@ -1,17 +1,19 @@
 //go:build !offline
 
 // cmdTui wires the store + pricing engine into the interactive explorer
-// (internal/tui). It lives behind `!offline` — exactly like the network refresh
-// seam — because Bubble Tea transitively pulls net/url + net/netip; those are pure
-// value/parsing packages (no dial, no http sink), and the default build already
-// carries them via the disclosed `pricing refresh`, but the air-gapped `offline`
-// build promises *zero* net/*, so the TUI is compiled out there (tui_offline.go).
-// The default `doctor --network` story is unchanged: nothing here can phone home.
+// (internal/tui), including the in-explorer plan picker (which persists to config
+// and recomputes amortization live). It lives behind `!offline` — exactly like the
+// network refresh seam — because Bubble Tea transitively pulls net/url + net/netip;
+// those are pure value/parsing packages (no dial, no http sink), and the default
+// build already carries them via the disclosed `pricing refresh`, but the
+// air-gapped `offline` build promises *zero* net/*, so the TUI is compiled out
+// there (tui_offline.go). The default `doctor --network` story is unchanged.
 package cli
 
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
@@ -42,32 +44,95 @@ func (a *App) cmdTui(args []string) int {
 		return 1
 	}
 	now := a.Now()
-	plans := a.planSet()
+	// The scrubbable windows, shortest → longest (←/→ in the TUI walks them).
+	specs := []string{"today", "week", "this month", "last month", "quarter", "last quarter", "this year", "last year", "all"}
 
-	// Pre-filter the scrubbable windows here (so the tui needs no period parsing or
-	// store/sqlite), and pre-compute each window's prorated plan fee so the tui can
-	// allocate the amortized lens across sessions.
-	reqWin, _ := parsePeriod(*periodSpec, now)
-	periods := make([]tui.Period, 0, 4)
-	startIdx := 0
-	for _, spec := range []string{"today", "week", "month", "all"} {
-		win, err := parsePeriod(spec, now)
-		if err != nil {
-			continue
+	// buildPeriods pre-filters each window and pre-computes its prorated plan fee.
+	// It reads the plan set fresh each call so the in-TUI picker (which rewrites
+	// config) recomputes amortization live.
+	buildPeriods := func() []tui.Period {
+		plans := a.planSet()
+		ps := make([]tui.Period, 0, len(specs))
+		for _, spec := range specs {
+			win, err := parsePeriod(spec, now)
+			if err != nil {
+				continue
+			}
+			evs := eventsInWindow(all, win)
+			amort, hasPlan := a.amortizedTotal(evs, win, plans)
+			ps = append(ps, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan})
 		}
-		if win.Label == reqWin.Label {
-			startIdx = len(periods)
-		}
-		evs := eventsInWindow(all, win)
-		amort, hasPlan := a.amortizedTotal(evs, win, plans)
-		periods = append(periods, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan})
+		return ps
 	}
 
-	if err := tui.Run(periods, startIdx, a.pricingEngine(), a.Out); err != nil {
+	periods := buildPeriods()
+	startIdx := 0
+	if reqWin, err := parsePeriod(*periodSpec, now); err == nil {
+		for i, p := range periods {
+			if p.Label == reqWin.Label {
+				startIdx = i
+			}
+		}
+	}
+
+	// setPlan persists the picker's choice (id + billing-cycle start) and returns
+	// recomputed periods so the amortized lens updates without leaving the TUI.
+	setPlan := func(id string, start time.Time) []tui.Period {
+		if err := config.SetDefaultPlan(a.Resolver.AppHome(), id, start); err != nil {
+			fmt.Fprintf(a.Err, "aispend: %v\n", err)
+		}
+		return buildPeriods()
+	}
+
+	m := tui.New(periods, startIdx, a.pricingEngine()).WithPlanPicker(a.planChoices(), now, setPlan)
+	if err := tui.RunModel(m, a.Out); err != nil {
 		fmt.Fprintf(a.Err, "aispend: tui: %v\n", err)
 		return 1
 	}
 	return 0
+}
+
+// planChoices builds the picker list from the seeded plans + the configured one,
+// with an explicit "API / no subscription" option appended.
+func (a *App) planChoices() []tui.PlanChoice {
+	current := ""
+	if cfg, err := config.LoadAppConfig(a.Resolver.AppHome()); err == nil {
+		current = cfg.Name
+	}
+	cs := make([]tui.PlanChoice, 0)
+	for _, p := range config.Plans() {
+		cs = append(cs, tui.PlanChoice{ID: p.ID, Label: p.Label, MonthlyUSD: p.MonthlyFeeUSD, Current: p.ID == current})
+	}
+	cs = append(cs, tui.PlanChoice{ID: "api", Current: current == "" || current == "api"})
+	return cs
+}
+
+// maybePickPlan runs the standalone picker for `aispend plans` on a TTY, writing
+// the choice to config. Returns true when handled; false (non-TTY) lets the caller
+// fall back to the static plan list.
+func (a *App) maybePickPlan() bool {
+	if !isTTY(a.Out) {
+		return false
+	}
+	chosen, start, ok, err := tui.RunPlanPicker(a.planChoices(), a.Now(), a.Out)
+	if err != nil {
+		fmt.Fprintf(a.Err, "aispend: %v\n", err)
+		return true
+	}
+	if !ok {
+		fmt.Fprintln(a.Out, "plan unchanged.")
+		return true
+	}
+	if err := config.SetDefaultPlan(a.Resolver.AppHome(), chosen, start); err != nil {
+		fmt.Fprintf(a.Err, "aispend: %v\n", err)
+		return true
+	}
+	if chosen == "" || chosen == "api" {
+		fmt.Fprintln(a.Out, "Plan set to API (no subscription) — the amortized view is off.")
+	} else {
+		fmt.Fprintf(a.Out, "Plan set to %s (start %s). Open `aispend tui` and press v for the amortized view (or `aispend report --view effective_allocated`).\n", chosen, start.Format("2006-01-02"))
+	}
+	return true
 }
 
 // eventsInWindow returns the events whose start falls in win (zero Since = no lower
@@ -86,48 +151,10 @@ func eventsInWindow(all []event.AgentEvent, win window) []event.AgentEvent {
 	return out
 }
 
-// maybePickPlan runs the interactive plan picker on a TTY and writes the choice to
-// config — the "visual way" to set the subscription plan (so amortized/ROI work)
-// without hand-editing TOML. Returns true when it handled the command; false (not
-// a TTY) lets the caller fall back to the static plan list.
-func (a *App) maybePickPlan() bool {
-	if !isTTY(a.Out) {
-		return false
-	}
-	current := ""
-	if cfg, err := config.LoadAppConfig(a.Resolver.AppHome()); err == nil {
-		current = cfg.Name
-	}
-	choices := make([]tui.PlanChoice, 0)
-	for _, p := range config.Plans() {
-		choices = append(choices, tui.PlanChoice{ID: p.ID, Label: p.Label, MonthlyUSD: p.MonthlyFeeUSD, Current: p.ID == current})
-	}
-	choices = append(choices, tui.PlanChoice{ID: "api", Current: current == "" || current == "api"})
-
-	chosen, ok, err := tui.RunPlanPicker(choices, a.Out)
-	if err != nil {
-		fmt.Fprintf(a.Err, "aispend: %v\n", err)
-		return true
-	}
-	if !ok {
-		fmt.Fprintln(a.Out, "plan unchanged.")
-		return true
-	}
-	if err := config.SetDefaultPlan(a.Resolver.AppHome(), chosen); err != nil {
-		fmt.Fprintf(a.Err, "aispend: %v\n", err)
-		return true
-	}
-	if chosen == "" || chosen == "api" {
-		fmt.Fprintln(a.Out, "Plan set to API (no subscription) — the amortized view is off.")
-	} else {
-		fmt.Fprintf(a.Out, "Plan set to %s. Open `aispend tui` and press v for the amortized view (or `aispend report --view effective_allocated`).\n", chosen)
-	}
-	return true
-}
-
 // amortizedTotal sums each present provider's prorated subscription fee for the
 // window — the same per-provider proration `report --view effective_allocated`
-// uses. Returns (0, false) when no provider has an amortizable plan.
+// uses (cycle-aware via the plan's start-date anchor). Returns (0, false) when no
+// provider has an amortizable plan.
 func (a *App) amortizedTotal(events []event.AgentEvent, win window, plans config.PlanSet) (int64, bool) {
 	provs := map[string]bool{}
 	for _, e := range events {

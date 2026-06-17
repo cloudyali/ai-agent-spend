@@ -40,6 +40,8 @@ func TestParsePeriod_Valid(t *testing.T) {
 		{"yesterday", ts(2026, 6, 16, 0, 0, 0, 0), endBefore(ts(2026, 6, 17, 0, 0, 0, 0)), "yesterday"},
 		{"last week", ts(2026, 6, 8, 0, 0, 0, 0), endBefore(ts(2026, 6, 15, 0, 0, 0, 0)), "last week"},
 		{"last month", ts(2026, 5, 1, 0, 0, 0, 0), endBefore(ts(2026, 6, 1, 0, 0, 0, 0)), "last month"},
+		{"last quarter", ts(2026, 1, 1, 0, 0, 0, 0), endBefore(ts(2026, 4, 1, 0, 0, 0, 0)), "last quarter"},
+		{"last year", ts(2025, 1, 1, 0, 0, 0, 0), endBefore(ts(2026, 1, 1, 0, 0, 0, 0)), "last year"},
 
 		// N days: calendar-aligned (midnight start), including today, ending now
 		{"90 days", ts(2026, 3, 20, 0, 0, 0, 0), now, "last 90 days"},

@@ -12,9 +12,11 @@ import (
 // and the result resolves to a subscription plan (fee seeded from the table).
 func TestSetDefaultPlan(t *testing.T) {
 	home := t.TempDir()
+	start := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
 
-	// Fresh: creates config.toml and resolves to a subscription with a seeded fee.
-	if err := SetDefaultPlan(home, "claude-max-20x"); err != nil {
+	// Fresh: creates config.toml and resolves to a subscription with a seeded fee
+	// and the start date (the billing-cycle anchor) persisted.
+	if err := SetDefaultPlan(home, "claude-max-20x", start); err != nil {
 		t.Fatal(err)
 	}
 	p, err := LoadAppConfig(home)
@@ -24,13 +26,16 @@ func TestSetDefaultPlan(t *testing.T) {
 	if p.Kind != "subscription" || p.Name != "claude-max-20x" || p.MonthlyFeeUSD <= 0 {
 		t.Fatalf("expected a seeded subscription, got %+v", p)
 	}
+	if !p.StartDate.Equal(start) {
+		t.Errorf("plan_start should be persisted, got %v want %v", p.StartDate, start)
+	}
 
 	// Replace in place, preserving an unrelated key.
 	path := filepath.Join(home, "config.toml")
 	if err := os.WriteFile(path, []byte("currency = \"USD\"\nplan = \"old-plan\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := SetDefaultPlan(home, "claude-max-20x"); err != nil {
+	if err := SetDefaultPlan(home, "claude-max-20x", start); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(path)
@@ -43,7 +48,7 @@ func TestSetDefaultPlan(t *testing.T) {
 	}
 
 	// Empty id → api / no subscription.
-	if err := SetDefaultPlan(home, ""); err != nil {
+	if err := SetDefaultPlan(home, "", time.Time{}); err != nil {
 		t.Fatal(err)
 	}
 	if p, _ := LoadAppConfig(home); p.Kind != "api" {
