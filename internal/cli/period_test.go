@@ -1,0 +1,130 @@
+package cli
+
+import (
+	"testing"
+	"time"
+)
+
+// All cases anchor to a fixed "now": Wednesday 2026-06-17 14:30 UTC.
+// 2026-06-15 is a Monday, so this week starts 06-15 and last week starts 06-08.
+func fixedNow() time.Time { return time.Date(2026, 6, 17, 14, 30, 0, 0, time.UTC) }
+
+func ts(y int, mo time.Month, d, h, mi, s, ns int) time.Time {
+	return time.Date(y, mo, d, h, mi, s, ns, time.UTC)
+}
+
+// endBefore returns the last representable instant before the given midnight
+// boundary — the inclusive end the store expects for completed periods.
+func endBefore(boundary time.Time) time.Time { return boundary.Add(-time.Nanosecond) }
+
+func TestParsePeriod_Valid(t *testing.T) {
+	now := fixedNow()
+	cases := []struct {
+		spec      string
+		wantSince time.Time
+		wantUntil time.Time
+		wantLabel string
+	}{
+		// in-progress calendar periods end at now
+		{"today", ts(2026, 6, 17, 0, 0, 0, 0), now, "today"},
+		{"week", ts(2026, 6, 15, 0, 0, 0, 0), now, "this week"},
+		{"this week", ts(2026, 6, 15, 0, 0, 0, 0), now, "this week"},
+		{"month", ts(2026, 6, 1, 0, 0, 0, 0), now, "this month"},
+		{"this month", ts(2026, 6, 1, 0, 0, 0, 0), now, "this month"},
+		{"quarter", ts(2026, 4, 1, 0, 0, 0, 0), now, "this quarter"},
+		{"this quarter", ts(2026, 4, 1, 0, 0, 0, 0), now, "this quarter"},
+		{"this year", ts(2026, 1, 1, 0, 0, 0, 0), now, "this year"},
+		{"year", ts(2026, 1, 1, 0, 0, 0, 0), now, "this year"},
+
+		// completed calendar periods span their full inclusive range
+		{"yesterday", ts(2026, 6, 16, 0, 0, 0, 0), endBefore(ts(2026, 6, 17, 0, 0, 0, 0)), "yesterday"},
+		{"last week", ts(2026, 6, 8, 0, 0, 0, 0), endBefore(ts(2026, 6, 15, 0, 0, 0, 0)), "last week"},
+		{"last month", ts(2026, 5, 1, 0, 0, 0, 0), endBefore(ts(2026, 6, 1, 0, 0, 0, 0)), "last month"},
+
+		// N days: calendar-aligned (midnight start), including today, ending now
+		{"90 days", ts(2026, 3, 20, 0, 0, 0, 0), now, "last 90 days"},
+		{"7 days", ts(2026, 6, 11, 0, 0, 0, 0), now, "last 7 days"},
+		{"1 day", ts(2026, 6, 17, 0, 0, 0, 0), now, "last 1 day"},
+		{"90d", ts(2026, 3, 20, 0, 0, 0, 0), now, "last 90 days"},
+
+		// since + custom range
+		{"since 2026-01-01", ts(2026, 1, 1, 0, 0, 0, 0), now, "since 2026-01-01"},
+		{"2026-01-01..2026-03-31", ts(2026, 1, 1, 0, 0, 0, 0), endBefore(ts(2026, 4, 1, 0, 0, 0, 0)), "2026-01-01 → 2026-03-31"},
+
+		// all time
+		{"all", time.Time{}, now, "all time"},
+		{"all time", time.Time{}, now, "all time"},
+
+		// case + separator tolerance
+		{"Today", ts(2026, 6, 17, 0, 0, 0, 0), now, "today"},
+		{"LAST WEEK", ts(2026, 6, 8, 0, 0, 0, 0), endBefore(ts(2026, 6, 15, 0, 0, 0, 0)), "last week"},
+		{"This Year", ts(2026, 1, 1, 0, 0, 0, 0), now, "this year"},
+		{"last-week", ts(2026, 6, 8, 0, 0, 0, 0), endBefore(ts(2026, 6, 15, 0, 0, 0, 0)), "last week"},
+		{"this-month", ts(2026, 6, 1, 0, 0, 0, 0), now, "this month"},
+		{"  week  ", ts(2026, 6, 15, 0, 0, 0, 0), now, "this week"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.spec, func(t *testing.T) {
+			w, err := parsePeriod(tc.spec, now)
+			if err != nil {
+				t.Fatalf("parsePeriod(%q) unexpected error: %v", tc.spec, err)
+			}
+			if !w.Since.Equal(tc.wantSince) {
+				t.Errorf("since = %v, want %v", w.Since, tc.wantSince)
+			}
+			if !w.Until.Equal(tc.wantUntil) {
+				t.Errorf("until = %v, want %v", w.Until, tc.wantUntil)
+			}
+			if w.Label != tc.wantLabel {
+				t.Errorf("label = %q, want %q", w.Label, tc.wantLabel)
+			}
+		})
+	}
+}
+
+func TestParsePeriod_Invalid(t *testing.T) {
+	now := fixedNow()
+	bad := []string{
+		"",                       // empty
+		"   ",                    // blank
+		"garbage",                // unknown token
+		"5 weeks",                // unsupported unit
+		"0 days",                 // N must be >= 1
+		"-5 days",                // negative
+		"days",                   // missing N
+		"since",                  // missing date
+		"since nope",             // bad date
+		"since 2026-13-01",       // impossible month
+		"2026-01-01",             // bare date — require `since` or a range
+		"2026-03-31..2026-01-01", // from after to
+		"2026-13-01..2026-03-31", // bad from
+		"2026-01-01..",           // missing to
+		"..2026-03-31",           // missing from
+	}
+	for _, spec := range bad {
+		t.Run(spec, func(t *testing.T) {
+			if _, err := parsePeriod(spec, now); err == nil {
+				t.Errorf("parsePeriod(%q) = nil error, want error", spec)
+			}
+		})
+	}
+}
+
+func TestStartOfQuarter(t *testing.T) {
+	cases := []struct {
+		in   time.Time
+		want time.Time
+	}{
+		{ts(2026, 1, 15, 9, 0, 0, 0), ts(2026, 1, 1, 0, 0, 0, 0)},    // Q1
+		{ts(2026, 3, 31, 23, 0, 0, 0), ts(2026, 1, 1, 0, 0, 0, 0)},   // Q1 edge
+		{ts(2026, 4, 1, 0, 0, 0, 0), ts(2026, 4, 1, 0, 0, 0, 0)},     // Q2 start
+		{ts(2026, 6, 17, 14, 0, 0, 0), ts(2026, 4, 1, 0, 0, 0, 0)},   // Q2
+		{ts(2026, 9, 30, 12, 0, 0, 0), ts(2026, 7, 1, 0, 0, 0, 0)},   // Q3 edge
+		{ts(2026, 12, 31, 23, 0, 0, 0), ts(2026, 10, 1, 0, 0, 0, 0)}, // Q4 edge
+	}
+	for _, tc := range cases {
+		if got := startOfQuarter(tc.in); !got.Equal(tc.want) {
+			t.Errorf("startOfQuarter(%v) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
