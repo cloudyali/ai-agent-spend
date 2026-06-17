@@ -170,6 +170,46 @@ func resolvePlan(name, feeStr, currency, startStr string) (Plan, error) {
 	return p, nil
 }
 
+// SetDefaultPlan writes the default `plan = "<id>"` into ~/.aispend/config.toml,
+// preserving every other line (comments, other keys). An empty id sets `plan = ""`
+// (treated as api / no subscription). This backs the interactive plan picker so a
+// user never has to hand-edit TOML.
+func SetDefaultPlan(appHome, planID string) error {
+	return setConfigKey(appHome, "plan", strconv.Quote(planID))
+}
+
+// setConfigKey sets one flat top-level key in config.toml (replacing it in place if
+// present, else appending), leaving all other content untouched. rawValue is the
+// already-formatted right-hand side (e.g. a quoted string).
+func setConfigKey(appHome, key, rawValue string) error {
+	path := filepath.Join(appHome, "config.toml")
+	var lines []string
+	if b, err := os.ReadFile(path); err == nil {
+		if s := strings.TrimRight(string(b), "\n"); s != "" {
+			lines = strings.Split(s, "\n")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	newLine := key + " = " + rawValue
+	found := false
+	for i, ln := range lines {
+		if k, _, ok := strings.Cut(ln, "="); ok && strings.TrimSpace(k) == key {
+			lines[i] = newLine
+			found = true
+			break
+		}
+	}
+	if !found {
+		lines = append(lines, newLine)
+	}
+	if err := os.MkdirAll(appHome, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+}
+
 // SeededPlan is a known subscription plan with a default monthly price.
 type SeededPlan struct {
 	ID            string  `json:"-"`

@@ -629,11 +629,16 @@ func (a *App) renderExplain(e event.AgentEvent, eng *pricing.Engine) {
 // --- plans ---
 
 func (a *App) cmdPlans(_ []string) int {
+	// On a terminal, offer the interactive picker (writes the choice to config);
+	// otherwise (pipe / offline build) fall back to the static list below.
+	if a.maybePickPlan() {
+		return 0
+	}
 	current := ""
 	if cfg, err := config.LoadAppConfig(a.Resolver.AppHome()); err == nil {
 		current = cfg.Name
 	}
-	fmt.Fprintln(a.Out, "Known subscription plans (set `plan = \"<id>\"` in ~/.aispend/config.toml):")
+	fmt.Fprintln(a.Out, "Known subscription plans (run `aispend plans` in a terminal to pick interactively, or set `plan = \"<id>\"` in ~/.aispend/config.toml):")
 	for _, p := range config.Plans() {
 		mark := " "
 		if p.ID == current {

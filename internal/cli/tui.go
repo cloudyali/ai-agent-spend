@@ -86,6 +86,45 @@ func eventsInWindow(all []event.AgentEvent, win window) []event.AgentEvent {
 	return out
 }
 
+// maybePickPlan runs the interactive plan picker on a TTY and writes the choice to
+// config — the "visual way" to set the subscription plan (so amortized/ROI work)
+// without hand-editing TOML. Returns true when it handled the command; false (not
+// a TTY) lets the caller fall back to the static plan list.
+func (a *App) maybePickPlan() bool {
+	if !isTTY(a.Out) {
+		return false
+	}
+	current := ""
+	if cfg, err := config.LoadAppConfig(a.Resolver.AppHome()); err == nil {
+		current = cfg.Name
+	}
+	choices := make([]tui.PlanChoice, 0)
+	for _, p := range config.Plans() {
+		choices = append(choices, tui.PlanChoice{ID: p.ID, Label: p.Label, MonthlyUSD: p.MonthlyFeeUSD, Current: p.ID == current})
+	}
+	choices = append(choices, tui.PlanChoice{ID: "api", Current: current == "" || current == "api"})
+
+	chosen, ok, err := tui.RunPlanPicker(choices, a.Out)
+	if err != nil {
+		fmt.Fprintf(a.Err, "aispend: %v\n", err)
+		return true
+	}
+	if !ok {
+		fmt.Fprintln(a.Out, "plan unchanged.")
+		return true
+	}
+	if err := config.SetDefaultPlan(a.Resolver.AppHome(), chosen); err != nil {
+		fmt.Fprintf(a.Err, "aispend: %v\n", err)
+		return true
+	}
+	if chosen == "" || chosen == "api" {
+		fmt.Fprintln(a.Out, "Plan set to API (no subscription) — the amortized view is off.")
+	} else {
+		fmt.Fprintf(a.Out, "Plan set to %s. Open `aispend tui` and press v for the amortized view (or `aispend report --view effective_allocated`).\n", chosen)
+	}
+	return true
+}
+
 // amortizedTotal sums each present provider's prorated subscription fee for the
 // window — the same per-provider proration `report --view effective_allocated`
 // uses. Returns (0, false) when no provider has an amortizable plan.

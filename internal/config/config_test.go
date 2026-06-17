@@ -3,9 +3,53 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+// SetDefaultPlan writes/replaces the `plan` key without disturbing other lines,
+// and the result resolves to a subscription plan (fee seeded from the table).
+func TestSetDefaultPlan(t *testing.T) {
+	home := t.TempDir()
+
+	// Fresh: creates config.toml and resolves to a subscription with a seeded fee.
+	if err := SetDefaultPlan(home, "claude-max-20x"); err != nil {
+		t.Fatal(err)
+	}
+	p, err := LoadAppConfig(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Kind != "subscription" || p.Name != "claude-max-20x" || p.MonthlyFeeUSD <= 0 {
+		t.Fatalf("expected a seeded subscription, got %+v", p)
+	}
+
+	// Replace in place, preserving an unrelated key.
+	path := filepath.Join(home, "config.toml")
+	if err := os.WriteFile(path, []byte("currency = \"USD\"\nplan = \"old-plan\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetDefaultPlan(home, "claude-max-20x"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(path)
+	got := string(b)
+	if !strings.Contains(got, "currency = \"USD\"") {
+		t.Errorf("must preserve unrelated keys:\n%s", got)
+	}
+	if !strings.Contains(got, `plan = "claude-max-20x"`) || strings.Contains(got, "old-plan") {
+		t.Errorf("must replace the plan in place:\n%s", got)
+	}
+
+	// Empty id → api / no subscription.
+	if err := SetDefaultPlan(home, ""); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := LoadAppConfig(home); p.Kind != "api" {
+		t.Errorf("empty plan should resolve to api, got %+v", p)
+	}
+}
 
 func TestParseTOML(t *testing.T) {
 	in := []byte(`
