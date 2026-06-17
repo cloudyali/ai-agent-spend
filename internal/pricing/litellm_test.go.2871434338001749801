@@ -1,0 +1,147 @@
+package pricing
+
+import (
+	"testing"
+
+	"github.com/agentspend/ai-agent-spend/internal/event"
+)
+
+// A trimmed LiteLLM model_prices_and_context_window.json: a placeholder entry to
+// skip, an Anthropic model (explicit cache rates), and an OpenAI model (cache_read
+// but no cache_creation — no write charge).
+const liteLLMFixture = `{
+  "sample_spec": {"input_cost_per_token": 0.0, "litellm_provider": "sample"},
+  "claude-opus-4-8": {
+    "input_cost_per_token": 0.000005,
+    "output_cost_per_token": 0.000025,
+    "cache_creation_input_token_cost": 0.00000625,
+    "cache_read_input_token_cost": 0.0000005,
+    "litellm_provider": "anthropic"
+  },
+  "gpt-5.3-codex": {
+    "input_cost_per_token": 0.00000175,
+    "output_cost_per_token": 0.000014,
+    "cache_read_input_token_cost": 0.000000875,
+    "litellm_provider": "openai"
+  }
+}`
+
+func TestParseLiteLLM(t *testing.T) {
+	rates, err := ParseLiteLLM([]byte(liteLLMFixture))
+	if err != nil {
+		t.Fatalf("ParseLiteLLM: %v", err)
+	}
+	if _, ok := rates["sample_spec"]; ok {
+		t.Error("placeholder entry (no input cost) should be skipped")
+	}
+	opus, ok := rates["claude-opus-4-8"]
+	if !ok {
+		t.Fatal("claude-opus-4-8 missing")
+	}
+	// $/token × 1e12 → micro-USD per Mtok
+	if opus.InputPerMTok != 5_000_000 || opus.OutputPerMTok != 25_000_000 ||
+		opus.CacheWritePerMTok != 6_250_000 || opus.CacheReadPerMTok != 500_000 {
+		t.Errorf("opus rate = %+v", opus)
+	}
+	codex, ok := rates["gpt-5.3-codex"]
+	if !ok {
+		t.Fatal("gpt-5.3-codex missing")
+	}
+	// OpenAI: real cached-input rate (0.5× input), and NO cache-write charge.
+	if codex.CacheReadPerMTok != 875_000 {
+		t.Errorf("codex cache-read = %d, want 875000 (0.5× input)", codex.CacheReadPerMTok)
+	}
+	if codex.CacheWritePerMTok != 0 {
+		t.Errorf("codex cache-write = %d, want 0 (LiteLLM omits cache_creation)", codex.CacheWritePerMTok)
+	}
+}
+
+// LiteLLM ids carry vendor prefixes, snapshot dates, dotted versions, and family
+// nicknames; ParseLiteLLM must land them on aispend's canonical ids so the overlay
+// actually matches priced models.
+func TestParseLiteLLM_Aliasing(t *testing.T) {
+	fixture := `{
+	  "anthropic/claude-opus-4-8":       {"input_cost_per_token": 0.000005, "output_cost_per_token": 0.000025},
+	  "claude-opus-4-8":                 {"input_cost_per_token": 0.000005, "output_cost_per_token": 0.000025},
+	  "claude-opus-4-7-20260115":        {"input_cost_per_token": 0.000005, "output_cost_per_token": 0.000025},
+	  "claude-sonnet-4.6":               {"input_cost_per_token": 0.000003, "output_cost_per_token": 0.000015},
+	  "openai/gpt-5.3-codex":            {"input_cost_per_token": 0.00000175, "output_cost_per_token": 0.000014},
+	  "gigachat-stub":                   {"input_cost_per_token": 0.0, "output_cost_per_token": 0.0}
+	}`
+	rates, err := ParseLiteLLM([]byte(fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6", "gpt-5.3-codex"} {
+		if _, ok := rates[want]; !ok {
+			t.Errorf("expected canonical key %q in %v", want, keysOf(rates))
+		}
+	}
+	if _, ok := rates["gigachat-stub"]; ok {
+		t.Error("zero-priced stub should be excluded")
+	}
+	if len(rates) != 4 {
+		t.Errorf("got %d models, want 4: %v", len(rates), keysOf(rates))
+	}
+}
+
+func TestCanonicalizeModelID(t *testing.T) {
+	cases := map[string]string{
+		"anthropic/claude-opus-4-8":  "claude-opus-4-8",
+		"claude-opus-4-8-20260115":   "claude-opus-4-8",
+		"Claude-Sonnet-4.6":          "claude-sonnet-4-6", // lowercase + dotted
+		"openai/gpt-5.3-codex":       "gpt-5.3-codex",     // dot preserved (not a version dash)
+		"claude-opus-4-8":            "claude-opus-4-8",   // already canonical (idempotent)
+		"vertex_ai/claude-haiku-4.5": "claude-haiku-4-5",
+		// family-order swaps (the form LiteLLM/models.dev often use)
+		"claude-4-6-sonnet":              "claude-sonnet-4-6",
+		"claude-4.6-sonnet":              "claude-sonnet-4-6",
+		"anthropic/claude-4-8-opus-20260115": "claude-opus-4-8",
+		"claude-4-5-haiku":               "claude-haiku-4-5",
+	}
+	for in, want := range cases {
+		if got := canonicalizeModelID(in); got != want {
+			t.Errorf("canonicalizeModelID(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func keysOf(m map[string]rate) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	return ks
+}
+
+func TestParseLiteLLM_Errors(t *testing.T) {
+	if _, err := ParseLiteLLM([]byte("not json")); err == nil {
+		t.Error("malformed JSON should error")
+	}
+	if _, err := ParseLiteLLM([]byte(`{"sample_spec":{"input_cost_per_token":0}}`)); err == nil {
+		t.Error("a table with no priced models should error")
+	}
+}
+
+// An engine built from embedded + a LiteLLM overlay prices overlaid models with
+// the new rates, keeps embedded models as a floor, and stamps the source version.
+func TestNewEngineWithRates_Overlay(t *testing.T) {
+	rates, _ := ParseLiteLLM([]byte(liteLLMFixture))
+	e := NewEngineWithRates("litellm-2026-06-16", rates)
+	if e.TableVersion() != "litellm-2026-06-16" {
+		t.Errorf("version = %q", e.TableVersion())
+	}
+	// overlaid model uses LiteLLM cache-read (0.5× input), not the embedded 10%
+	c, ok := e.Components("gpt-5.3-codex", event.Tokens{Input: 1_000_000, CacheRead: 1_000_000})
+	if !ok || c.CacheRead.Micros*2 != c.Input.Micros {
+		t.Errorf("overlay codex cache-read should be 0.5× input: %+v ok=%v", c, ok)
+	}
+	// embedded-only model still priced (floor preserved)
+	if _, ok := e.Components("claude-haiku-4-5", event.Tokens{Input: 1}); !ok {
+		t.Error("embedded models should remain after overlay")
+	}
+	// nil overlay ⇒ plain embedded engine
+	if NewEngineWithRates("", nil).TableVersion() == "litellm-2026-06-16" {
+		t.Error("nil overlay should not restamp version")
+	}
+}

@@ -1,0 +1,15 @@
+{
+  "version": "plans-2026-06",
+  "currency": "USD",
+  "note": "Seeded subscription prices (USD/month) so `plan = \"...\"` resolves a fee by default; monthly_fee_usd in config.toml overrides. Verify against live pricing before release.",
+  "plans": {
+    "claude-pro":          { "provider": "anthropic", "monthly_fee_usd": 20,  "label": "Claude Pro" },
+    "claude-max-5x":       { "provider": "anthropic", "monthly_fee_usd": 100, "label": "Claude Max 5x" },
+    "claude-max-20x":      { "provider": "anthropic", "monthly_fee_usd": 200, "label": "Claude Max 20x" },
+    "claude-team":         { "provider": "anthropic", "monthly_fee_usd": 25,  "label": "Claude Team (per seat)" },
+    "claude-team-premium": { "provider": "anthropic", "monthly_fee_usd": 125, "label": "Claude Team Premium (per seat)" },
+    "chatgpt-go":          { "provider": "openai",    "monthly_fee_usd": 8,   "label": "ChatGPT Go (incl. Codex)" },
+    "chatgpt-plus":        { "provider": "openai",    "monthly_fee_usd": 20,  "label": "ChatGPT Plus (incl. Codex)" },
+    "chatgpt-pro":         { "provider": "openai",    "monthly_fee_usd": 200, "label": "ChatGPT Pro (incl. Codex)" }
+  }
+}

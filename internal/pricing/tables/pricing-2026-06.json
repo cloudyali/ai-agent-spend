@@ -1,0 +1,20 @@
+{
+  "version": "pricing-2026-06",
+  "currency": "USD",
+  "note": "Public API list rates, micro-USD per 1,000,000 tokens (1 USD = 1,000,000 micros). Anthropic: cache_read ~= 10% of input; cache_write_per_mtok is the 5-min tier (~1.25x input). The 1-hour cache-write tier is NOT a column here: it is derived in code as 2x input (oneHourCacheInputMultiple) and applied only to the ephemeral_1h token subset (event.Tokens.CacheWrite1h). OpenAI: cache_read ~= 0.5x input (cached-input discount, NOT the 10% Anthropic heuristic); cache_write n/a (0). Current models per June 2026; legacy retained so older sessions still price. Verify against live price lists before release.",
+  "models": {
+    "claude-fable-5":    { "input_per_mtok": 10000000, "output_per_mtok": 50000000, "cache_read_per_mtok": 1000000, "cache_write_per_mtok": 12500000 },
+    "claude-opus-4-8":   { "input_per_mtok": 5000000,  "output_per_mtok": 25000000, "cache_read_per_mtok": 500000, "cache_write_per_mtok": 6250000 },
+    "claude-opus-4-7":   { "input_per_mtok": 5000000,  "output_per_mtok": 25000000, "cache_read_per_mtok": 500000, "cache_write_per_mtok": 6250000 },
+    "claude-opus-4-6":   { "input_per_mtok": 5000000,  "output_per_mtok": 25000000, "cache_read_per_mtok": 500000, "cache_write_per_mtok": 6250000 },
+    "claude-sonnet-4-6": { "input_per_mtok": 3000000,  "output_per_mtok": 15000000, "cache_read_per_mtok": 300000, "cache_write_per_mtok": 3750000 },
+    "claude-haiku-4-5":  { "input_per_mtok": 1000000,  "output_per_mtok": 5000000,  "cache_read_per_mtok": 100000, "cache_write_per_mtok": 1250000 },
+
+    "claude-opus-4":     { "input_per_mtok": 15000000, "output_per_mtok": 75000000, "cache_read_per_mtok": 1500000, "cache_write_per_mtok": 18750000 },
+    "claude-sonnet-4":   { "input_per_mtok": 3000000,  "output_per_mtok": 15000000, "cache_read_per_mtok": 300000,  "cache_write_per_mtok": 3750000 },
+    "claude-haiku-4":    { "input_per_mtok": 800000,   "output_per_mtok": 4000000,  "cache_read_per_mtok": 80000,   "cache_write_per_mtok": 1000000 },
+
+    "gpt-5.3-codex":     { "input_per_mtok": 1750000,  "output_per_mtok": 14000000, "cache_read_per_mtok": 875000,  "cache_write_per_mtok": 0 },
+    "gpt-5-codex":       { "input_per_mtok": 1750000,  "output_per_mtok": 14000000, "cache_read_per_mtok": 875000,  "cache_write_per_mtok": 0 }
+  }
+}
