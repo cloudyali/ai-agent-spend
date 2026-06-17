@@ -245,6 +245,12 @@ func TestRun_MoreCommands(t *testing.T) {
 	if out, _, c := run(t, "today"); c != 0 || !strings.Contains(out, "today ·") {
 		t.Errorf("today command: code=%d out=%s", c, out)
 	}
+	if out, _, c := run(t, "top"); c != 0 || !strings.Contains(out, "aispend top") {
+		t.Errorf("top command: code=%d out=%s", c, out)
+	}
+	if out, _, c := run(t, "top", "--sessions", "--period", "all"); c != 0 || !strings.Contains(out, "sessions") {
+		t.Errorf("top --sessions: code=%d out=%s", c, out)
+	}
 	if out, _, c := run(t, "report", "--period", "week", "--by", "repo"); c != 0 || !strings.Contains(out, "by repo") {
 		t.Errorf("report --by repo: code=%d out=%s", c, out)
 	}
@@ -778,6 +784,70 @@ func TestRenderToday_UncoveredProviderNoted(t *testing.T) {
 	}
 	if !strings.Contains(got, "Codex not in the ROI") {
 		t.Errorf("the uncovered provider should be named:\n%s", got)
+	}
+}
+
+// `aispend top` is the bridge from "my spend is high" to "explain why": the
+// priciest turns (default) or sessions in a window, each printed with its id so
+// the next step is a copy-paste `explain` (08-cli-tui-concept.md).
+func TestRenderTop_Turns(t *testing.T) {
+	big := event.USD(5_000_000)
+	mid := event.USD(1_000_000)
+	events := []event.AgentEvent{
+		{EventID: "evt_big", SessionID: "3f9c1a2b-aa", Provider: "claude_code", Model: "claude-opus-4-8",
+			Tokens: event.Tokens{Input: 40_000, Output: 9_000, CacheRead: 21_000_000}, CostViews: event.CostViews{APIEquivalent: &big}},
+		{EventID: "evt_mid", SessionID: "a17d4e5f-bb", Provider: "claude_code", Model: "claude-sonnet-4", CostViews: event.CostViews{APIEquivalent: &mid}},
+		{EventID: "evt_nil", Provider: "claude_code", Model: "mystery"}, // no api-equivalent
+	}
+	var buf bytes.Buffer
+	a := &App{Out: &buf, Now: time.Now}
+	a.renderTop(events, 10, false, "this week", len(events))
+	got := buf.String()
+	for _, want := range []string{"aispend top", "this week", "priciest turns", "evt_big", "$5.00", "evt_mid", "$1.00", "explain"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("top missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Index(got, "evt_big") > strings.Index(got, "evt_mid") {
+		t.Errorf("turns must be priciest-first:\n%s", got)
+	}
+	if strings.Contains(got, "evt_nil") {
+		t.Errorf("a nil-cost turn must not appear as a ranked row:\n%s", got)
+	}
+}
+
+func TestRenderTop_Sessions(t *testing.T) {
+	a1, a2, b := event.USD(3_000_000), event.USD(1_000_000), event.USD(5_000_000)
+	events := []event.AgentEvent{
+		{EventID: "e1", SessionID: "3f9c", Provider: "claude_code", Model: "claude-opus-4-8", CostViews: event.CostViews{APIEquivalent: &a1}},
+		{EventID: "e2", SessionID: "3f9c", Provider: "claude_code", Model: "claude-sonnet-4", CostViews: event.CostViews{APIEquivalent: &a2}},
+		{EventID: "e3", SessionID: "a17d", Provider: "claude_code", Model: "claude-opus-4-8", CostViews: event.CostViews{APIEquivalent: &b}},
+	}
+	var buf bytes.Buffer
+	a := &App{Out: &buf, Now: time.Now}
+	a.renderTop(events, 10, true, "this week", len(events))
+	got := buf.String()
+	for _, want := range []string{"priciest sessions", "3f9c", "a17d", "$5.00", "$4.00", "explain session:"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("top --sessions missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Index(got, "a17d") > strings.Index(got, "3f9c") {
+		t.Errorf("sessions must be priciest-first (a17d $5 before 3f9c $4):\n%s", got)
+	}
+}
+
+func TestRenderTop_EmptyStates(t *testing.T) {
+	var buf bytes.Buffer
+	a := &App{Out: &buf, Now: time.Now}
+	a.renderTop(nil, 10, false, "today", 0)
+	if got := buf.String(); !strings.Contains(got, "no spend") || !strings.Contains(got, "scan") {
+		t.Errorf("fresh empty top should point at scan:\n%s", got)
+	}
+	buf.Reset()
+	a.renderTop(nil, 10, false, "today", 4200)
+	if got := buf.String(); strings.Contains(got, "run `aispend scan`") {
+		t.Errorf("with stored data, an empty window must not say run scan:\n%s", got)
 	}
 }
 
