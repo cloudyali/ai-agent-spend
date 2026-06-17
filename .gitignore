@@ -1,7 +1,8 @@
 # --- Go build artifacts ---
 /bin/
 /dist/
-/aispend          # compiled CLI at repo root (anchored: keeps cmd/aispend/ source)
+# compiled CLI at repo root (anchored: keeps cmd/aispend/ source)
+/aispend
 *.exe
 *.test
 *.out
