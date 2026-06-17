@@ -1,50 +1,62 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/agentspend/ai-agent-spend/internal/pricing"
 )
 
-func ev(id, sess, model string, micros int64) event.AgentEvent {
-	m := event.USD(micros)
-	return event.AgentEvent{EventID: id, SessionID: sess, Provider: "claude_code", Model: model, CostViews: event.CostViews{APIEquivalent: &m}}
+func priced(t *testing.T, eng *pricing.Engine, id, sess, repo, model string, ts time.Time, tk event.Tokens) event.AgentEvent {
+	t.Helper()
+	e := event.AgentEvent{EventID: id, SessionID: sess, Repo: repo, Provider: "claude_code", Model: model, Tokens: tk, TSStart: ts, TSEnd: ts.Add(time.Minute)}
+	if err := eng.Price(&e, pricing.Plan{Kind: "api"}); err != nil {
+		t.Fatal(err)
+	}
+	return e
 }
 
-// The hero interaction: arrow to a session, ↵ to its receipt, esc back, q quits.
+// The hero flow: rows are anchored on repo/when (not opaque hashes), priciest
+// first; ↵ drills to a receipt with composition + arbitrage; esc back; q quits.
 func TestModel_NavigateDrillBack(t *testing.T) {
+	eng := pricing.NewEngine()
+	base := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
 	periods := []Period{{Label: "today", Events: []event.AgentEvent{
-		ev("e1", "3f9c", "claude-opus-4-8", 4_000_000),
-		ev("e2", "3f9c", "claude-sonnet-4", 1_000_000),
-		ev("e3", "a17d", "claude-opus-4-8", 6_000_000),
+		priced(t, eng, "evt_aaaa1111bbbb", "3f9c", "payments", "claude-opus-4-8", base, event.Tokens{Input: 100_000, Output: 50_000, CacheRead: 5_000_000}),
+		priced(t, eng, "evt_bbbb2222cccc", "3f9c", "payments", "claude-sonnet-4", base.Add(time.Hour), event.Tokens{Input: 20_000}),
+		priced(t, eng, "evt_cccc3333dddd", "a17d", "web", "claude-opus-4-8", base.Add(2*time.Hour), event.Tokens{Input: 50_000, CacheRead: 20_000_000}),
 	}}}
-	rcpt := func(evs []event.AgentEvent) string { return "RECEIPT:" + evs[0].SessionID }
-	m := New(periods, 0, rcpt)
+	m := New(periods, 0, eng)
 
 	v := m.View()
-	if !strings.Contains(v, "a17d") || strings.Index(v, "a17d") > strings.Index(v, "3f9c") {
-		t.Fatalf("sessions should be priciest-first (a17d $6 before 3f9c $5):\n%s", v)
+	if !strings.Contains(v, "today") || !strings.Contains(v, "web") || !strings.Contains(v, "payments") {
+		t.Fatalf("list should show period + repos:\n%s", v)
 	}
-	if m.cursor != 0 {
-		t.Fatalf("cursor starts at 0, got %d", m.cursor)
+	if strings.Index(v, "web") > strings.Index(v, "payments") {
+		t.Fatalf("sessions should be priciest-first (web/a17d $10 before payments/3f9c $4):\n%s", v)
+	}
+	// rows must NOT carry the opaque session hash anymore
+	if strings.Contains(v, "a17d") || strings.Contains(v, "3f9c") {
+		t.Errorf("list rows should not show raw session hashes:\n%s", v)
 	}
 
 	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = nm.(Model)
-	if m.cursor != 1 {
-		t.Fatalf("down → cursor 1, got %d", m.cursor)
-	}
-
+	m = nm.(Model) // cursor → 1 (payments/3f9c)
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = nm.(Model)
 	if m.mode != modeReceipt {
 		t.Fatal("enter should open the receipt")
 	}
-	if !strings.Contains(m.View(), "RECEIPT:3f9c") {
-		t.Fatalf("receipt should be for the selected session (3f9c):\n%s", m.View())
+	r := m.View()
+	for _, want := range []string{"payments", "total", "composition", "cache-read", "without cache", "top turns", "aaaa1111"} {
+		if !strings.Contains(r, want) {
+			t.Errorf("receipt missing %q:\n%s", want, r)
+		}
 	}
 
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -52,7 +64,6 @@ func TestModel_NavigateDrillBack(t *testing.T) {
 	if m.mode != modeList {
 		t.Fatal("esc should return to the list")
 	}
-
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if cmd == nil {
 		t.Fatal("q should issue a command")
@@ -62,13 +73,17 @@ func TestModel_NavigateDrillBack(t *testing.T) {
 	}
 }
 
-// ←/→ scrub the period and reload the rows; you can't scrub past the ends.
 func TestModel_PeriodScrub(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
 	periods := []Period{
-		{Label: "today", Events: []event.AgentEvent{ev("e1", "s1", "claude-opus-4-8", 1_000_000)}},
-		{Label: "this week", Events: []event.AgentEvent{ev("e1", "s1", "claude-opus-4-8", 1_000_000), ev("e2", "s2", "claude-sonnet-4", 2_000_000)}},
+		{Label: "today", Events: []event.AgentEvent{priced(t, eng, "e1", "s1", "r", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000})}},
+		{Label: "this week", Events: []event.AgentEvent{
+			priced(t, eng, "e1", "s1", "r", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),
+			priced(t, eng, "e2", "s2", "r", "claude-sonnet-4", ts, event.Tokens{Input: 2_000_000}),
+		}},
 	}
-	m := New(periods, 0, func(e []event.AgentEvent) string { return "" })
+	m := New(periods, 0, eng)
 	if m.label() != "today" || len(m.rows) != 1 {
 		t.Fatalf("start today/1 row, got %s/%d", m.label(), len(m.rows))
 	}
@@ -79,38 +94,31 @@ func TestModel_PeriodScrub(t *testing.T) {
 	}
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	m = nm.(Model)
-	if m.label() != "today" {
-		t.Fatalf("left → today, got %s", m.label())
-	}
-	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft}) // can't go past the first
 	m = nm.(Model)
 	if m.label() != "today" {
-		t.Fatal("left at the first period should stay put")
+		t.Fatalf("left should clamp at today, got %s", m.label())
 	}
 }
 
-// ctrl+c quits from anywhere; in receipt mode q/esc return to the list (not quit);
-// k/j alias up/down; up at the top stays; window size is recorded.
 func TestModel_KeysAndModes(t *testing.T) {
-	periods := []Period{{Label: "today", Events: []event.AgentEvent{
-		ev("e1", "3f9c", "claude-opus-4-8", 4_000_000),
-		ev("e2", "a17d", "claude-sonnet-4", 2_000_000),
-	}}}
-	m := New(periods, 0, func(evs []event.AgentEvent) string { return "R:" + evs[0].SessionID })
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "r", "claude-opus-4-8", ts, event.Tokens{Input: 4_000_000}),
+		priced(t, eng, "e2", "s2", "r", "claude-sonnet-4", ts, event.Tokens{Input: 2_000_000}),
+	}}}, 0, eng)
 
-	// window size recorded
 	nm, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = nm.(Model)
 	if m.w != 120 || m.h != 40 {
 		t.Fatalf("window size not recorded: %dx%d", m.w, m.h)
 	}
-	// up at top stays at 0
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
 	m = nm.(Model)
 	if m.cursor != 0 {
-		t.Fatalf("up at top should stay 0, got %d", m.cursor)
+		t.Fatalf("up at top stays 0, got %d", m.cursor)
 	}
-	// j (alias down) → 1, k (alias up) → 0
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
 	m = nm.(Model)
 	if m.cursor != 1 {
@@ -121,52 +129,80 @@ func TestModel_KeysAndModes(t *testing.T) {
 	if m.cursor != 0 {
 		t.Fatalf("k should move up, got %d", m.cursor)
 	}
-	// ctrl+c from list quits
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
-	if cmd == nil {
-		t.Fatal("ctrl+c should issue a command")
-	}
-	if _, ok := cmd().(tea.QuitMsg); !ok {
+	if cmd == nil || func() bool { _, ok := cmd().(tea.QuitMsg); return !ok }() {
 		t.Fatal("ctrl+c should quit")
 	}
-	// in receipt mode, q returns to the list rather than quitting
+	// q in receipt mode returns to the list (does not quit)
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = nm.(Model)
 	nm, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	m = nm.(Model)
-	if m.mode != modeList {
-		t.Fatal("q in receipt mode should go back to the list")
-	}
-	if cmd != nil {
-		t.Fatal("q in receipt mode should not quit")
+	if m.mode != modeList || cmd != nil {
+		t.Fatal("q in receipt mode should go back, not quit")
 	}
 }
 
-func TestHelpers(t *testing.T) {
-	if money(431_850) != "$0.43" || money(50_310_000) != "$50.31" {
-		t.Errorf("money: %s %s", money(431_850), money(50_310_000))
+// A long list clamps to the viewport with a "more" indicator, and the window
+// follows the cursor to the bottom.
+func TestModel_ScrollWindow(t *testing.T) {
+	eng := pricing.NewEngine()
+	base := time.Date(2026, 6, 17, 1, 0, 0, 0, time.UTC)
+	var evs []event.AgentEvent
+	for i := 0; i < 20; i++ {
+		evs = append(evs, priced(t, eng, fmt.Sprintf("e%02d", i), fmt.Sprintf("s%02d", i), "r",
+			"claude-opus-4-8", base.Add(time.Duration(i)*time.Minute), event.Tokens{Input: int64((20 - i) * 100_000)}))
 	}
-	if shortSession("3f9c1a2b-aaaa-bbbb") != "3f9c1a2b…" || shortSession("short") != "short" {
-		t.Errorf("shortSession: %q %q", shortSession("3f9c1a2b-aaaa-bbbb"), shortSession("short"))
+	m := New([]Period{{Label: "today", Events: evs}}, 0, eng)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 12})
+	m = nm.(Model)
+	if s, e := m.windowRange(len(m.rows)); e-s >= len(m.rows) {
+		t.Fatalf("expected a clamped window, got %d of %d", e-s, len(m.rows))
 	}
-	if modelList(nil) != "(no model)" {
-		t.Errorf("empty modelList = %q", modelList(nil))
+	if !strings.Contains(m.View(), "more") {
+		t.Errorf("a clamped list should show a 'more' indicator:\n%s", m.View())
 	}
-	got := modelList(map[string]bool{"claude-opus-4-8": true, "claude-sonnet-4": true})
-	if got != "opus-4-8, sonnet-4" {
-		t.Errorf("modelList = %q, want trimmed + sorted", got)
+	for i := 0; i < 19; i++ {
+		nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = nm.(Model)
+	}
+	if _, e := m.windowRange(len(m.rows)); e != len(m.rows) {
+		t.Errorf("cursor at the bottom should reveal the last row, end=%d n=%d", e, len(m.rows))
 	}
 }
 
-// Empty period: honest message, and ↵ must not crash or drill into nothing.
 func TestModel_Empty(t *testing.T) {
-	m := New([]Period{{Label: "today", Events: nil}}, 0, func(e []event.AgentEvent) string { return "R" })
+	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {
 		t.Fatalf("empty view should say no sessions:\n%s", m.View())
 	}
 	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = nm.(Model)
 	if m.mode != modeList {
-		t.Fatal("enter on an empty list must stay in the list (no crash)")
+		t.Fatal("enter on an empty list must not crash/drill")
+	}
+}
+
+func TestHelpers(t *testing.T) {
+	if money(431_850) != "$0.43" || money(3_630_860_000) != "$3,630.86" {
+		t.Errorf("money: %s %s", money(431_850), money(3_630_860_000))
+	}
+	if humanModel("<synthetic>") != "other" || humanModel("claude-opus-4-8") != "opus-4-8" || humanModel("") != "—" {
+		t.Errorf("humanModel wrong: %q %q %q", humanModel("<synthetic>"), humanModel("claude-opus-4-8"), humanModel(""))
+	}
+	if shortID("evt_ebc9d002053373db") != "ebc9d002" {
+		t.Errorf("shortID = %q", shortID("evt_ebc9d002053373db"))
+	}
+	if comma(1256) != "1,256" || comma(254) != "254" {
+		t.Errorf("comma: %s %s", comma(1256), comma(254))
+	}
+	if elapsed(22*time.Hour+12*time.Minute) != "22h12m" || elapsed(26*time.Hour) != "1d2h" {
+		t.Errorf("elapsed: %s %s", elapsed(22*time.Hour+12*time.Minute), elapsed(26*time.Hour))
+	}
+	if trunc("abcdef", 4) != "abc…" || orDash("") != "—" || providerLabel("claude_code") != "Claude Code" {
+		t.Errorf("trunc/orDash/providerLabel wrong")
+	}
+	if spendBar(5, 10, 4) != "██░░" {
+		t.Errorf("spendBar = %q, want ██░░", spendBar(5, 10, 4))
 	}
 }

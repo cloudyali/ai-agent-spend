@@ -1,17 +1,15 @@
 //go:build !offline
 
-// cmdTui wires the store + pricing + the session-receipt renderer into the
-// interactive explorer (internal/tui). It lives behind `!offline` — exactly like
-// the network refresh seam — because Bubble Tea transitively pulls net/url +
-// net/netip; those are pure value/parsing packages (no dial, no http sink), and
-// the default build already carries them via the disclosed `pricing refresh`, but
-// the air-gapped `offline` build promises *zero* net/*, so the TUI is compiled out
-// there (see tui_offline.go). The default `doctor --network` story is unchanged:
-// nothing here can phone home.
+// cmdTui wires the store + pricing engine into the interactive explorer
+// (internal/tui). It lives behind `!offline` — exactly like the network refresh
+// seam — because Bubble Tea transitively pulls net/url + net/netip; those are pure
+// value/parsing packages (no dial, no http sink), and the default build already
+// carries them via the disclosed `pricing refresh`, but the air-gapped `offline`
+// build promises *zero* net/*, so the TUI is compiled out there (tui_offline.go).
+// The default `doctor --network` story is unchanged: nothing here can phone home.
 package cli
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 
@@ -44,7 +42,6 @@ func (a *App) cmdTui(args []string) int {
 		fmt.Fprintf(a.Err, "aispend: %v\n", err)
 		return 1
 	}
-	eng := a.pricingEngine()
 	now := a.Now()
 
 	// Pre-filter the scrubbable windows here so the tui package needs no period
@@ -63,12 +60,7 @@ func (a *App) cmdTui(args []string) int {
 		periods = append(periods, tui.Period{Label: win.Label, Events: eventsInWindow(all, win)})
 	}
 
-	receipt := func(evs []event.AgentEvent) string {
-		var b bytes.Buffer
-		(&App{Out: &b, Now: a.Now}).renderSessionReceipt(evs, eng)
-		return b.String()
-	}
-	if err := tui.Run(periods, startIdx, receipt, a.Out); err != nil {
+	if err := tui.Run(periods, startIdx, a.pricingEngine(), a.Out); err != nil {
 		fmt.Fprintf(a.Err, "aispend: tui: %v\n", err)
 		return 1
 	}
