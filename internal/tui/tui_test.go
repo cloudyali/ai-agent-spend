@@ -219,6 +219,41 @@ func TestTimeLayout(t *testing.T) {
 	}
 }
 
+// When only one cost lens has data, `v` is a no-op and its hint is hidden — no
+// switching into an all-$0 screen.
+func TestModel_SingleViewNoSwitch(t *testing.T) {
+	eng := pricing.NewEngine()
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "repo", "claude-opus-4-8", time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC), event.Tokens{Input: 1_000_000}),
+	}}}, 0, eng)
+	if len(m.avail) != 1 || m.view() != "api_equivalent" {
+		t.Fatalf("only api-equivalent should be available, got %v", m.avail)
+	}
+	if strings.Contains(m.View(), "v view") {
+		t.Errorf("the v hint should hide when there's only one populated view:\n%s", m.View())
+	}
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	m = nm.(Model)
+	if m.view() != "api_equivalent" {
+		t.Errorf("v should be a no-op with a single view, got %q", m.view())
+	}
+}
+
+// A session with no cost in the active lens shows "—", never a phantom $0.00.
+func TestModel_UnpricedSessionShowsDash(t *testing.T) {
+	eng := pricing.NewEngine()
+	good := priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC), event.Tokens{Input: 1_000_000})
+	bad := event.AgentEvent{EventID: "e2", SessionID: "s2", Repo: "infra", Provider: "claude_code", Model: "mystery-model", TSStart: time.Date(2026, 6, 17, 10, 0, 0, 0, time.UTC)}
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{good, bad}}}, 0, eng)
+	v := m.View()
+	if !strings.Contains(v, "—") {
+		t.Errorf("the unpriced session should show — for cost:\n%s", v)
+	}
+	if strings.Contains(v, "$0.00") {
+		t.Errorf("must never assert a phantom $0.00:\n%s", v)
+	}
+}
+
 func TestModel_Empty(t *testing.T) {
 	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {

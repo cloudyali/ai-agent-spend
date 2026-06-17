@@ -34,16 +34,20 @@ const (
 	modeReceipt
 )
 
-// metered cost views the explorer can cycle with `v` (effective_allocated is a
-// period-level allocation, not a per-session number, so it is intentionally out).
-var views = []string{"api_equivalent", "reported", "estimated", "billed", "marginal"}
+// cycleViews are the distinct cost lenses `v` can rotate through. estimated mirrors
+// api-equivalent in 0A so it is omitted; effective_allocated is a period-level
+// allocation, not a per-session number, so it is out too. Crucially, `v` only
+// offers the views actually PRESENT in the current data (see availableViews), so
+// it never lands on an all-$0 screen — and the hint hides when there's only one.
+var cycleViews = []string{"api_equivalent", "reported", "billed", "marginal"}
 
 // Model is the Bubble Tea model. Update/View are pure over messages, so the whole
 // interaction is testable by feeding tea.KeyMsg values — no terminal required.
 type Model struct {
 	periods []Period
 	pIdx    int
-	vIdx    int
+	curView string   // active cost lens
+	avail   []string // views with data in the current period (what `v` rotates through)
 	eng     *pricing.Engine
 	rows    []sessionStat
 	cursor  int
@@ -56,6 +60,7 @@ type Model struct {
 type sessionStat struct {
 	id       string
 	micros   int64
+	hasView  bool // at least one turn carries the active cost lens (else cost is "—", not $0)
 	turns    int
 	first    time.Time
 	last     time.Time
@@ -84,9 +89,17 @@ func New(periods []Period, startIdx int, eng *pricing.Engine) Model {
 	if startIdx < 0 || startIdx >= len(periods) {
 		startIdx = 0
 	}
-	m := Model{periods: periods, pIdx: startIdx, eng: eng, mode: modeList}
-	m.rows = groupSessions(m.events(), m.view())
+	m := Model{periods: periods, pIdx: startIdx, eng: eng, mode: modeList, curView: "api_equivalent"}
+	m.refresh()
 	return m
+}
+
+// refresh recomputes the available views + rows for the current period, keeping
+// the active view valid. Called on construction and whenever the period changes.
+func (m *Model) refresh() {
+	m.avail = availableViews(m.events())
+	m.curView = ensureView(m.curView, m.avail)
+	m.rows = groupSessions(m.events(), m.curView)
 }
 
 func (m Model) events() []event.AgentEvent {
@@ -103,12 +116,7 @@ func (m Model) label() string {
 	return m.periods[m.pIdx].Label
 }
 
-func (m Model) view() string {
-	if m.vIdx < 0 || m.vIdx >= len(views) {
-		return views[0]
-	}
-	return views[m.vIdx]
-}
+func (m Model) view() string { return m.curView }
 
 func (m Model) Init() tea.Cmd { return nil }
 
@@ -141,19 +149,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "left", "h":
 			if m.pIdx > 0 {
 				m.pIdx--
-				m.rows = groupSessions(m.events(), m.view())
+				m.refresh()
 				m.cursor = 0
 			}
 		case "right", "l":
 			if m.pIdx < len(m.periods)-1 {
 				m.pIdx++
-				m.rows = groupSessions(m.events(), m.view())
+				m.refresh()
 				m.cursor = 0
 			}
 		case "v":
-			m.vIdx = (m.vIdx + 1) % len(views)
-			m.rows = groupSessions(m.events(), m.view())
-			m.cursor = 0
+			if len(m.avail) > 1 { // only switch when there's another populated view
+				m.curView = nextView(m.avail, m.curView)
+				m.rows = groupSessions(m.events(), m.curView)
+				m.cursor = 0
+			}
 		case "enter":
 			if len(m.rows) > 0 {
 				m.sel = m.rows[m.cursor].evs
@@ -199,7 +209,7 @@ func (m Model) listView() string {
 	// Header.
 	b.WriteString(stBold.Render("aispend") + stFaint.Render(fmt.Sprintf(" · %s   ·   %d sessions", m.label(), len(m.rows))) + "\n")
 	if viewPriced == 0 {
-		b.WriteString(stFaint.Render("no "+viewLabel(view)+" cost for these sessions — press v to switch view") + "\n")
+		b.WriteString(stFaint.Render("no "+viewLabel(view)+" cost recorded for these sessions") + "\n")
 	} else {
 		head := stBold.Render(money(total)) + stFaint.Render(" "+viewLabel(view))
 		if view == "api_equivalent" && without > apiTotal {
@@ -207,7 +217,12 @@ func (m Model) listView() string {
 		}
 		b.WriteString(head + "\n")
 	}
-	b.WriteString(stFaint.Render("←/→ period · v view · ↑/↓ move · ↵ open receipt · q quit") + "\n\n")
+	// Offer `v` only when there's actually another populated view to switch to.
+	hint := "←/→ period · ↑/↓ move · ↵ open receipt · q quit"
+	if len(m.avail) > 1 {
+		hint = "←/→ period · v view (" + viewLabel(view) + ") · ↑/↓ move · ↵ open receipt · q quit"
+	}
+	b.WriteString(stFaint.Render(hint) + "\n\n")
 
 	if len(m.rows) == 0 {
 		b.WriteString(stFaint.Render("  no sessions in "+m.label()) + "\n")
@@ -231,6 +246,9 @@ func (m Model) listView() string {
 	for i := start; i < end; i++ {
 		r := m.rows[i]
 		cost := money(r.micros)
+		if !r.hasView { // session carries no cost in this lens — say so, never a phantom $0
+			cost = "—"
+		}
 		bar := spendBar(r.micros, maxMicros, barW)
 		meta := fmt.Sprintf("%-15s  %-18s  %6s  %s",
 			fmtTime(r.first), trunc(orDash(r.repo), 18), comma(int64(r.turns)), trunc(humanModel(r.dominant()), 12))
@@ -381,7 +399,10 @@ func groupSessions(events []event.AgentEvent, view string) []sessionStat {
 		if g.repo == "" {
 			g.repo = sessionRepo(e)
 		}
-		mic, _ := viewMicros(e, view)
+		mic, ok := viewMicros(e, view)
+		if ok {
+			g.hasView = true
+		}
 		g.micros += mic
 		if e.Model != "" {
 			g.byModel[e.Model] += mic
@@ -436,6 +457,48 @@ func viewMicros(e event.AgentEvent, view string) (int64, bool) {
 }
 
 func viewLabel(view string) string { return strings.ReplaceAll(view, "_", "-") }
+
+// availableViews returns the cost lenses actually present in the events, in
+// canonical order — so `v` only rotates through views that have data. Always
+// returns at least api-equivalent.
+func availableViews(events []event.AgentEvent) []string {
+	has := map[string]bool{}
+	for _, e := range events {
+		for _, v := range cycleViews {
+			if _, ok := viewMicros(e, v); ok {
+				has[v] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(cycleViews))
+	for _, v := range cycleViews {
+		if has[v] {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"api_equivalent"}
+	}
+	return out
+}
+
+func ensureView(cur string, avail []string) string {
+	for _, v := range avail {
+		if v == cur {
+			return cur
+		}
+	}
+	return avail[0]
+}
+
+func nextView(avail []string, cur string) string {
+	for i, v := range avail {
+		if v == cur {
+			return avail[(i+1)%len(avail)]
+		}
+	}
+	return avail[0]
+}
 
 func spendBar(micros, max int64, width int) string {
 	if max <= 0 || width <= 0 {
