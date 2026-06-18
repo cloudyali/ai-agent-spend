@@ -320,11 +320,14 @@ func TestModel_InTUIPlanPicker(t *testing.T) {
 		priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),
 	}}}
 	withPlan := []Period{{Label: "today", Events: base[0].Events, Amortized: 100_000_000, HasPlan: true}}
-	var gotID string
+	var gotProvider, gotID string
 	var gotStart time.Time
-	setPlan := func(id string, start time.Time) []Period { gotID, gotStart = id, start; return withPlan }
-
-	m := New(base, 0, eng).WithPlanPicker(planChoices(), ts, setPlan)
+	setPlan := func(provider, id string, start time.Time) []Period {
+		gotProvider, gotID, gotStart = provider, id, start
+		return withPlan
+	}
+	provs := []ProviderChoice{{Name: "claude_code", Label: "Claude Code"}}
+	m := New(base, 0, eng).WithPlanPicker(provs, planChoices(), ts, setPlan)
 	for _, v := range m.avail {
 		if v == amortizedView {
 			t.Fatal("no plan yet → amortized must not be available")
@@ -336,7 +339,7 @@ func TestModel_InTUIPlanPicker(t *testing.T) {
 
 	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
 	m = nm.(Model)
-	if m.mode != modePlan || !strings.Contains(m.View(), "Set your subscription plan") {
+	if m.mode != modePlan || !strings.Contains(m.View(), "Set the plan for Claude Code") {
 		t.Fatalf("p should open the picker:\n%s", m.View())
 	}
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // pick the current plan → date step
@@ -346,15 +349,40 @@ func TestModel_InTUIPlanPicker(t *testing.T) {
 	}
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // confirm the date
 	m = nm.(Model)
-	wantStart := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC) // start date defaults to today (midnight)
-	if gotID != "claude-max-20x" || !gotStart.Equal(wantStart) {
-		t.Errorf("setPlan called with (%q, %v), want (claude-max-20x, %v)", gotID, gotStart, wantStart)
+	wantStart := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC) // start date defaults to today (midnight, UTC)
+	if gotProvider != "claude_code" || gotID != "claude-max-20x" || !gotStart.Equal(wantStart) {
+		t.Errorf("setPlan called with (%q, %q, %v), want (claude_code, claude-max-20x, %v)", gotProvider, gotID, gotStart, wantStart)
 	}
 	if m.mode != modeList {
 		t.Error("after confirm should return to the list")
 	}
 	if m.view() != amortizedView {
 		t.Errorf("should land on the amortized lens, got %q", m.view())
+	}
+}
+
+// With multiple providers, `p` opens the provider step first, then the chosen
+// provider's plan step.
+func TestModel_InTUIPlanPicker_MultiProvider(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	base := []Period{{Label: "today", Events: []event.AgentEvent{
+		priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),
+	}}}
+	provs := []ProviderChoice{{Name: "claude_code", Label: "Claude Code"}, {Name: "codex", Label: "Codex"}}
+	m := New(base, 0, eng).WithPlanPicker(provs, planChoices(), ts, func(string, string, time.Time) []Period { return base })
+
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	m = nm.(Model)
+	if m.mode != modePlan || !strings.Contains(m.View(), "which provider") {
+		t.Fatalf("p with multiple providers should show the provider step:\n%s", m.View())
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown}) // → codex
+	m = nm.(Model)
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // choose codex
+	m = nm.(Model)
+	if !strings.Contains(m.View(), "Set the plan for Codex") {
+		t.Errorf("should advance to codex's plan step:\n%s", m.View())
 	}
 }
 

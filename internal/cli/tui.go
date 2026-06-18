@@ -13,6 +13,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/agentspend/ai-agent-spend/internal/config"
@@ -75,16 +76,16 @@ func (a *App) cmdTui(args []string) int {
 		}
 	}
 
-	// setPlan persists the picker's choice (id + billing-cycle start) and returns
-	// recomputed periods so the amortized lens updates without leaving the TUI.
-	setPlan := func(id string, start time.Time) []tui.Period {
-		if err := config.SetDefaultPlan(a.Resolver.AppHome(), id, start); err != nil {
+	// setPlan persists the picker's choice (provider + id + billing-cycle start) and
+	// returns recomputed periods so the amortized lens updates without leaving the TUI.
+	setPlan := func(provider, id string, start time.Time) []tui.Period {
+		if err := config.SetProviderPlan(a.Resolver.AppHome(), provider, id, start); err != nil {
 			fmt.Fprintf(a.Err, "aispend: %v\n", err)
 		}
 		return buildPeriods()
 	}
 
-	m := tui.New(periods, startIdx, a.pricingEngine()).WithPlanPicker(a.planChoices(), now, setPlan)
+	m := tui.New(periods, startIdx, a.pricingEngine()).WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan)
 	if err := tui.RunModel(m, a.Out); err != nil {
 		fmt.Fprintf(a.Err, "aispend: tui: %v\n", err)
 		return 1
@@ -92,19 +93,37 @@ func (a *App) cmdTui(args []string) int {
 	return 0
 }
 
-// planChoices builds the picker list from the seeded plans + the configured one,
-// with an explicit "API / no subscription" option appended.
+// planChoices builds the plan catalog for the picker, with an explicit "API / no
+// subscription" option appended. The currently-selected plan is marked per
+// provider (see planProviders), not here.
 func (a *App) planChoices() []tui.PlanChoice {
-	current := ""
-	if cfg, err := config.LoadAppConfig(a.Resolver.AppHome()); err == nil {
-		current = cfg.Name
-	}
 	cs := make([]tui.PlanChoice, 0)
 	for _, p := range config.Plans() {
-		cs = append(cs, tui.PlanChoice{ID: p.ID, Label: p.Label, MonthlyUSD: p.MonthlyFeeUSD, Current: p.ID == current})
+		cs = append(cs, tui.PlanChoice{ID: p.ID, Label: p.Label, MonthlyUSD: p.MonthlyFeeUSD})
 	}
-	cs = append(cs, tui.PlanChoice{ID: "api", Current: current == "" || current == "api"})
+	cs = append(cs, tui.PlanChoice{ID: "api"})
 	return cs
+}
+
+// planProviders lists the providers present in the data with their currently
+// effective subscription plan, so the picker can set one plan per provider.
+func (a *App) planProviders(all []event.AgentEvent) []tui.ProviderChoice {
+	plans := a.planSet()
+	seen := map[string]bool{}
+	var out []tui.ProviderChoice
+	for _, e := range all {
+		if e.Provider == "" || seen[e.Provider] {
+			continue
+		}
+		seen[e.Provider] = true
+		cur := ""
+		if p := plans.For(e.Provider); p.Kind == "subscription" {
+			cur = p.Name
+		}
+		out = append(out, tui.ProviderChoice{Name: e.Provider, Label: providerLabel(e.Provider), Current: cur})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // maybePickPlan runs the standalone picker for `aispend plans` on a TTY, writing
@@ -114,7 +133,13 @@ func (a *App) maybePickPlan() bool {
 	if !isTTY(a.Out) {
 		return false
 	}
-	chosen, start, ok, err := tui.RunPlanPicker(a.planChoices(), a.Now(), a.Out)
+	var provs []tui.ProviderChoice
+	if st, err := a.openStore(); err == nil {
+		if all, err := st.Query(store.Filter{}); err == nil {
+			provs = a.planProviders(all)
+		}
+	}
+	provider, chosen, start, ok, err := tui.RunPlanPicker(provs, a.planChoices(), a.Now(), a.Out)
 	if err != nil {
 		fmt.Fprintf(a.Err, "aispend: %v\n", err)
 		return true
@@ -123,14 +148,18 @@ func (a *App) maybePickPlan() bool {
 		fmt.Fprintln(a.Out, "plan unchanged.")
 		return true
 	}
-	if err := config.SetDefaultPlan(a.Resolver.AppHome(), chosen, start); err != nil {
+	if err := config.SetProviderPlan(a.Resolver.AppHome(), provider, chosen, start); err != nil {
 		fmt.Fprintf(a.Err, "aispend: %v\n", err)
 		return true
 	}
+	target := "default"
+	if provider != "" {
+		target = provider
+	}
 	if chosen == "" || chosen == "api" {
-		fmt.Fprintln(a.Out, "Plan set to API (no subscription) — the amortized view is off.")
+		fmt.Fprintf(a.Out, "%s: no subscription — the amortized view is off for it.\n", target)
 	} else {
-		fmt.Fprintf(a.Out, "Plan set to %s (start %s). Open `aispend tui` and press v for the amortized view (or `aispend report --view effective_allocated`).\n", chosen, start.Format("2006-01-02"))
+		fmt.Fprintf(a.Out, "%s plan set to %s (start %s). Open `aispend tui` and press v for the amortized view.\n", target, chosen, start.Format("2006-01-02"))
 	}
 	return true
 }

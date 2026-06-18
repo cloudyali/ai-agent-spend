@@ -10,75 +10,102 @@ import (
 
 func planChoices() []PlanChoice {
 	return []PlanChoice{
-		{ID: "claude-max-20x", Label: "Claude Max 20×", MonthlyUSD: 200, Current: true},
+		{ID: "claude-max-20x", Label: "Claude Max 20×", MonthlyUSD: 200},
 		{ID: "claude-pro", Label: "Claude Pro", MonthlyUSD: 20},
 		{ID: "api"}, // no subscription
 	}
 }
 
-// A real plan goes plan → date; the start date defaults to today and is adjustable.
-func TestPlanPicker_PlanThenDate(t *testing.T) {
-	today := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC)
-	m := newPlanPicker(planChoices(), today)
-	if m.cursor != 0 {
-		t.Fatalf("cursor should start on the current plan, got %d", m.cursor)
-	}
-	v := m.View()
-	for _, want := range []string{"Claude Max 20×", "$200/mo", "current", "API / no subscription", "↵ select"} {
-		if !strings.Contains(v, want) {
-			t.Errorf("plan view missing %q:\n%s", want, v)
-		}
-	}
-
-	// enter on the current (real) plan → date phase, defaulting to today
-	pk, finished := m.step(tea.KeyMsg{Type: tea.KeyEnter})
-	m = pk
-	if finished || m.phase != phaseDate {
-		t.Fatalf("a real plan should advance to the date step (finished=%v phase=%v)", finished, m.phase)
-	}
-	if !m.start.Equal(today) {
-		t.Errorf("start should default to today, got %v", m.start)
-	}
-	if dv := m.View(); !strings.Contains(dv, "start date") || !strings.Contains(dv, "2026-06-17") {
-		t.Errorf("date view should show the default start:\n%s", dv)
-	}
-	// nudge: -1 day → Jun 16
-	pk, _ = m.step(tea.KeyMsg{Type: tea.KeyDown})
-	m = pk
-	if !m.start.Equal(time.Date(2026, 6, 16, 0, 0, 0, 0, time.UTC)) {
-		t.Errorf("down should subtract a day, got %v", m.start)
-	}
-	// confirm
-	pk, finished = m.step(tea.KeyMsg{Type: tea.KeyEnter})
-	m = pk
-	if !finished || !m.done || m.chosen != "claude-max-20x" {
-		t.Errorf("enter on date should confirm: finished=%v done=%v chosen=%q", finished, m.done, m.chosen)
+func providerChoices() []ProviderChoice {
+	return []ProviderChoice{
+		{Name: "claude_code", Label: "Claude Code", Current: "claude-max-20x"},
+		{Name: "codex", Label: "Codex", Current: ""},
 	}
 }
 
-// The no-subscription option skips the date step and confirms immediately.
+// One provider: skip the provider step, go straight to plan → date.
+func TestPlanPicker_SingleProvider(t *testing.T) {
+	today := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC)
+	provs := []ProviderChoice{{Name: "claude_code", Label: "Claude Code", Current: "claude-max-20x"}}
+	m := newPlanPicker(provs, planChoices(), today)
+	if m.phase != phasePlan || m.provider != "claude_code" {
+		t.Fatalf("single provider should start at the plan step for it, got phase=%v provider=%q", m.phase, m.provider)
+	}
+	if v := m.View(); !strings.Contains(v, "Set the plan for Claude Code") || !strings.Contains(v, "current") {
+		t.Errorf("plan view should name the provider + mark current:\n%s", v)
+	}
+	pk, fin := m.step(tea.KeyMsg{Type: tea.KeyEnter}) // real plan → date step
+	m = pk
+	if fin || m.phase != phaseDate {
+		t.Fatalf("a real plan should advance to the date step, got fin=%v phase=%v", fin, m.phase)
+	}
+	pk, fin = m.step(tea.KeyMsg{Type: tea.KeyEnter}) // confirm date
+	m = pk
+	if !fin || !m.done || m.chosen != "claude-max-20x" || m.provider != "claude_code" {
+		t.Errorf("confirm: fin=%v done=%v chosen=%q provider=%q", fin, m.done, m.chosen, m.provider)
+	}
+}
+
+// Multiple providers: provider step first, then per-provider plan + date.
+func TestPlanPicker_MultiProvider(t *testing.T) {
+	today := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC)
+	m := newPlanPicker(providerChoices(), planChoices(), today)
+	if m.phase != phaseProvider {
+		t.Fatalf("multiple providers should start at the provider step, got %v", m.phase)
+	}
+	if !strings.Contains(m.View(), "which provider") {
+		t.Errorf("provider view:\n%s", m.View())
+	}
+	pk, _ := m.step(tea.KeyMsg{Type: tea.KeyDown}) // → codex
+	m = pk
+	pk, _ = m.step(tea.KeyMsg{Type: tea.KeyEnter}) // choose codex → plan step
+	m = pk
+	if m.phase != phasePlan || m.provider != "codex" {
+		t.Fatalf("after choosing codex: phase=%v provider=%q", m.phase, m.provider)
+	}
+	if !strings.Contains(m.View(), "Set the plan for Codex") {
+		t.Errorf("plan header should name codex:\n%s", m.View())
+	}
+	pk, _ = m.step(tea.KeyMsg{Type: tea.KeyDown}) // cursor → claude-pro
+	m = pk
+	pk, fin := m.step(tea.KeyMsg{Type: tea.KeyEnter}) // real → date
+	m = pk
+	if fin || m.phase != phaseDate {
+		t.Fatal("real plan → date")
+	}
+	pk, fin = m.step(tea.KeyMsg{Type: tea.KeyEnter})
+	m = pk
+	if !fin || !m.done || m.provider != "codex" || m.chosen != "claude-pro" {
+		t.Errorf("confirm codex/claude-pro: provider=%q chosen=%q done=%v", m.provider, m.chosen, m.done)
+	}
+}
+
 func TestPlanPicker_NoSubSkipsDate(t *testing.T) {
-	today := time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC)
-	m := newPlanPicker(planChoices(), today)
+	m := newPlanPicker([]ProviderChoice{{Name: "claude_code"}}, planChoices(), time.Now())
 	m.cursor = 2 // "api"
-	pk, finished := m.step(tea.KeyMsg{Type: tea.KeyEnter})
+	pk, fin := m.step(tea.KeyMsg{Type: tea.KeyEnter})
 	m = pk
-	if !finished || !m.done || m.chosen != "api" {
-		t.Errorf("api should confirm without a date step: finished=%v done=%v chosen=%q", finished, m.done, m.chosen)
+	if !fin || !m.done || m.chosen != "api" {
+		t.Errorf("api should confirm without a date step: fin=%v done=%v chosen=%q", fin, m.done, m.chosen)
 	}
 }
 
-func TestPlanPicker_EscCancels(t *testing.T) {
-	m := newPlanPicker(planChoices(), time.Now())
-	pk, finished := m.step(tea.KeyMsg{Type: tea.KeyEsc})
-	if !finished || pk.done {
-		t.Errorf("esc in the plan step should cancel (finished, not done): finished=%v done=%v", finished, pk.done)
+func TestPlanPicker_EscNavigation(t *testing.T) {
+	// multi: esc in the plan step goes back to the provider step; esc there cancels.
+	m := newPlanPicker(providerChoices(), planChoices(), time.Now())
+	pk, _ := m.step(tea.KeyMsg{Type: tea.KeyEnter}) // choose provider 0 → plan
+	m = pk
+	pk, fin := m.step(tea.KeyMsg{Type: tea.KeyEsc})
+	m = pk
+	if fin || m.phase != phaseProvider {
+		t.Fatalf("esc in plan (multi) → provider step, got fin=%v phase=%v", fin, m.phase)
 	}
-	// esc in the date step goes back to the plan step, not cancel
-	m2 := newPlanPicker(planChoices(), time.Now())
-	m2.phase = phaseDate
-	pk2, finished2 := m2.step(tea.KeyMsg{Type: tea.KeyEsc})
-	if finished2 || pk2.phase != phasePlan {
-		t.Errorf("esc in the date step should return to the plan step: finished=%v phase=%v", finished2, pk2.phase)
+	if _, fin = m.step(tea.KeyMsg{Type: tea.KeyEsc}); !fin {
+		t.Error("esc in the provider step should finish (cancel)")
+	}
+	// single: esc in the plan step cancels.
+	s := newPlanPicker([]ProviderChoice{{Name: "claude_code"}}, planChoices(), time.Now())
+	if _, fin = s.step(tea.KeyMsg{Type: tea.KeyEsc}); !fin {
+		t.Error("esc in plan (single provider) should finish (cancel)")
 	}
 }

@@ -63,18 +63,21 @@ type Model struct {
 	w, h    int
 
 	// in-explorer plan picker (optional; enabled via WithPlanPicker). setPlan
-	// persists the choice and returns recomputed periods so the amortized lens
-	// updates live without leaving the TUI.
-	plans   []PlanChoice
-	today   time.Time
-	setPlan func(planID string, start time.Time) []Period
-	picker  planPicker
+	// persists the choice (for the chosen provider) and returns recomputed periods
+	// so the amortized lens updates live without leaving the TUI.
+	providers []ProviderChoice
+	plans     []PlanChoice
+	today     time.Time
+	setPlan   func(provider, planID string, start time.Time) []Period
+	picker    planPicker
 }
 
-// WithPlanPicker enables the in-explorer plan picker (the `p` key): plans is the
-// selectable list, today seeds the start-date default, and setPlan persists the
-// choice (id + start) and returns the recomputed periods.
-func (m Model) WithPlanPicker(plans []PlanChoice, today time.Time, setPlan func(string, time.Time) []Period) Model {
+// WithPlanPicker enables the in-explorer plan picker (the `p` key): providers is
+// the set whose plans can be set (one per provider), plans is the catalog, today
+// seeds the start-date default, and setPlan persists the choice (provider + id +
+// start) and returns the recomputed periods.
+func (m Model) WithPlanPicker(providers []ProviderChoice, plans []PlanChoice, today time.Time, setPlan func(provider, planID string, start time.Time) []Period) Model {
+	m.providers = providers
 	m.plans = plans
 	m.today = today
 	m.setPlan = setPlan
@@ -184,7 +187,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if finished {
 				m.mode = modeList
 				if m.picker.done && m.setPlan != nil { // confirmed → persist + recompute live
-					m.periods = m.setPlan(m.picker.chosen, m.picker.start)
+					m.periods = m.setPlan(m.picker.provider, m.picker.chosen, m.picker.start)
 					if m.pIdx >= len(m.periods) {
 						m.pIdx = 0
 					}
@@ -226,7 +229,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "p":
 				if m.setPlan != nil {
-					m.picker = newPlanPicker(m.plans, m.today)
+					m.picker = newPlanPicker(m.providers, m.plans, m.today)
 					m.mode = modePlan
 				}
 			case "enter":

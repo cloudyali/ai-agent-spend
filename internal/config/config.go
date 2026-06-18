@@ -170,20 +170,29 @@ func resolvePlan(name, feeStr, currency, startStr string) (Plan, error) {
 	return p, nil
 }
 
-// SetDefaultPlan writes the default `plan = "<id>"` into ~/.aispend/config.toml,
-// preserving every other line. For a real subscription it also writes
-// `plan_start` (the billing-cycle anchor used for monthly-cycle amortization) when
-// a non-zero start is given. An empty/"api" id sets `plan = ""`-equivalent (no
-// subscription) and leaves the date untouched. Backs the interactive plan picker
-// so a user never has to hand-edit TOML.
-func SetDefaultPlan(appHome, planID string, start time.Time) error {
-	if err := setConfigKey(appHome, "plan", strconv.Quote(planID)); err != nil {
+// SetProviderPlan writes a provider's plan into ~/.aispend/config.toml, preserving
+// every other line. provider "" sets the default (`plan`/`plan_start`); a named
+// provider sets `<provider>_plan` / `<provider>_plan_start` — so different
+// providers can each carry their own subscription, one plan per provider. For a
+// real subscription it also writes the start date (the billing-cycle anchor) when
+// non-zero; "api"/empty clears the subscription and leaves the date untouched.
+func SetProviderPlan(appHome, provider, planID string, start time.Time) error {
+	planKey, startKey := "plan", "plan_start"
+	if provider != "" {
+		planKey, startKey = provider+"_plan", provider+"_plan_start"
+	}
+	if err := setConfigKey(appHome, planKey, strconv.Quote(planID)); err != nil {
 		return err
 	}
 	if planID != "" && planID != "api" && !start.IsZero() {
-		return setConfigKey(appHome, "plan_start", strconv.Quote(start.Format(planStartLayout)))
+		return setConfigKey(appHome, startKey, strconv.Quote(start.Format(planStartLayout)))
 	}
 	return nil
+}
+
+// SetDefaultPlan sets the default (no-provider) plan. Convenience wrapper.
+func SetDefaultPlan(appHome, planID string, start time.Time) error {
+	return SetProviderPlan(appHome, "", planID, start)
 }
 
 // setConfigKey sets one flat top-level key in config.toml (replacing it in place if

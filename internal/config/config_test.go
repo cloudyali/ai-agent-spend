@@ -56,6 +56,39 @@ func TestSetDefaultPlan(t *testing.T) {
 	}
 }
 
+// Different providers each carry their own plan (one per provider), coexisting
+// with the default — via <provider>_plan / <provider>_plan_start keys.
+func TestSetProviderPlan_MultiProvider(t *testing.T) {
+	home := t.TempDir()
+	start := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+
+	if err := SetProviderPlan(home, "", "claude-max-20x", start); err != nil { // default
+		t.Fatal(err)
+	}
+	if err := SetProviderPlan(home, "codex", "chatgpt-pro", start); err != nil { // per-provider
+		t.Fatal(err)
+	}
+
+	set, err := LoadPlanSet(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.Default.Name != "claude-max-20x" || set.Default.Kind != "subscription" {
+		t.Errorf("default plan wrong: %+v", set.Default)
+	}
+	cx, ok := set.ByProvider["codex"]
+	if !ok || cx.Name != "chatgpt-pro" || cx.Kind != "subscription" || cx.MonthlyFeeUSD <= 0 || !cx.StartDate.Equal(start) {
+		t.Errorf("codex plan wrong: %+v (ok=%v)", cx, ok)
+	}
+	// a provider without its own plan falls back to the default
+	if set.For("claude_code").Name != "claude-max-20x" {
+		t.Errorf("claude_code should fall back to default, got %+v", set.For("claude_code"))
+	}
+	if set.For("codex").Name != "chatgpt-pro" {
+		t.Errorf("codex should use its own plan, got %+v", set.For("codex"))
+	}
+}
+
 func TestParseTOML(t *testing.T) {
 	in := []byte(`
 # a comment
