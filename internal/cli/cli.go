@@ -929,17 +929,20 @@ func startOfMonth(t time.Time) time.Time {
 // spanDays returns the number of days spanned by the events' timestamps (min 1),
 // used to amortize a subscription over `--all` history.
 func spanDays(events []event.AgentEvent) int {
-	if len(events) == 0 {
-		return 1
-	}
-	lo, hi := events[0].TSStart, events[0].TSStart
+	var lo, hi time.Time
 	for _, e := range events {
-		if e.TSStart.Before(lo) {
+		if e.TSStart.IsZero() { // a malformed event must not stretch the span to year 1
+			continue
+		}
+		if lo.IsZero() || e.TSStart.Before(lo) {
 			lo = e.TSStart
 		}
 		if e.TSStart.After(hi) {
 			hi = e.TSStart
 		}
+	}
+	if lo.IsZero() {
+		return 1
 	}
 	if d := int(hi.Sub(lo).Hours()/24) + 1; d > 1 {
 		return d
@@ -951,8 +954,11 @@ func spanDays(events []event.AgentEvent) int {
 // amortize a subscription over --all history. Zero when there are no events.
 func spanStart(events []event.AgentEvent) time.Time {
 	var lo time.Time
-	for i, e := range events {
-		if i == 0 || e.TSStart.Before(lo) {
+	for _, e := range events {
+		if e.TSStart.IsZero() { // skip malformed events so they can't anchor the window to year 1
+			continue
+		}
+		if lo.IsZero() || e.TSStart.Before(lo) {
 			lo = e.TSStart
 		}
 	}

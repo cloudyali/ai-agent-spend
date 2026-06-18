@@ -256,6 +256,15 @@ func TestAmortizeSubscription(t *testing.T) {
 		}
 	})
 
+	t.Run("an ancient window start is clamped to the plan start (robust to a corrupt timestamp)", func(t *testing.T) {
+		// A stray/corrupt event timestamp (e.g. ~1997) must NOT bill ~29 years of
+		// fees: billing starts at the plan's StartDate, not the window's since.
+		got, ok := AmortizeSubscription(sub(d(2026, 6, 12)), d(1997, 3, 1), d(2026, 7, 12))
+		if !ok || got != event.USD(200_000_000) {
+			t.Errorf("ancient since should clamp to plan start (one $200 cycle), got %v, %v", got, ok)
+		}
+	})
+
 	t.Run("a window entirely before the start date bills nothing", func(t *testing.T) {
 		if _, ok := AmortizeSubscription(sub(d(2026, 6, 12)), d(2026, 6, 1), d(2026, 6, 10)); ok {
 			t.Error("window before the plan started should not bill")

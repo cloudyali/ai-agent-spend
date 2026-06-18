@@ -174,6 +174,14 @@ func (a *App) amortizedTotal(events []event.AgentEvent, win window, plans config
 	hasPlan := false
 	for prov := range provs {
 		plan := toPricingPlan(plans.For(prov))
+		// Amortizing "all time" (no lower bound) without a billing anchor would
+		// flat-prorate the fee across the ENTIRE event span — which a single stray
+		// or corrupt timestamp can blow up into decades of plan fees. Require a
+		// plan start for the unbounded window; with one, AmortizeSubscription clamps
+		// to it (robust to bad timestamps). Bounded windows (this month, …) are fine.
+		if win.Since.IsZero() && plan.StartDate.IsZero() {
+			continue
+		}
 		if prorated, ok := proratePlan(plan, winSince, win.Until, legacyDays); ok {
 			total += prorated.Micros
 			hasPlan = true
