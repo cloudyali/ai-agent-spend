@@ -60,7 +60,7 @@ func (a *App) cmdTui(args []string) int {
 				continue
 			}
 			evs := eventsInWindow(all, win)
-			amort, hasPlan := a.amortizedTotal(evs, win, plans)
+			amort, hasPlan := a.amortizedByProvider(evs, win, plans)
 			ps = append(ps, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan})
 		}
 		return ps
@@ -180,11 +180,12 @@ func eventsInWindow(all []event.AgentEvent, win window) []event.AgentEvent {
 	return out
 }
 
-// amortizedTotal sums each present provider's prorated subscription fee for the
+// amortizedByProvider prorates each present provider's subscription fee for the
 // window — the same per-provider proration `report --view effective_allocated`
-// uses (cycle-aware via the plan's start-date anchor). Returns (0, false) when no
-// provider has an amortizable plan.
-func (a *App) amortizedTotal(events []event.AgentEvent, win window, plans config.PlanSet) (int64, bool) {
+// uses (cycle-aware via the plan's start-date anchor) — keyed by provider so the
+// TUI can allocate each provider's fee only among its own sessions. Empty map when
+// no provider has an amortizable plan.
+func (a *App) amortizedByProvider(events []event.AgentEvent, win window, plans config.PlanSet) (map[string]int64, bool) {
 	provs := map[string]bool{}
 	for _, e := range events {
 		if e.Provider != "" {
@@ -199,7 +200,7 @@ func (a *App) amortizedTotal(events []event.AgentEvent, win window, plans config
 	} else if d := int(win.Until.Sub(win.Since).Hours() / 24); d > 0 {
 		legacyDays = d
 	}
-	var total int64
+	out := map[string]int64{}
 	hasPlan := false
 	for prov := range provs {
 		plan := toPricingPlan(plans.For(prov))
@@ -211,10 +212,10 @@ func (a *App) amortizedTotal(events []event.AgentEvent, win window, plans config
 		if win.Since.IsZero() && plan.StartDate.IsZero() {
 			continue
 		}
-		if prorated, ok := proratePlan(plan, winSince, win.Until, legacyDays); ok {
-			total += prorated.Micros
+		if prorated, ok := proratePlan(plan, winSince, win.Until, legacyDays); ok && prorated.Micros > 0 {
+			out[prov] = prorated.Micros
 			hasPlan = true
 		}
 	}
-	return total, hasPlan
+	return out, hasPlan
 }

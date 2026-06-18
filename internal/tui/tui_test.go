@@ -280,7 +280,7 @@ func TestModel_AmortizedLens(t *testing.T) {
 		priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 3_000_000}), // api $15
 		priced(t, eng, "e2", "s2", "web", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),      // api $5
 	}
-	per := Period{Label: "this month", Events: evs, Amortized: 200_000_000, HasPlan: true} // $200 plan
+	per := Period{Label: "this month", Events: evs, Amortized: map[string]int64{"claude_code": 200_000_000}, HasPlan: true} // $200 plan
 	m := New([]Period{per}, 0, eng)
 
 	found := false
@@ -319,7 +319,7 @@ func TestModel_InTUIPlanPicker(t *testing.T) {
 	base := []Period{{Label: "today", Events: []event.AgentEvent{
 		priced(t, eng, "e1", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000}),
 	}}}
-	withPlan := []Period{{Label: "today", Events: base[0].Events, Amortized: 100_000_000, HasPlan: true}}
+	withPlan := []Period{{Label: "today", Events: base[0].Events, Amortized: map[string]int64{"claude_code": 100_000_000}, HasPlan: true}}
 	var gotProvider, gotID string
 	var gotStart time.Time
 	setPlan := func(provider, id string, start time.Time) []Period {
@@ -422,6 +422,46 @@ func TestModel_ReceiptFiles(t *testing.T) {
 	}
 	if strings.Index(r, "internal/cli/tui.go") > strings.Index(r, "README.md") {
 		t.Errorf("most-touched file should come first:\n%s", r)
+	}
+}
+
+// Each provider's plan fee is allocated only among ITS sessions — a codex session
+// never absorbs claude's fee.
+func TestModel_AmortizedPerProvider(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	mk := func(id, prov, model string, tk event.Tokens) event.AgentEvent {
+		e := event.AgentEvent{EventID: id, SessionID: id, Provider: prov, Model: model, Tokens: tk, TSStart: ts, TSEnd: ts}
+		if err := eng.Price(&e, pricing.Plan{Kind: "api"}); err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
+	evs := []event.AgentEvent{
+		mk("cc", "claude_code", "claude-opus-4-8", event.Tokens{Input: 2_000_000}),
+		mk("cx", "codex", "gpt-5.3-codex", event.Tokens{Input: 1_000_000}),
+	}
+	per := Period{Label: "this month", Events: evs, HasPlan: true,
+		Amortized: map[string]int64{"claude_code": 200_000_000, "codex": 100_000_000}}
+	m := New([]Period{per}, 0, eng)
+	for m.view() != amortizedView {
+		nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+		m = nm.(Model)
+	}
+	var cc, cx int64
+	for _, r := range m.rows {
+		switch r.id {
+		case "cc":
+			cc = r.micros
+		case "cx":
+			cx = r.micros
+		}
+	}
+	if cc != 200_000_000 {
+		t.Errorf("claude_code session should get claude's $200 (not a share of the combined pool), got %d", cc)
+	}
+	if cx != 100_000_000 {
+		t.Errorf("codex session should get codex's $100, got %d", cx)
 	}
 }
 

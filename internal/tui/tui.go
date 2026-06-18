@@ -26,8 +26,8 @@ import (
 type Period struct {
 	Label     string
 	Events    []event.AgentEvent
-	Amortized int64 // prorated plan fee for this window (micros); 0 if no plan
-	HasPlan   bool  // a subscription plan is configured (enables the amortized lens)
+	Amortized map[string]int64 // prorated plan fee per provider (micros); empty if no plan
+	HasPlan   bool             // any provider has a subscription plan (enables the amortized lens)
 }
 
 type mode int
@@ -150,14 +150,26 @@ func (m Model) buildRows() []sessionStat {
 	rows := groupSessions(m.events(), m.curView)
 	if m.curView == amortizedView {
 		per := m.period()
-		basis := make(map[string]int64, len(rows))
+		// Allocate each provider's prorated fee across ONLY its own sessions, by
+		// api-equivalent share — so a codex session never absorbs claude's plan fee.
+		basisByProv := map[string]map[string]int64{}
 		for _, r := range rows {
-			basis[r.id] = r.apiMicros
+			if basisByProv[r.provider] == nil {
+				basisByProv[r.provider] = map[string]int64{}
+			}
+			basisByProv[r.provider][r.id] = r.apiMicros
 		}
-		alloc := pricing.Allocate(event.Money{Micros: per.Amortized, Currency: "USD"}, basis)
+		alloc := map[string]int64{}
+		for prov, basis := range basisByProv {
+			if fee := per.Amortized[prov]; fee > 0 {
+				for sid, m := range pricing.Allocate(event.Money{Micros: fee, Currency: "USD"}, basis) {
+					alloc[sid] = m.Micros
+				}
+			}
+		}
 		for i := range rows {
-			rows[i].micros = alloc[rows[i].id].Micros
-			rows[i].hasView = per.HasPlan && rows[i].apiMicros > 0
+			rows[i].micros = alloc[rows[i].id]
+			rows[i].hasView = per.Amortized[rows[i].provider] > 0 // covered by a plan
 		}
 		sort.SliceStable(rows, func(i, j int) bool { return rows[i].micros > rows[j].micros })
 	}
@@ -321,13 +333,17 @@ func (m Model) listView() string {
 func (m Model) headerLine(view string) string {
 	if view == amortizedView {
 		per := m.period()
+		var total int64
+		for _, v := range per.Amortized {
+			total += v
+		}
 		var api int64
 		for _, e := range m.events() {
 			api += apiMicros(e)
 		}
-		head := stBold.Render(money(per.Amortized)) + stFaint.Render(" amortized (plan)")
-		if api > 0 && per.Amortized > 0 {
-			head += stFaint.Render(fmt.Sprintf("   ·   api-equivalent %s   ·   %s ROI", money(api), roiStr(float64(api)/float64(per.Amortized))))
+		head := stBold.Render(money(total)) + stFaint.Render(" amortized (plan)")
+		if api > 0 && total > 0 {
+			head += stFaint.Render(fmt.Sprintf("   ·   api-equivalent %s   ·   %s ROI", money(api), roiStr(float64(api)/float64(total))))
 		}
 		return head
 	}
