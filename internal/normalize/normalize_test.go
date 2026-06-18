@@ -65,6 +65,24 @@ func TestNormalize_MapsAssistantTurn(t *testing.T) {
 	}
 }
 
+// Files touched: file_path/notebook_path from the turn's tool_use inputs, made
+// repo-relative (no absolute/home leak), deduped + sorted. Bash (command, no
+// file) is ignored; a path outside the repo degrades to its base name.
+func TestNormalize_FilesTouched(t *testing.T) {
+	const editLine = `{"type":"assistant","uuid":"a2","sessionId":"sess_1","timestamp":"2026-06-14T10:00:05Z","cwd":"/Users/dev/payments","message":{"id":"msg_2","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/Users/dev/payments/src/app.go"}},{"type":"tool_use","name":"Read","input":{"file_path":"/Users/dev/payments/README.md"}},{"type":"tool_use","name":"Edit","input":{"file_path":"/Users/dev/payments/src/app.go"}},{"type":"tool_use","name":"Bash","input":{"command":"go test ./..."}},{"type":"tool_use","name":"Read","input":{"file_path":"/etc/hosts"}}],"usage":{"input_tokens":100,"output_tokens":10}}}`
+	n := ClaudeCode{GOOS: "linux", IdentityHash: "id"}
+	ev, err := n.Normalize(rec(editLine, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(ev.Files, ","); got != "README.md,hosts,src/app.go" {
+		t.Errorf("Files = %q, want \"README.md,hosts,src/app.go\" (repo-relative, deduped, sorted; Bash skipped; /etc/hosts → base)", got)
+	}
+	if strings.Contains(strings.Join(ev.Files, ","), "/Users/") {
+		t.Errorf("absolute/home path leaked into Files: %v", ev.Files)
+	}
+}
+
 func TestNormalize_AttributeStampsProjectAndCostTag(t *testing.T) {
 	n := ClaudeCode{GOOS: "linux", IdentityHash: "id", Attribute: func(string) (string, string) {
 		return "payments-service", "team-payments"

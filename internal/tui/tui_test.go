@@ -372,6 +372,31 @@ func TestModel_PlanPickerDisabled(t *testing.T) {
 	}
 }
 
+// The session receipt lists the files touched, most-touched first.
+func TestModel_ReceiptFiles(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	mk := func(id string, files []string) event.AgentEvent {
+		e := priced(t, eng, id, "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000})
+		e.Files = files
+		return e
+	}
+	evs := []event.AgentEvent{
+		mk("e1", []string{"internal/cli/tui.go", "README.md"}),
+		mk("e2", []string{"internal/cli/tui.go"}), // touched twice → ranks first
+	}
+	m := New([]Period{{Label: "today", Events: evs}}, 0, eng)
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = nm.(Model)
+	r := m.View()
+	if !strings.Contains(r, "files") || !strings.Contains(r, "internal/cli/tui.go") || !strings.Contains(r, "README.md") {
+		t.Errorf("receipt should list the files touched:\n%s", r)
+	}
+	if strings.Index(r, "internal/cli/tui.go") > strings.Index(r, "README.md") {
+		t.Errorf("most-touched file should come first:\n%s", r)
+	}
+}
+
 func TestModel_Empty(t *testing.T) {
 	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {

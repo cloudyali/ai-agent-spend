@@ -411,6 +411,14 @@ func (m Model) receiptView() string {
 		}
 	}
 
+	if files, more := topFiles(s.evs, 5); len(files) > 0 {
+		fl := "  files       " + strings.Join(files, " · ")
+		if more > 0 {
+			fl += stFaint.Render(fmt.Sprintf("  (+%d more)", more))
+		}
+		b.WriteString(fl + "\n")
+	}
+
 	b.WriteString("\n  top turns" + stFaint.Render("  (api-equivalent)") + "\n")
 	for _, e := range topTurns(s.evs, 5) {
 		amt := "—"
@@ -674,6 +682,35 @@ func addComp(a, b pricing.CostComponents) pricing.CostComponents {
 		CacheWrite:   add(a.CacheWrite, b.CacheWrite),
 		CacheWrite1h: add(a.CacheWrite1h, b.CacheWrite1h),
 	}
+}
+
+// topFiles unions the files touched across a session's turns, most-touched first,
+// returning the top n plus how many more there are.
+func topFiles(evs []event.AgentEvent, n int) ([]string, int) {
+	count := map[string]int{}
+	for _, e := range evs {
+		for _, f := range e.Files {
+			count[f]++
+		}
+	}
+	if len(count) == 0 {
+		return nil, 0
+	}
+	files := make([]string, 0, len(count))
+	for f := range count {
+		files = append(files, f)
+	}
+	sort.Slice(files, func(i, j int) bool {
+		if count[files[i]] != count[files[j]] {
+			return count[files[i]] > count[files[j]]
+		}
+		return files[i] < files[j]
+	})
+	more := 0
+	if len(files) > n {
+		more, files = len(files)-n, files[:n]
+	}
+	return files, more
 }
 
 func tokenSummary(t event.Tokens) string {

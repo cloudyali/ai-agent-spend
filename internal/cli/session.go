@@ -143,9 +143,9 @@ func (a *App) renderSessionReceipt(events []event.AgentEvent, eng *pricing.Engin
 	}
 
 	header := paint(color, cBold, "session "+shortSession(sid))
-	fmt.Fprintf(a.Out, "%s  ·  %s  ·  %s → %s (%s)\n",
+	fmt.Fprintf(a.Out, "%s  ·  %s  ·  %s → %s UTC (%s)\n",
 		header, providerLabel(events[0].Provider),
-		start.Format("2006-01-02 15:04"), end.Format("15:04"), humanizeDuration(end.Sub(start)))
+		start.UTC().Format("2006-01-02 15:04"), end.UTC().Format("15:04"), humanizeDuration(end.Sub(start)))
 
 	totalStr := "not computable"
 	if priced > 0 {
@@ -158,6 +158,14 @@ func (a *App) renderSessionReceipt(events []event.AgentEvent, eng *pricing.Engin
 		if without > 0 {
 			fmt.Fprintf(a.Out, "  %-12s %s\n", "arbitrage", arbitrageLine(without, without-total))
 		}
+	}
+
+	if files, more := sessionFiles(events, 6); len(files) > 0 {
+		line := strings.Join(files, " · ")
+		if more > 0 {
+			line += fmt.Sprintf("  (+%d more)", more)
+		}
+		fmt.Fprintf(a.Out, "  %-12s %s\n", "files", line)
 	}
 
 	if top := topTurns(events, 5); len(top) > 0 {
@@ -205,6 +213,35 @@ func apiMicros(e event.AgentEvent) int64 {
 		return m.Micros
 	}
 	return 0
+}
+
+// sessionFiles unions the files touched across a session's turns, most-touched
+// first, returning the top n plus how many more there are.
+func sessionFiles(events []event.AgentEvent, n int) ([]string, int) {
+	count := map[string]int{}
+	for _, e := range events {
+		for _, f := range e.Files {
+			count[f]++
+		}
+	}
+	if len(count) == 0 {
+		return nil, 0
+	}
+	files := make([]string, 0, len(count))
+	for f := range count {
+		files = append(files, f)
+	}
+	sort.Slice(files, func(i, j int) bool {
+		if count[files[i]] != count[files[j]] {
+			return count[files[i]] > count[files[j]]
+		}
+		return files[i] < files[j]
+	})
+	more := 0
+	if len(files) > n {
+		more, files = len(files)-n, files[:n]
+	}
+	return files, more
 }
 
 // modelList renders the distinct models in a session as short names, sorted.

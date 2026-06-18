@@ -35,6 +35,7 @@ type AgentEvent struct {
 	Evidence      Evidence  `json:"evidence"`
 	Tools         []string  `json:"tools,omitempty"`
 	MCPServers    []string  `json:"mcp_servers,omitempty"`
+	Files         []string  `json:"files,omitempty"`    // repo-relative paths the turn operated on (Edit/Write/Read/…)
 	Activity      string    `json:"activity,omitempty"` // classifier deferred to 0B
 	TSStart       time.Time `json:"ts_start"`
 	TSEnd         time.Time `json:"ts_end"`

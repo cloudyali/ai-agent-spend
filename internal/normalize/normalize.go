@@ -14,6 +14,7 @@ import (
 	"math"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -53,8 +54,12 @@ var dateSuffix = regexp.MustCompile(`-[0-9]{8}$`)
 
 // ccContent is one item in a message's content array (text, tool_use, ...).
 type ccContent struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
+	Type  string `json:"type"`
+	Name  string `json:"name"`
+	Input struct {
+		FilePath     string `json:"file_path"`     // Edit / Write / Read / MultiEdit
+		NotebookPath string `json:"notebook_path"` // NotebookEdit
+	} `json:"input"`
 }
 
 // ccLine is the subset of a Claude Code JSONL record we read.
@@ -98,6 +103,7 @@ func (n ClaudeCode) Normalize(rec provider.RawRecord) (event.AgentEvent, error) 
 
 	u := line.Message.Usage
 	tools, mcp := toolsAndServers(line.Message.Content)
+	files := filesTouched(line.Message.Content, line.CWD)
 
 	var fiveMin, oneHour int64
 	if cc := u.CacheCreation; cc != nil {
@@ -152,6 +158,7 @@ func (n ClaudeCode) Normalize(rec provider.RawRecord) (event.AgentEvent, error) 
 		},
 		Tools:      tools,
 		MCPServers: mcp,
+		Files:      files,
 		TSStart:    line.Timestamp,
 		TSEnd:      line.Timestamp,
 		Evidence: event.Evidence{
@@ -225,6 +232,53 @@ func toolsAndServers(content []ccContent) (tools, servers []string) {
 		}
 	}
 	return tools, servers
+}
+
+// filesTouched collects the repo-relative paths a turn operated on, from its
+// file tools' inputs (Edit/Write/Read/MultiEdit → file_path, NotebookEdit →
+// notebook_path). Paths are made relative to the session cwd (the repo root) so
+// no absolute/home path leaks; a path outside the repo degrades to its base name.
+// Deduped and sorted for a stable event.
+func filesTouched(content []ccContent, cwd string) []string {
+	seen := map[string]bool{}
+	var files []string
+	for _, c := range content {
+		if c.Type != "tool_use" {
+			continue
+		}
+		p := c.Input.FilePath
+		if p == "" {
+			p = c.Input.NotebookPath
+		}
+		rel := relativizeFile(cwd, p)
+		if rel == "" || rel == "." || seen[rel] {
+			continue
+		}
+		seen[rel] = true
+		files = append(files, rel)
+	}
+	sort.Strings(files)
+	return files
+}
+
+// relativizeFile renders a tool's file path relative to the repo (cwd), using
+// forward slashes. Absolute paths under cwd become repo-relative; absolute paths
+// outside it degrade to the base name (never leak an absolute/home path); already-
+// relative paths pass through cleaned.
+func relativizeFile(cwd, p string) string {
+	if p == "" {
+		return ""
+	}
+	p = filepath.Clean(p)
+	if filepath.IsAbs(p) {
+		if cwd != "" {
+			if rel, err := filepath.Rel(cwd, p); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+				return filepath.ToSlash(rel)
+			}
+		}
+		return filepath.Base(p)
+	}
+	return filepath.ToSlash(p)
 }
 
 // eventIDFromKey hashes a dedupe key into a stable id. 16 hex chars (64 bits)
