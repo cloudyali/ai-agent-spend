@@ -44,9 +44,15 @@ type App struct {
 
 // Run is the entry point: dispatch args, write to out/err, return an exit code.
 func Run(args []string, out, err io.Writer) int {
-	app := &App{Resolver: platform.Detect(), Now: time.Now, Out: out, Err: err}
+	app := &App{Resolver: platform.Detect(), Now: nowUTC, Out: out, Err: err}
 	return app.dispatch(args)
 }
+
+// nowUTC is the app clock. AgentSpend is UTC end-to-end — event timestamps and
+// billing data are UTC — so period boundaries (today/week/month/…), scan cutoffs,
+// and the plan-start default are all computed in UTC for clean reconciliation,
+// regardless of the machine's local zone.
+func nowUTC() time.Time { return time.Now().UTC() }
 
 func (a *App) dispatch(args []string) int {
 	if len(args) == 0 {

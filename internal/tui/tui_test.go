@@ -217,6 +217,12 @@ func TestTimeLayout(t *testing.T) {
 	if got := time.Date(2026, 6, 17, 7, 42, 0, 0, time.UTC).Format(timeLayout); got != "Jun 17 7:42am" {
 		t.Errorf("am layout = %q, want 'Jun 17 7:42am'", got)
 	}
+	// fmtTime must render in UTC regardless of the input zone: 02:00 in +5:30 is
+	// 20:30 the previous day in UTC.
+	ist := time.FixedZone("IST", 5*3600+30*60)
+	if got := fmtTime(time.Date(2026, 6, 17, 2, 0, 0, 0, ist)); got != "Jun 16 8:30pm" {
+		t.Errorf("fmtTime should render UTC, got %q", got)
+	}
 }
 
 // When only one cost lens has data, `v` is a no-op and its hint is hidden — no

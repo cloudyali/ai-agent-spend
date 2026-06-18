@@ -45,11 +45,12 @@ func newPlanPicker(choices []PlanChoice, today time.Time) planPicker {
 	return m
 }
 
-// dayStart truncates to midnight in the value's OWN location (not forced to
-// Local) — the caller passes the local "now", so this yields the local date,
-// while staying timezone-independent for tests that pass a fixed UTC time.
+// dayStart truncates to UTC midnight. AgentSpend is UTC end-to-end (billing data,
+// event timestamps, and plan start dates are all UTC), so the plan-start anchor is
+// the UTC calendar date — timezone-independent and consistent with the ledger.
 func dayStart(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	t = t.UTC()
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
 func isNoSub(id string) bool { return id == "" || id == "api" }

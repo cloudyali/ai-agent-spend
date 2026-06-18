@@ -288,7 +288,7 @@ func (m Model) listView() string {
 		barW = 28
 	}
 	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%9s  %-*s  %-15s  %-18s  %6s  %s",
-		"COST", barW, "SHARE", "WHEN", "PROJECT", "TURNS", "MODEL")) + "\n")
+		"COST", barW, "SHARE", "WHEN (UTC)", "PROJECT", "TURNS", "MODEL")) + "\n")
 
 	maxMicros := m.rows[0].micros
 	start, end := m.windowRange(len(m.rows))
@@ -393,7 +393,7 @@ func (m Model) receiptView() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("%s · %s · %s → %s\n",
+	b.WriteString(fmt.Sprintf("%s · %s · %s → %s UTC\n",
 		stBold.Render(orDash(s.repo)), providerLabel(s.provider), fmtTime(s.first), fmtTime(s.last)))
 	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed", len(s.evs), turnsWord(len(s.evs)), elapsed(s.last.Sub(s.first)))) + "\n\n")
 
@@ -742,11 +742,12 @@ func shortID(id string) string {
 }
 
 // timeLayout renders a 12-hour wall-clock with an am/pm marker (e.g. "Jun 17
-// 7:42am"); fmtTime converts to the viewer's LOCAL zone first, since the stored
-// timestamps come from logs in UTC and "when did I work on this" means local.
+// 7:42am"). fmtTime renders in UTC: AgentSpend is UTC end-to-end (billing data and
+// event timestamps are UTC), so every surface shows UTC for clean reconciliation —
+// the WHEN column header and the receipt window are labelled "UTC".
 const timeLayout = "Jan 02 3:04pm"
 
-func fmtTime(t time.Time) string { return t.Local().Format(timeLayout) }
+func fmtTime(t time.Time) string { return t.UTC().Format(timeLayout) }
 
 func elapsed(d time.Duration) string {
 	if d < 0 {
