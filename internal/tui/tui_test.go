@@ -465,6 +465,37 @@ func TestModel_AmortizedPerProvider(t *testing.T) {
 	}
 }
 
+// The spend-over-time bar buckets api-equivalent spend by an adaptive calendar
+// unit and labels the peak.
+func TestDurationBar(t *testing.T) {
+	if chooseUnit(10*time.Hour) != "hour" || chooseUnit(10*24*time.Hour) != "day" ||
+		chooseUnit(100*24*time.Hour) != "week" || chooseUnit(400*24*time.Hour) != "month" {
+		t.Fatalf("unit selection wrong")
+	}
+
+	mk := func(day int, micros int64) event.AgentEvent {
+		m := event.USD(micros)
+		ts := time.Date(2026, 6, day, 12, 0, 0, 0, time.UTC)
+		return event.AgentEvent{EventID: fmt.Sprintf("e%d", day), SessionID: "s", Provider: "claude_code",
+			Model: "claude-opus-4-8", TSStart: ts, TSEnd: ts, CostViews: event.CostViews{APIEquivalent: &m}}
+	}
+	evs := []event.AgentEvent{mk(1, 1_000_000), mk(3, 5_000_000), mk(5, 2_000_000)} // span 4 days → daily
+
+	vals, unit, start := bucketSpend(evs)
+	if unit != "day" || len(vals) != 5 || !start.Equal(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("expected 5 daily buckets from Jun 1, got unit=%q n=%d start=%v", unit, len(vals), start)
+	}
+	if vals[0] != 1_000_000 || vals[1] != 0 || vals[2] != 5_000_000 || vals[3] != 0 || vals[4] != 2_000_000 {
+		t.Errorf("daily buckets wrong: %v", vals)
+	}
+	db := durationBar(evs)
+	for _, want := range []string{"by day", "peak", "Jun 3", "$5.00"} {
+		if !strings.Contains(db, want) {
+			t.Errorf("durationBar missing %q:\n%s", want, db)
+		}
+	}
+}
+
 func TestModel_Empty(t *testing.T) {
 	m := New([]Period{{Label: "today", Events: nil}}, 0, pricing.NewEngine())
 	if !strings.Contains(m.View(), "no sessions") {

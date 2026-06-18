@@ -295,6 +295,10 @@ func (m Model) listView() string {
 		return b.String()
 	}
 
+	if db := durationBar(m.events()); db != "" { // spend-over-time across the period
+		b.WriteString(db + "\n\n")
+	}
+
 	barW := width - 72
 	if barW < 8 {
 		barW = 8
@@ -700,6 +704,168 @@ func addComp(a, b pricing.CostComponents) pricing.CostComponents {
 		CacheRead:    add(a.CacheRead, b.CacheRead),
 		CacheWrite:   add(a.CacheWrite, b.CacheWrite),
 		CacheWrite1h: add(a.CacheWrite1h, b.CacheWrite1h),
+	}
+}
+
+var blockRamp = []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
+
+// sparkline renders one block glyph per value, scaled to the series max, so the
+// peak bucket towers over the rest. Zero/all-zero cells are blank; any nonzero
+// value shows at least the lowest block.
+func sparkline(vals []int64) string {
+	var max int64
+	for _, v := range vals {
+		if v > max {
+			max = v
+		}
+	}
+	var b strings.Builder
+	for _, v := range vals {
+		if max <= 0 || v <= 0 {
+			b.WriteRune(blockRamp[0])
+			continue
+		}
+		idx := int(v * 8 / max)
+		if idx < 1 {
+			idx = 1
+		}
+		if idx > 8 {
+			idx = 8
+		}
+		b.WriteRune(blockRamp[idx])
+	}
+	return b.String()
+}
+
+// durationBar renders a spend-over-time bar for the current period: api-equivalent
+// spend bucketed across the events' span by an adaptive calendar unit, with the
+// peak bucket labelled. Empty when there's no priced spend.
+func durationBar(events []event.AgentEvent) string {
+	vals, unit, start := bucketSpend(events)
+	if len(vals) <= 1 { // a single bucket isn't a chart worth showing
+		return ""
+	}
+	peakIdx, peakVal := 0, int64(-1)
+	for i, v := range vals {
+		if v > peakVal {
+			peakIdx, peakVal = i, v
+		}
+	}
+	if peakVal <= 0 {
+		return ""
+	}
+	end := bucketAt(start, unit, len(vals)-1)
+	return fmt.Sprintf("  by %-5s %s  %s–%s · peak %s %s",
+		unit, stBar.Render(sparkline(vals)),
+		bucketLabel(start, unit), bucketLabel(end, unit),
+		bucketLabel(bucketAt(start, unit, peakIdx), unit), money(peakVal))
+}
+
+// bucketSpend buckets api-equivalent spend into adaptive calendar buckets across
+// the events' UTC span (hour for <~1.5d, day for <50d, week for <350d, else
+// month), returning the per-bucket totals, the unit, and the aligned start.
+func bucketSpend(events []event.AgentEvent) ([]int64, string, time.Time) {
+	var lo, hi time.Time
+	for _, e := range events {
+		if e.TSStart.IsZero() || apiMicros(e) <= 0 {
+			continue
+		}
+		t := e.TSStart.UTC()
+		if lo.IsZero() || t.Before(lo) {
+			lo = t
+		}
+		if t.After(hi) {
+			hi = t
+		}
+	}
+	if lo.IsZero() {
+		return nil, "", time.Time{}
+	}
+	unit := chooseUnit(hi.Sub(lo))
+	start := truncateTo(lo, unit)
+	n := bucketIndex(start, unit, hi) + 1
+	if n < 1 {
+		n = 1
+	}
+	vals := make([]int64, n)
+	for _, e := range events {
+		if e.TSStart.IsZero() {
+			continue
+		}
+		a := apiMicros(e)
+		if a <= 0 {
+			continue
+		}
+		if i := bucketIndex(start, unit, e.TSStart.UTC()); i >= 0 && i < n {
+			vals[i] += a
+		}
+	}
+	return vals, unit, start
+}
+
+func chooseUnit(span time.Duration) string {
+	switch {
+	case span < 36*time.Hour:
+		return "hour"
+	case span < 50*24*time.Hour:
+		return "day"
+	case span < 350*24*time.Hour:
+		return "week"
+	default:
+		return "month"
+	}
+}
+
+func truncateTo(t time.Time, unit string) time.Time {
+	t = t.UTC()
+	switch unit {
+	case "hour":
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, time.UTC)
+	case "week":
+		d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7)) // back to Monday
+	case "month":
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+	default: // day
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	}
+}
+
+func bucketIndex(start time.Time, unit string, t time.Time) int {
+	t = t.UTC()
+	switch unit {
+	case "hour":
+		return int(t.Sub(start) / time.Hour)
+	case "week":
+		return int(t.Sub(start) / (7 * 24 * time.Hour))
+	case "month":
+		return (t.Year()-start.Year())*12 + int(t.Month()) - int(start.Month())
+	default: // day
+		return int(t.Sub(start) / (24 * time.Hour))
+	}
+}
+
+func bucketAt(start time.Time, unit string, i int) time.Time {
+	switch unit {
+	case "hour":
+		return start.Add(time.Duration(i) * time.Hour)
+	case "week":
+		return start.AddDate(0, 0, 7*i)
+	case "month":
+		return start.AddDate(0, i, 0)
+	default: // day
+		return start.AddDate(0, 0, i)
+	}
+}
+
+func bucketLabel(t time.Time, unit string) string {
+	switch unit {
+	case "hour":
+		return t.Format("Jan 2 3pm")
+	case "month":
+		return t.Format("Jan 2006")
+	default: // day / week
+		return t.Format("Jan 2")
 	}
 }
 
