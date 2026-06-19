@@ -1,0 +1,49 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l internal/ cmd/)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test (with coverage)
+        run: go test ./... -coverprofile=coverage.out
+
+      # t-wada RED guard for the const→var fix: -ldflags -X is silently ignored on a
+      # const, so on the old code this step fails. It proves version stamping works.
+      - name: version stamping is wired
+        run: |
+          go build -ldflags "-X github.com/agentspend/ai-agent-spend/internal/cli.Version=ci-smoke-9.9.9" -o /tmp/aispend ./cmd/aispend
+          out="$(/tmp/aispend version)"
+          echo "$out"
+          echo "$out" | grep -q "ci-smoke-9.9.9" || {
+            echo "FAIL: version not stamped via -ldflags (is internal/cli.Version a const again?)"; exit 1; }
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # shellcheck is preinstalled on ubuntu-latest runners.
+      - name: shellcheck
+        run: shellcheck -x install.sh install_test.sh
+      - name: install.sh unit tests
+        run: sh install_test.sh

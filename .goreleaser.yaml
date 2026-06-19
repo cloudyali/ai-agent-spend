@@ -1,0 +1,132 @@
+# GoReleaser config for aispend — one `git tag` fans out to every outlet.
+# Validate locally with:  goreleaser check   (and:  goreleaser release --snapshot --clean)
+# Schema: GoReleaser v2 (https://goreleaser.com). Requires GoReleaser >= v2.10 for homebrew_casks.
+version: 2
+
+project_name: aispend
+
+before:
+  hooks:
+    # Keep releases honest: deps resolve and the suite is green before anything ships.
+    - go mod download
+    - go test ./...
+
+builds:
+  # Standard binary — the one almost everyone installs.
+  - id: aispend
+    main: ./cmd/aispend
+    binary: aispend
+    env:
+      - CGO_ENABLED=0 # fully static, no libc linkage — runs anywhere
+    flags:
+      - -trimpath # strip local paths → reproducible, no $HOME leakage
+    ldflags:
+      # Stamp the version into internal/cli.Version (must be a `var`, see cli.go).
+      - -s -w -X github.com/agentspend/ai-agent-spend/internal/cli.Version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}" # reproducible: archive mtimes = commit time
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+  # The "provably offline" SKU: net/* is compiled out via the `offline` build tag,
+  # so this binary physically cannot open a socket. Nobody else ships this.
+  - id: aispend-offline
+    main: ./cmd/aispend
+    binary: aispend
+    tags:
+      - offline
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/agentspend/ai-agent-spend/internal/cli.Version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  # Default archives. name_template MUST match archive_name() in install.sh.
+  - id: archives
+    ids: [aispend]
+    name_template: "aispend_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+
+  - id: archives-offline
+    ids: [aispend-offline]
+    name_template: "aispend-offline_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  # install.sh downloads this file and verifies the archive before extracting.
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# Homebrew (macOS). Formula is deprecated upstream; casks are the supported path.
+# Linux users: use the curl installer or `go install` (Linuxbrew is not targeted).
+homebrew_casks:
+  - name: aispend
+    ids: [archives] # never the offline archive
+    homepage: "https://github.com/agentspend/ai-agent-spend"
+    description: "Local, explainable AI-coding spend — prices each turn against a pinned table, offline."
+    binaries:
+      - aispend
+    # Unsigned binaries get quarantined by Gatekeeper ("app is damaged"). Until the
+    # release is notarized (needs a paid Apple Developer account), strip the bit on
+    # install so `aispend` actually runs. Remove this once notarization is wired up.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/aispend"]
+          end
+    # Don't push prereleases (e.g. v1.0.0-rc1) to the tap.
+    skip_upload: auto
+    repository:
+      owner: agentspend
+      name: homebrew-tap # → users run: brew install agentspend/tap/aispend
+      branch: main
+      # Cross-repo push needs a PAT with contents:write on the tap repo.
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@agentspend.dev
+
+release:
+  github:
+    owner: agentspend
+    name: ai-agent-spend
+  prerelease: auto # tags like v1.2.3-rc1 are marked prerelease automatically
+  draft: false
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Others
+      order: 999
+
+report_sizes: true

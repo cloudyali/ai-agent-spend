@@ -1,0 +1,35 @@
+name: release
+
+# Push a semver tag → GoReleaser builds every platform, signs the checksums,
+# cuts the GitHub Release, and updates the Homebrew tap. Nothing else triggers it.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the Release and upload assets
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags so the changelog is correct
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod # single source of truth for the Go version
+          cache: true
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          # Default token: creates the Release in THIS repo.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Separate PAT (contents:write on agentspend/homebrew-tap) — the default
+          # token cannot push to another repo. Create it, save as this secret.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
