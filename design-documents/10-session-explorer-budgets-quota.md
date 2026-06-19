@@ -161,11 +161,11 @@ that triggered them — that *is* the chain, for free. Add a **chain view** as a
 drill from the receipt (toggle `c`).
 
 > **Shipped (2026-06-19).** `c` on the receipt opens `modeChain`: `chain.Build(sel.evs)`
-> rendered as the turns in time order with a running cumulative-cost gutter and a `p<N>`
-> marker on each prompt group's first turn (Claude PromptIDs; Codex, with none, reads as
-> one flat chain). `↑/↓` walks the turns, `tab` jumps prompt-to-prompt, `↵` opens the
-> turn's evidence (esc back to the chain), `~` flags a not-priced turn, and long chains
-> page via `fileWindow`. Cross-session `←/→` travel is the remaining bit (deferred).
+> rendered as the turns in time order — columns **WHEN · MODEL · COST** (per-turn) **·
+> CUM** (the running gutter). `↑/↓` walks the turns, `↵` opens the turn's evidence (esc
+> back), `~` flags a not-priced turn, and long chains page via `fileWindow`.
+> (Per-prompt `p<N>` group markers were tried and removed as noise; cross-session `←/→`
+> travel stays deferred.)
 
 ```
 CHAIN  rajgad · feat/heatmap › session bd34e22a   ↑↓ turn · tab prompt · ↵ evidence
@@ -197,6 +197,18 @@ existing per-turn evidence view. The genuinely new pieces:
   `~` and a one-line confidence note — same ethos as the rest of the ledger.
 
 ## C. Budgets (API-equivalent only, off by default)
+
+> **Shipped (2026-06-19, t-wada TDD).** `internal/budget` computes a monthly **pace**
+> (`ComputePace`): period-to-date api-equivalent spend projected to month end at the
+> current run rate, with a verdict — "on track", "under", or "N.N× over pace" — plus
+> `UsedFraction`/`ElapsedFraction` for the bar. A `budget_usd` key in config.toml turns
+> it on (off by default; `config.LoadBudget`), and `aispend today` renders the line —
+> `budget $500/mo  [####----]  $214 used (43%) · 63% of month · on track` — against the
+> local calendar month, excluding + disclosing providers with no api-equivalent.
+> Informational only, never enforced (a budget is your $ ceiling, not the provider's
+> hard wall). It also renders in the **TUI list header** (`WithBudget`, above the quota
+> gauges; re-paced on each watch tick). Scoped budgets (per repo/provider/cost_tag) are
+> the next slice.
 
 This maps onto what already exists. Budgets measure against `CostViews.APIEquivalent`
 (the view is already on every event), scope by the **same group keys the faceter uses**

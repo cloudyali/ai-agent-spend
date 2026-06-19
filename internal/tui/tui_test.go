@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/agentspend/ai-agent-spend/internal/chain"
+	"github.com/agentspend/ai-agent-spend/internal/budget"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
 	"github.com/agentspend/ai-agent-spend/internal/quota"
@@ -1380,30 +1380,15 @@ func TestModel_ListShowsSubagentRollup(t *testing.T) {
 	}
 }
 
-func TestNextPromptTurn(t *testing.T) {
-	ts := []chain.Turn{{PromptID: "p1"}, {PromptID: "p1"}, {PromptID: "p2"}, {PromptID: "p2"}}
-	if got := nextPromptTurn(ts, 0); got != 2 {
-		t.Errorf("from group p1 should jump to p2's first turn (2), got %d", got)
-	}
-	if got := nextPromptTurn(ts, 2); got != 0 {
-		t.Errorf("from the last group should wrap to 0, got %d", got)
-	}
-	if got := nextPromptTurn(nil, 0); got != 0 {
-		t.Errorf("empty turns → 0, got %d", got)
-	}
-}
-
-// `c` opens the prompt-chain from the receipt; tab jumps prompt-to-prompt; ↵ opens a
-// turn's evidence and esc returns to the chain.
+// `c` opens the chain from the receipt; ↓ moves the cursor; ↵ opens a turn's evidence
+// and esc returns to the chain.
 func TestModel_ChainViewFromReceipt(t *testing.T) {
 	eng := pricing.NewEngine()
 	now := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
-	mk := func(id, pid string, min int, in int64) event.AgentEvent {
-		e := priced(t, eng, "evt_"+id, "s1", "payments", "claude-opus-4-8", now.Add(time.Duration(min)*time.Minute), event.Tokens{Input: in})
-		e.PromptID = pid
-		return e
+	mk := func(id string, min int, in int64) event.AgentEvent {
+		return priced(t, eng, "evt_"+id, "s1", "payments", "claude-opus-4-8", now.Add(time.Duration(min)*time.Minute), event.Tokens{Input: in})
 	}
-	evs := []event.AgentEvent{mk("a", "p1", 0, 1_000_000), mk("b", "p1", 1, 2_000_000), mk("c", "p2", 2, 500_000)}
+	evs := []event.AgentEvent{mk("a", 0, 1_000_000), mk("b", 1, 2_000_000), mk("c", 2, 500_000)}
 	m := New([]Period{{Label: "today", Events: evs}}, 0, eng)
 	nm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m = nm.(Model)
@@ -1414,16 +1399,13 @@ func TestModel_ChainViewFromReceipt(t *testing.T) {
 	if m.mode != modeChain {
 		t.Fatalf("c should open the chain view, got mode %v", m.mode)
 	}
-	v := m.View()
-	for _, want := range []string{"CHAIN", "p1", "p2"} {
-		if !strings.Contains(v, want) {
-			t.Errorf("chain view missing %q:\n%s", want, v)
-		}
+	if !strings.Contains(m.View(), "CHAIN") {
+		t.Errorf("chain view should render a CHAIN header:\n%s", m.View())
 	}
-	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab}) // jump to next prompt (the p2 turn, index 2)
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown}) // ↓ to the next turn
 	m = nm.(Model)
-	if m.chainCursor != 2 {
-		t.Errorf("tab should jump to the next prompt group's first turn (2), got %d", m.chainCursor)
+	if m.chainCursor != 1 {
+		t.Errorf("down should move the chain cursor to 1, got %d", m.chainCursor)
 	}
 	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // open that turn's evidence
 	m = nm.(Model)
@@ -1434,6 +1416,25 @@ func TestModel_ChainViewFromReceipt(t *testing.T) {
 	m = nm.(Model)
 	if m.mode != modeChain {
 		t.Errorf("esc from evidence should return to the chain, got %v", m.mode)
+	}
+}
+
+// The monthly budget pace gauge renders in the list header from the injected pace.
+func TestModel_BudgetGaugeRenders(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	start, end := budget.MonthBounds(now)
+	pace := budget.ComputePace(500_000_000, 250_000_000, start, now, end) // 50% at ~half the month
+	m := New([]Period{{Label: "today", Events: nil}}, 0, eng).
+		WithNow(now).
+		WithBudget(func() (budget.Pace, bool) { return pace, true })
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+	v := m.View()
+	for _, want := range []string{"budget", "$500", "50%", "on track"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("list header should show the budget pace gauge (%q):\n%s", want, v)
+		}
 	}
 }
 

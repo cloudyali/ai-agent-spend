@@ -119,6 +119,54 @@ func TestRenderToday_ShowsCodexQuotaGauge(t *testing.T) {
 	}
 }
 
+func TestRenderBudget_ShowsPace(t *testing.T) {
+	home := t.TempDir()
+	cfg := filepath.Join(home, ".aispend")
+	if err := os.MkdirAll(cfg, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg, "config.toml"), []byte("budget_usd = 500\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC) // mid-month
+	var out strings.Builder
+	a := appWithHome(home, &out, now)
+	st, err := a.openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := event.USD(250_000_000) // $250 spent this month → 50% of a $500 budget at ~half the month
+	e := event.AgentEvent{EventID: "e1", SessionID: "s1", Provider: "claude_code", Model: "claude-opus-4-8",
+		TSStart: now.Add(-48 * time.Hour), TSEnd: now.Add(-48 * time.Hour), CostViews: event.CostViews{APIEquivalent: &m}}
+	if err := st.Write([]event.AgentEvent{e}); err != nil {
+		t.Fatal(err)
+	}
+	a.renderBudget(st, now)
+	v := out.String()
+	for _, want := range []string{"budget", "$500", "50%", "on track"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("budget pace line missing %q:\n%s", want, v)
+		}
+	}
+}
+
+func TestRenderBudget_OffByDefault(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".aispend"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	a := appWithHome(home, &out, time.Now()) // no config.toml → no budget
+	st, err := a.openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.renderBudget(st, time.Now())
+	if out.String() != "" {
+		t.Errorf("no budget configured → nothing printed, got:\n%s", out.String())
+	}
+}
+
 func TestRenderToday_UnknownWhenSnapshotAbsent(t *testing.T) {
 	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
 	var out strings.Builder

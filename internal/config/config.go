@@ -118,6 +118,29 @@ func LoadPlanSet(appHome string) (PlanSet, error) {
 	return set, nil
 }
 
+// LoadBudget reads the optional `budget_usd` ceiling from ~/.aispend/config.toml,
+// returning it as micros. ok is false when unset, blank, or non-positive — budgets are
+// off by default. It is a monthly, api-equivalent ceiling: informational (aispend never
+// enforces), distinct from a provider's hard quota window.
+func LoadBudget(appHome string) (micros int64, ok bool, err error) {
+	m, err := loadConfigMap(appHome)
+	if err != nil {
+		return 0, false, err
+	}
+	v := strings.TrimSpace(m["budget_usd"])
+	if v == "" {
+		return 0, false, nil
+	}
+	f, perr := strconv.ParseFloat(v, 64)
+	if perr != nil {
+		return 0, false, fmt.Errorf("config: budget_usd %q: %w", v, perr)
+	}
+	if f <= 0 {
+		return 0, false, nil
+	}
+	return int64(f*1_000_000 + 0.5), true, nil
+}
+
 func loadConfigMap(appHome string) (map[string]string, error) {
 	b, err := os.ReadFile(filepath.Join(appHome, "config.toml"))
 	if errors.Is(err, os.ErrNotExist) {

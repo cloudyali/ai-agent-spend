@@ -17,6 +17,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/agentspend/ai-agent-spend/internal/budget"
 	"github.com/agentspend/ai-agent-spend/internal/chain"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
@@ -135,6 +136,12 @@ type Model struct {
 	// ledger. quotaFn re-reads on each refresh so a watch tick keeps it current.
 	quotaFn func() []quota.Sample
 	quota   []quota.Sample
+
+	// budget (optional; WithBudget): the monthly api-equivalent pace gauge. budgetFn is
+	// re-read on each refresh (so a watch tick re-paces); off by default → not rendered.
+	budgetFn   func() (budget.Pace, bool)
+	budgetPace budget.Pace
+	budgetSet  bool
 }
 
 // WithPlanPicker enables the in-explorer plan picker (the `p` key): providers is
@@ -156,6 +163,16 @@ func (m Model) WithPlanPicker(providers []ProviderChoice, plans []PlanChoice, to
 // from the ledger.
 func (m Model) WithQuota(fn func() []quota.Sample) Model {
 	m.quotaFn = fn
+	m.refresh()
+	return m
+}
+
+// WithBudget enables the monthly budget pace gauge in the list header: fn returns the
+// pace and whether a budget is configured (the cli computes it from the month's
+// api-equivalent spend). Re-read on each refresh so a watch tick re-paces; off by
+// default → nothing renders.
+func (m Model) WithBudget(fn func() (budget.Pace, bool)) Model {
+	m.budgetFn = fn
 	m.refresh()
 	return m
 }
@@ -249,6 +266,9 @@ func (m *Model) refresh() {
 	m.rows = m.buildRows()
 	if m.quotaFn != nil {
 		m.quota = m.quotaFn() // re-read the plan-limit snapshot so a watch tick keeps it fresh
+	}
+	if m.budgetFn != nil {
+		m.budgetPace, m.budgetSet = m.budgetFn() // re-pace on each refresh / watch tick
 	}
 }
 
@@ -466,8 +486,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.chainCursor < len(ts)-1 {
 					m.chainCursor++
 				}
-			case "tab":
-				m.chainCursor = nextPromptTurn(ts, m.chainCursor) // jump to the next prompt
 			case "enter":
 				if m.chainCursor >= 0 && m.chainCursor < len(ts) {
 					if e, ok := m.eventByID(ts[m.chainCursor].EventID); ok {
@@ -596,8 +614,8 @@ func (m Model) listView() string {
 	// Plan-limit gauges (the weekly/5h wall) — a reported snapshot, shown above the
 	// sessions and before the empty check so the wall is visible even on a quiet day,
 	// with an explicit "unknown" line when Claude activity has no local snapshot.
-	if ql := m.quotaLines(); len(ql) > 0 {
-		for _, line := range ql {
+	if g := m.gaugeLines(); len(g) > 0 {
+		for _, line := range g {
 			b.WriteString(line + "\n")
 		}
 		b.WriteString("\n")
@@ -719,8 +737,8 @@ func (m Model) windowRange(n int) (int, int) {
 	if anyLive(m.rows, m.now, liveWindow) {
 		visible-- // the live legend line sits above the rows too
 	}
-	if n := len(m.quotaLines()); n > 0 {
-		visible -= n + 1 // plan-limit gauge lines + their separating blank
+	if n := len(m.gaugeLines()); n > 0 {
+		visible -= n + 1 // budget + plan-limit gauge lines + their separating blank
 	}
 	// Day-group headers cost a line each: one day needs a single header, but several
 	// days can put a header before nearly every row, so halve the row budget then —
@@ -1679,52 +1697,35 @@ func receiptFiles(evs []event.AgentEvent) []fileRow {
 	return rows
 }
 
-// fileWindow clamps a file list of length n to budget rows, sliding to keep cursor
-// visible — the receipt's vertical analogue of windowRange. budget ≤ 0 (size
-// unknown) or ≥ n shows everything.
-// chainView renders the drilled session's prompt-chain: its turns in time order with a
-// running cumulative-cost gutter, a "p<N>" marker on the first turn of each prompt
-// group (Claude PromptIDs; Codex has none, so it reads as one flat chain), and the
-// cursor's turn highlighted. ↵ opens that turn's evidence. Long chains page via
-// fileWindow; ASCII-degrades like every other surface.
+// chainView renders the drilled session's turns in time order with a running
+// cumulative-cost gutter (per-turn cost + cumulative) and the cursor's turn
+// highlighted. ↵ opens that turn's evidence. Long chains page via fileWindow;
+// ASCII-degrades like every other surface.
 func (m Model) chainView() string {
 	c := m.chainData
 	var b strings.Builder
 	b.WriteString(m.breadcrumb() + "\n\n")
 	b.WriteString(stBold.Render("CHAIN") + stFaint.Render(fmt.Sprintf("  %d %s · %s",
 		len(c.Turns), turnsWord(len(c.Turns)), money(c.TotalMicros))) + "\n")
-	b.WriteString(stFaint.Render("  ↑/↓ turn · tab prompt · ↵ evidence · esc back") + "\n\n")
+	b.WriteString(stFaint.Render("  ↑/↓ turn · ↵ evidence · esc back") + "\n\n")
 	if len(c.Turns) == 0 {
 		return b.String() + stFaint.Render("  (no turns)") + "\n"
 	}
-	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%-3s %10s  %-8s  %s", "", "CUM", "WHEN", "MODEL · COST")) + "\n")
+	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%-8s  %-12s  %9s  %9s", "WHEN", "MODEL", "COST", "CUM")) + "\n")
 
-	groupNo := map[string]int{}
-	for i, g := range c.Groups {
-		groupNo[g.PromptID] = i + 1
-	}
 	budget := m.h - 9
 	if budget < 1 {
 		budget = len(c.Turns) // no window size yet → show all (tests, pipes)
 	}
 	start, end := fileWindow(len(c.Turns), m.chainCursor, budget)
-	prevPID, havePrev := "", false
-	if start > 0 {
-		prevPID, havePrev = c.Turns[start-1].PromptID, true
-	}
 	for i := start; i < end; i++ {
 		t := c.Turns[i]
-		pr := ""
-		if t.PromptID != "" && (!havePrev || t.PromptID != prevPID) { // first turn of a prompt group
-			pr = fmt.Sprintf("p%d", groupNo[t.PromptID])
-		}
-		prevPID, havePrev = t.PromptID, true
 		cost := money(t.CostMicros)
 		if !t.HasCost {
 			cost = "~" + cost // not computable — the gutter doesn't count it
 		}
-		line := fmt.Sprintf("%-3s %10s  %-8s  %s · %s",
-			pr, money(t.CumMicros), clockTime(t.TS, time.Local), trunc(humanModel(t.Model), 12), cost)
+		line := fmt.Sprintf("%-8s  %-12s  %9s  %9s",
+			clockTime(t.TS, time.Local), trunc(humanModel(t.Model), 12), cost, money(t.CumMicros))
 		if i == m.chainCursor {
 			b.WriteString(stSel.Render("▶ "+line) + "\n")
 		} else {
@@ -1735,22 +1736,6 @@ func (m Model) chainView() string {
 		b.WriteString(stFaint.Render(fmt.Sprintf("  … +%d more ↓", len(c.Turns)-end)) + "\n")
 	}
 	return b.String()
-}
-
-// nextPromptTurn returns the index of the first turn of the next prompt group after
-// cursor, wrapping to the top from the last group. One group (or empty PromptIDs, e.g.
-// Codex) wraps to 0 — a harmless no-op when already there.
-func nextPromptTurn(turns []chain.Turn, cursor int) int {
-	if cursor < 0 || cursor >= len(turns) {
-		return 0
-	}
-	cur := turns[cursor].PromptID
-	for j := cursor + 1; j < len(turns); j++ {
-		if turns[j].PromptID != cur {
-			return j
-		}
-	}
-	return 0
 }
 
 // eventByID finds the drilled session's event for a chain turn, so ↵ can open its
@@ -1764,6 +1749,9 @@ func (m Model) eventByID(id string) (event.AgentEvent, bool) {
 	return event.AgentEvent{}, false
 }
 
+// fileWindow clamps a file list of length n to budget rows, sliding to keep cursor
+// visible — the receipt's vertical analogue of windowRange. budget ≤ 0 (size unknown)
+// or ≥ n shows everything.
 func fileWindow(n, cursor, budget int) (start, end int) {
 	if budget <= 0 || budget >= n {
 		return 0, n
@@ -1978,6 +1966,30 @@ func quotaProviderTitle(p string) string {
 		return p
 	}
 	return strings.ToUpper(p[:1]) + p[1:]
+}
+
+// gaugeLines is the list header's gauge block: the budget pace line (when set) above
+// the quota gauges. Its length is also the height reservation (see windowRange), so
+// both render and budgeting read the same source.
+func (m Model) gaugeLines() []string {
+	var out []string
+	if m.budgetSet {
+		out = append(out, m.budgetGaugeLine())
+	}
+	return append(out, m.quotaLines()...)
+}
+
+// budgetGaugeLine renders the monthly budget as PACE, not just level: used $ and %,
+// how far through the month, and the on-track / over / under verdict.
+func (m Model) budgetGaugeLine() string {
+	p := m.budgetPace
+	pct := p.UsedFraction() * 100
+	rest := fmt.Sprintf(" %s/mo  %s  %s (%.0f%%) · %.0f%% of month",
+		money(p.Limit), quota.Bar(pct, 12), money(p.Spent), pct, p.ElapsedFraction*100)
+	if s := p.Status(); s != "" {
+		rest += " · " + s
+	}
+	return "  " + stBold.Render("budget") + stFaint.Render(rest)
 }
 
 // quotaLines builds the plan-limit gauge block for the list header: one line per active

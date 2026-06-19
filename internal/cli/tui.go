@@ -16,6 +16,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/agentspend/ai-agent-spend/internal/budget"
 	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/provider"
@@ -106,6 +107,14 @@ func (a *App) cmdTui(args []string) int {
 	m := tui.New(periods, startIdx, a.pricingEngine()).WithNow(now).
 		WithQuota(func() []quota.Sample {
 			return append(a.claudeQuotaSamples(a.Now()), a.codexQuotaSamples(a.Now())...)
+		}).
+		WithBudget(func() (budget.Pace, bool) {
+			st2, err := a.openStore() // re-open so a watch tick re-paces against fresh spend
+			if err != nil {
+				return budget.Pace{}, false
+			}
+			p, _, ok := a.budgetPace(st2, a.Now())
+			return p, ok
 		}).
 		WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan)
 	if *watch {

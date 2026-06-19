@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentspend/ai-agent-spend/internal/budget"
 	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
@@ -50,7 +51,61 @@ func (a *App) cmdToday(args []string) int {
 		}
 	}
 	a.renderToday(events, now, a.planSet(), storeTotal, a.pricingEngine())
+	a.renderBudget(st, now)
 	return 0
+}
+
+// renderBudget prints the month-to-date budget pace line when a budget is configured
+// (off by default → nothing printed). It sums the api-equivalent spend for the current
+// calendar month against the ceiling and shows PACE, not just level — a budget is your
+// dollar ceiling, informational only (never the provider's hard limit, which is the
+// quota gauge). Providers with no computable api-equivalent are excluded and disclosed.
+// budgetPace computes the month-to-date api-equivalent pace against the configured
+// budget (shared by `today` and the TUI header). ok is false when no budget is set;
+// uncovered lists providers with no api-equivalent (excluded from the sum) for honest
+// disclosure.
+func (a *App) budgetPace(st *store.FileStore, now time.Time) (p budget.Pace, uncovered []string, ok bool) {
+	micros, set, err := config.LoadBudget(a.Resolver.AppHome())
+	if err != nil || !set {
+		return budget.Pace{}, nil, false
+	}
+	start, end := budget.MonthBounds(now)
+	evs, err := st.Query(store.Filter{Since: start, Until: now})
+	if err != nil {
+		return budget.Pace{}, nil, false
+	}
+	var spent int64
+	unc := map[string]bool{}
+	for _, e := range evs {
+		if m := e.CostViews.APIEquivalent; m != nil {
+			spent += m.Micros
+		} else if e.Provider != "" {
+			unc[e.Provider] = true
+		}
+	}
+	keys := make([]string, 0, len(unc))
+	for k := range unc {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return budget.ComputePace(micros, spent, start, now, end), keys, true
+}
+
+func (a *App) renderBudget(st *store.FileStore, now time.Time) {
+	p, uncovered, ok := a.budgetPace(st, now)
+	if !ok {
+		return
+	}
+	pct := p.UsedFraction() * 100
+	line := fmt.Sprintf("  budget %s/mo  %s  %s used (%.0f%%) · %.0f%% of month",
+		usd(p.Limit, "USD"), bar(pct), usd(p.Spent, "USD"), pct, p.ElapsedFraction*100)
+	if s := p.Status(); s != "" {
+		line += " · " + s
+	}
+	fmt.Fprintln(a.Out, line)
+	if len(uncovered) > 0 {
+		fmt.Fprintf(a.Out, "  note: %s excluded from the budget (no api-equivalent)\n", joinProviderLabels(uncovered))
+	}
 }
 
 func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config.PlanSet, storeTotal int, eng *pricing.Engine) {
