@@ -53,6 +53,17 @@ func (r Resolver) AppDBPath() string {
 	return filepath.Join(r.AppHome(), "aispend.db")
 }
 
+// ClaudeUsagePath is the local usage snapshot Claude Code caches — the weekly / 5h /
+// Opus rate-limit windows — honoring CLAUDE_CONFIG_DIR, else ~/.claude/usage-exact.json.
+// It is a point-in-time snapshot Claude Code refreshes itself; aispend only reads it.
+func (r Resolver) ClaudeUsagePath() string {
+	base := r.env("CLAUDE_CONFIG_DIR")
+	if base == "" {
+		base = filepath.Join(r.Home, ".claude")
+	}
+	return filepath.Join(base, "usage-exact.json")
+}
+
 // ProviderRoots returns the ordered candidate root directories for an agent's
 // local data on this OS. Env overrides rank first. The list is candidates, not
 // guarantees — callers use ExistingRoots to filter to what is actually present.

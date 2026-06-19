@@ -10,6 +10,7 @@ import (
 
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
+	"github.com/agentspend/ai-agent-spend/internal/quota"
 )
 
 func priced(t *testing.T, eng *pricing.Engine, id, sess, repo, model string, ts time.Time, tk event.Tokens) event.AgentEvent {
@@ -223,11 +224,16 @@ func TestTimeLayout(t *testing.T) {
 	if got := time.Date(2026, 6, 17, 7, 42, 0, 0, time.UTC).Format(timeLayout); got != "Jun 17 7:42am" {
 		t.Errorf("am layout = %q, want 'Jun 17 7:42am'", got)
 	}
-	// fmtTime must render in UTC regardless of the input zone: 02:00 in +5:30 is
-	// 20:30 the previous day in UTC.
+	// Visual times render in the GIVEN (local) zone, not forced to UTC: 02:00 in +5:30
+	// stays 2:00am rendered in that zone, and converts only when rendered elsewhere
+	// (the backend keeps the UTC instant — fmtTimeIn just chooses the display zone).
 	ist := time.FixedZone("IST", 5*3600+30*60)
-	if got := fmtTime(time.Date(2026, 6, 17, 2, 0, 0, 0, ist)); got != "Jun 16 8:30pm" {
-		t.Errorf("fmtTime should render UTC, got %q", got)
+	in := time.Date(2026, 6, 17, 2, 0, 0, 0, ist)
+	if got := fmtTimeIn(in, ist); got != "Jun 17 2:00am" {
+		t.Errorf("fmtTimeIn(local) should render the wall clock of that zone, got %q", got)
+	}
+	if got := fmtTimeIn(in, time.UTC); got != "Jun 16 8:30pm" {
+		t.Errorf("fmtTimeIn(UTC) should convert to UTC, got %q", got)
 	}
 }
 
@@ -796,7 +802,7 @@ func TestBucketSpend_UndatedTurnsFoldIntoSessionDay(t *testing.T) {
 	for _, e := range evs {
 		want += apiMicros(e)
 	}
-	vals, unit, start := bucketSpend(evs, time.Time{}, time.Time{})
+	vals, unit, start := bucketSpend(evs, time.Time{}, time.Time{}, time.UTC)
 	var got int64
 	for _, v := range vals {
 		got += v
@@ -805,7 +811,7 @@ func TestBucketSpend_UndatedTurnsFoldIntoSessionDay(t *testing.T) {
 		t.Fatalf("bar total %s must reconcile with the session total %s (undated turn was dropped)", money(got), money(want))
 	}
 	// The undated s1 turn folds onto s1's own day (Jun 10), not s2's day or a stray bucket.
-	if i := bucketIndex(start, unit, d10); vals[i] != apiMicros(s1dated)+apiMicros(s1undated) {
+	if i := bucketIndex(start, unit, d10, time.UTC); vals[i] != apiMicros(s1dated)+apiMicros(s1undated) {
 		t.Errorf("undated s1 spend should fold onto Jun 10 (s1's day): bucket=%s want=%s",
 			money(vals[i]), money(apiMicros(s1dated)+apiMicros(s1undated)))
 	}
@@ -944,14 +950,14 @@ func TestDurationBar(t *testing.T) {
 	}
 	evs := []event.AgentEvent{mk(1, 1_000_000), mk(3, 5_000_000), mk(5, 2_000_000)} // span 4 days → daily
 
-	vals, unit, start := bucketSpend(evs, time.Time{}, time.Time{})
+	vals, unit, start := bucketSpend(evs, time.Time{}, time.Time{}, time.UTC)
 	if unit != "day" || len(vals) != 5 || !start.Equal(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("expected 5 daily buckets from Jun 1, got unit=%q n=%d start=%v", unit, len(vals), start)
 	}
 	if vals[0] != 1_000_000 || vals[1] != 0 || vals[2] != 5_000_000 || vals[3] != 0 || vals[4] != 2_000_000 {
 		t.Errorf("daily buckets wrong: %v", vals)
 	}
-	db := durationBar(evs, time.Time{}, time.Time{})
+	db := durationBar(evs, time.Time{}, time.Time{}, time.UTC)
 	for _, want := range []string{"by day", "peak", "Jun 3", "$5.00"} {
 		if !strings.Contains(db, want) {
 			t.Errorf("durationBar missing %q:\n%s", want, db)
@@ -974,7 +980,7 @@ func TestBucketSpend_UnitTracksPeriod(t *testing.T) {
 	// A full-quarter window must bucket by week across the quarter (~13 weeks), not day.
 	qSince := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	qUntil := time.Date(2026, 6, 30, 23, 59, 59, 0, time.UTC)
-	vals, unit, _ := bucketSpend(evs, qSince, qUntil)
+	vals, unit, _ := bucketSpend(evs, qSince, qUntil, time.UTC)
 	if unit != "week" {
 		t.Errorf("a ~90-day period must bucket by week regardless of event span, got %q", unit)
 	}
@@ -983,18 +989,36 @@ func TestBucketSpend_UnitTracksPeriod(t *testing.T) {
 	}
 
 	// A year-long window → month.
-	if _, unit, _ := bucketSpend(evs, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)); unit != "month" {
+	if _, unit, _ := bucketSpend(evs, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC), time.UTC); unit != "month" {
 		t.Errorf("a ~365-day period must bucket by month, got %q", unit)
 	}
 
 	// Unbounded "all" falls back to the events' own span → day.
-	if _, unit, _ := bucketSpend(evs, time.Time{}, time.Time{}); unit != "day" {
+	if _, unit, _ := bucketSpend(evs, time.Time{}, time.Time{}, time.UTC); unit != "day" {
 		t.Errorf("the unbounded window should fall back to the event span (day), got %q", unit)
 	}
 
 	// The list view wires the period bounds through, so a long window reads "by week".
-	if db := durationBar(evs, qSince, qUntil); !strings.Contains(db, "by week") {
+	if db := durationBar(evs, qSince, qUntil, time.UTC); !strings.Contains(db, "by week") {
 		t.Errorf("durationBar over a quarter should read 'by week':\n%s", db)
+	}
+}
+
+// The spend bar buckets and labels in the display zone: a turn at 20:00 UTC lands in
+// the next local day's 1am hour bucket under IST (+5:30), not the UTC hour.
+func TestBucketSpend_LocalizesToDisplayZone(t *testing.T) {
+	ist := time.FixedZone("IST", 5*3600+30*60)
+	m := event.USD(3_000_000)
+	ts := time.Date(2026, 6, 19, 20, 0, 0, 0, time.UTC) // == 2026-06-20 01:30 IST
+	ev := event.AgentEvent{EventID: "e1", SessionID: "s", Provider: "claude_code",
+		Model: "claude-opus-4-8", TSStart: ts, TSEnd: ts, CostViews: event.CostViews{APIEquivalent: &m}}
+	since := time.Date(2026, 6, 19, 18, 0, 0, 0, time.UTC)
+	until := time.Date(2026, 6, 19, 22, 0, 0, 0, time.UTC)
+	db := durationBar([]event.AgentEvent{ev}, since, until, ist)
+	for _, want := range []string{"by hour", "Jun 20", "1am"} { // local day rolled over, local hour
+		if !strings.Contains(db, want) {
+			t.Errorf("durationBar should bucket/label in IST (want %q):\n%s", want, db)
+		}
 	}
 }
 
@@ -1193,6 +1217,178 @@ func TestModel_PeriodPersistsAcrossDrill(t *testing.T) {
 		}
 		nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 		m = nm.(Model)
+	}
+}
+
+// The session list groups by calendar day (most-recent first), labels Today/Yesterday
+// against the reference now, and the live session leads its day with a badge.
+func TestModel_DayGroupedListWithLive(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	mk := func(id, repo string, ts time.Time, in int64) event.AgentEvent {
+		return priced(t, eng, "evt_"+id, id, repo, "claude-opus-4-8", ts, event.Tokens{Input: in})
+	}
+	evs := []event.AgentEvent{
+		mk("slive", "payments", now.Add(-3*time.Minute), 1_000_000), // today, live (3m ago)
+		mk("sbig", "web", now.Add(-5*time.Hour), 9_000_000),         // today, priciest
+		mk("syest", "billing", now.AddDate(0, 0, -1), 2_000_000),    // yesterday
+	}
+	m := New([]Period{{Label: "this week", Events: evs, Since: now.AddDate(0, 0, -6), Until: now}}, 0, eng).WithNow(now)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+	v := m.View()
+
+	if !strings.Contains(v, "Today") || !strings.Contains(v, "Yesterday") {
+		t.Fatalf("expected Today/Yesterday day headers:\n%s", v)
+	}
+	if !strings.Contains(v, "live") {
+		t.Errorf("expected a live badge for the 3-minutes-ago session:\n%s", v)
+	}
+	if !strings.Contains(v, "active in the last 10m") {
+		t.Errorf("expected the live legend explaining the badge:\n%s", v)
+	}
+	if strings.Index(v, "Today") > strings.Index(v, "Yesterday") {
+		t.Errorf("the most-recent day (Today) should sort above Yesterday:\n%s", v)
+	}
+	if strings.Index(v, "payments") > strings.Index(v, "web") {
+		t.Errorf("the live session should lead its day (payments before the priciest web):\n%s", v)
+	}
+}
+
+// Watch mode: a tick reloads fresh periods and advances the clock in place, so an
+// ongoing session's data updates and liveness decays without leaving the list.
+func TestModel_WatchTickRefreshesAndAdvancesClock(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	mk := func(id string, ago time.Duration, in int64) event.AgentEvent {
+		return priced(t, eng, "evt_"+id, id, "payments", "claude-opus-4-8", now.Add(-ago), event.Tokens{Input: in})
+	}
+	win := func(evs []event.AgentEvent) []Period {
+		return []Period{{Label: "this week", Events: evs, Since: now.AddDate(0, 0, -6), Until: now}}
+	}
+	start := win([]event.AgentEvent{mk("s1", 2*time.Minute, 1_000_000)})                                      // one live session
+	grown := win([]event.AgentEvent{mk("s1", 2*time.Minute, 1_000_000), mk("s2", 30*time.Minute, 2_000_000)}) // a second appears
+
+	clock := now
+	m := New(start, 0, eng).
+		WithNow(now).
+		WithWatch(time.Second, func() time.Time { return clock }, func() []Period { return grown })
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+	if len(m.rows) != 1 {
+		t.Fatalf("setup: one session before the tick, got %d", len(m.rows))
+	}
+	if !strings.Contains(m.View(), "active in the last") {
+		t.Fatal("setup: the 2-minutes-ago session should be live before the tick")
+	}
+
+	clock = now.Add(20 * time.Minute) // time moves on; the session goes stale
+	nm, cmd := m.Update(tickMsg(clock))
+	m = nm.(Model)
+
+	if len(m.rows) != 2 {
+		t.Errorf("a tick should reload fresh data (2 sessions now), got %d", len(m.rows))
+	}
+	if cmd == nil {
+		t.Error("a watch tick should re-arm the next tick")
+	}
+	if strings.Contains(m.View(), "active in the last") {
+		t.Errorf("after the clock advanced 20m nothing is live → legend should be gone:\n%s", m.View())
+	}
+}
+
+func TestModel_InitArmsTickOnlyWhenWatching(t *testing.T) {
+	eng := pricing.NewEngine()
+	base := []Period{{Label: "today", Events: nil}}
+	if New(base, 0, eng).Init() != nil {
+		t.Error("no watch configured → Init should arm no tick")
+	}
+	watched := New(base, 0, eng).WithWatch(time.Second, nil, func() []Period { return base })
+	if watched.Init() == nil {
+		t.Error("watch configured → Init should arm a tick")
+	}
+}
+
+// Without a reference clock (no WithNow), nothing is live, so the live legend is
+// suppressed — the badge never appears without something to explain.
+func TestModel_NoLiveLegendWithoutClock(t *testing.T) {
+	eng := pricing.NewEngine()
+	ts := time.Date(2026, 6, 19, 11, 59, 0, 0, time.UTC)
+	e := priced(t, eng, "evt_x", "s1", "payments", "claude-opus-4-8", ts, event.Tokens{Input: 1_000_000})
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{e}}}, 0, eng) // no WithNow → now zero
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m = nm.(Model)
+	if strings.Contains(m.View(), "active in the last") {
+		t.Errorf("no reference clock should mean no live legend:\n%s", m.View())
+	}
+}
+
+// The plan-limit gauge renders in the list header from the injected quota samples,
+// and shows even with no sessions in the window (the wall is visible on a quiet day).
+func TestModel_QuotaGaugeRenders(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	samples := []quota.Sample{{Provider: "claude", Window: quota.WindowWeekly, UsedPercent: 78, ResetsAt: now.Add(48 * time.Hour), ObservedAt: now}}
+	m := New([]Period{{Label: "this week", Events: nil, Since: now.AddDate(0, 0, -6), Until: now}}, 0, eng).
+		WithNow(now).
+		WithQuota(func() []quota.Sample { return samples })
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+	v := m.View()
+	for _, want := range []string{"Claude", "weekly", "78%", "resets in"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("list header should show the Claude weekly gauge (%q):\n%s", want, v)
+		}
+	}
+}
+
+// With Claude activity but no quota snapshot, the header shows an explicit "unknown"
+// line rather than nothing — so the gauge explains its blank.
+// The receipt leads with the resolved human session title when a name resolver is wired.
+func TestModel_ReceiptShowsSessionName(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	e := priced(t, eng, "evt_aaaa1111", "s1", "payments", "claude-opus-4-8", now, event.Tokens{Input: 100_000, Output: 2_000, CacheRead: 5_000_000})
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{e}}}, 0, eng).
+		WithNameResolver(func(event.AgentEvent) (string, bool) { return "Fixed the failing test", true })
+	nm, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // list → receipt
+	m = nm.(Model)
+	if m.mode != modeReceipt {
+		t.Fatalf("enter should open the receipt, mode=%v", m.mode)
+	}
+	if !strings.Contains(m.View(), "Fixed the failing test") {
+		t.Errorf("receipt should lead with the resolved session title:\n%s", m.View())
+	}
+}
+
+// Subagent turns roll up under their parent session and the row shows a ⋮N-sub marker.
+func TestModel_ListShowsSubagentRollup(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	mk := func(id, sub string) event.AgentEvent {
+		e := priced(t, eng, "evt_"+id, "P", "payments", "claude-opus-4-8", now, event.Tokens{Input: 100_000})
+		e.SubagentID = sub
+		return e
+	}
+	evs := []event.AgentEvent{mk("p", ""), mk("a", "w1"), mk("b", "w2")} // one session P + two subagents
+	m := New([]Period{{Label: "today", Events: evs}}, 0, eng).WithNow(now)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+	if v := m.View(); !strings.Contains(v, "⋮2 sub") {
+		t.Errorf("the session row should show the rolled-up subagent count (⋮2 sub):\n%s", v)
+	}
+}
+
+func TestModel_QuotaUnknownWhenClaudeActivityNoSnapshot(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	e := priced(t, eng, "evt_x", "s1", "payments", "claude-opus-4-8", now.Add(-time.Hour), event.Tokens{Input: 1_000_000})
+	m := New([]Period{{Label: "today", Events: []event.AgentEvent{e}, Since: now.AddDate(0, 0, -1), Until: now}}, 0, eng).WithNow(now)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+	v := m.View()
+	if !strings.Contains(v, "Claude weekly") || !strings.Contains(v, "unknown") {
+		t.Errorf("Claude activity with no quota snapshot should show the explicit unknown line:\n%s", v)
 	}
 }
 

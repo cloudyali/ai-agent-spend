@@ -145,10 +145,23 @@ func (n ClaudeCode) Normalize(rec provider.RawRecord) (event.AgentEvent, error) 
 		}
 	}
 
+	// Roll a subagent transcript up under its parent session: the parent id is the
+	// directory two levels up from a .../<parent>/subagents/agent-*.jsonl path,
+	// available here as the in-memory RawPath (never persisted). Non-subagent records
+	// pass through unchanged.
+	sid, subagent := line.SessionID, ""
+	if parent, worker, ok := subagentParent(rec.Source.RawPath); ok {
+		if parent != "" {
+			sid = parent
+		}
+		subagent = worker
+	}
+
 	ev := event.AgentEvent{
 		SchemaVersion: event.SchemaVersion,
 		EventID:       id,
-		SessionID:     line.SessionID,
+		SessionID:     sid,
+		SubagentID:    subagent,
 		PromptID:      line.Message.ID,
 		Provider:      parserName,
 		Surface:       "coding_agent",
@@ -323,6 +336,28 @@ type Deduper interface {
 // among entries sharing a dedupe key we keep the single one with the largest token
 // total. First-appearance order is preserved for determinism.
 //
+// subagentParent recognizes a Claude Code subagent transcript by its path shape
+// (.../<parentSessionId>/subagents/agent-<worker>.jsonl) and returns the parent
+// session id (the directory two levels up) and the worker id, so the turn can roll up
+// under its parent. ok is false for any non-subagent path — including the empty
+// RawPath that unit tests pass — leaving the record unchanged.
+func subagentParent(rawPath string) (parent, worker string, ok bool) {
+	if rawPath == "" {
+		return "", "", false
+	}
+	dir := filepath.Dir(rawPath) // .../<parent>/subagents
+	if filepath.Base(dir) != "subagents" {
+		return "", "", false
+	}
+	parent = filepath.Base(filepath.Dir(dir)) // <parent>
+	worker = strings.TrimSuffix(filepath.Base(rawPath), filepath.Ext(rawPath))
+	worker = strings.TrimPrefix(worker, "agent-")
+	if parent == "" || parent == "." || worker == "" {
+		return "", "", false
+	}
+	return parent, worker, true
+}
+
 // Sidechain/subagent replay (a subagent re-emitting a parent's usage under a new
 // request id) is a separate double-count handled when subagent attribution lands
 // in 0B; 0A has one provider and the placeholder undercount is the live bug.

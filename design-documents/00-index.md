@@ -40,9 +40,11 @@ _Last updated: 2026-06-17 · UX/UI concept captures (07–09) added · Status: P
    is worth, backed by [research-local-session-data.md](research-local-session-data.md).
 7. **The UX/UI concept captures** — [07-ui-concept.md](07-ui-concept.md) (web),
    [08-cli-tui-concept.md](08-cli-tui-concept.md) (CLI/TUI), and
-   [09-session-view.md](09-session-view.md) (the work-session receipt): the surface
+   [09-session-view.md](09-session-view.md) (the work-session receipt), and
+   [10-session-explorer-budgets-quota.md](10-session-explorer-budgets-quota.md)
+   (session-as-spine, prompt-chain travel, budgets, the plan-quota window): the surface
    design — arbitrage chart, `explain` receipt, faceted explorer, session receipt —
-   captured from the 2026-06-17 brainstorm.
+   captured from the 2026-06-17 and 2026-06-19 brainstorms.
 8. **The phase specs**, in roadmap order (below).
 
 ## Document map
@@ -58,6 +60,7 @@ _Last updated: 2026-06-17 · UX/UI concept captures (07–09) added · Status: P
 | [07-ui-concept.md](07-ui-concept.md) | Web UI concept: arbitrage/cache chart, `explain` receipt slide-over, faceted explorer | Concept (brainstorm capture) |
 | [08-cli-tui-concept.md](08-cli-tui-concept.md) | CLI/TUI concept: ANSI `explain` receipt, composition-striped `report`, navigable TUI, reaching `explain` without an id | Concept (brainstorm capture) |
 | [09-session-view.md](09-session-view.md) | Session as a first-class unit: `report --by session` + `explain session:<id>` receipt, spike-not-streak temporal view | Concept (brainstorm capture) |
+| [10-session-explorer-budgets-quota.md](10-session-explorer-budgets-quota.md) | Session as the explorer spine (live + historical), prompt-chain travel, API-equivalent budgets, and the local plan-quota window (Codex `rate_limits` / Claude usage snapshot) | Concept (brainstorm capture) |
 | [research-local-session-data.md](research-local-session-data.md) | Source note: mining agents' local session data (verified vs ccusage/CodeBurn) | Reference |
 | [phase-0A-trusted-explainable-ledger.md](phase-0A-trusted-explainable-ledger.md) | Claude Code local ledger + `explain` | **Detailed — building now** |
 | [phase-0B-provider-coverage-and-findings.md](phase-0B-provider-coverage-and-findings.md) | Codex + Cursor, fixtures, cost-driver findings, TUI | Planned |

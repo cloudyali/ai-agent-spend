@@ -21,6 +21,7 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/provider"
 	"github.com/agentspend/ai-agent-spend/internal/provider/claudecode"
 	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
+	"github.com/agentspend/ai-agent-spend/internal/quota"
 	"github.com/agentspend/ai-agent-spend/internal/store"
 	"github.com/agentspend/ai-agent-spend/internal/tui"
 )
@@ -33,6 +34,7 @@ func (a *App) cmdTui(args []string) int {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
 	periodSpec := fs.String("period", "week", "initial calendar window (same grammar as `report`)")
+	watch := fs.Bool("watch", false, "live mode: periodically re-scan logs and refresh the view in place")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -60,13 +62,22 @@ func (a *App) cmdTui(args []string) int {
 	// config) recomputes amortization live.
 	buildPeriods := func() []tui.Period {
 		plans := a.planSet()
+		// Re-read the store and the clock each call so the picker AND the watch tick
+		// see freshly-scanned turns and current windows; fall back to the startup
+		// snapshot if a re-open fails.
+		evsAll, winNow := all, a.Now()
+		if st2, err := a.openStore(); err == nil {
+			if fresh, e := st2.Query(store.Filter{}); e == nil {
+				evsAll = fresh
+			}
+		}
 		ps := make([]tui.Period, 0, len(specs))
 		for _, spec := range specs {
-			win, err := parsePeriod(spec, now)
+			win, err := parsePeriod(spec, winNow)
 			if err != nil {
 				continue
 			}
-			evs := eventsInWindow(all, win)
+			evs := eventsInWindow(evsAll, win)
 			amort, hasPlan := a.amortizedByProvider(evs, win, plans)
 			ps = append(ps, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan, Since: win.Since, Until: win.Until})
 		}
@@ -92,9 +103,21 @@ func (a *App) cmdTui(args []string) int {
 		return buildPeriods()
 	}
 
-	m := tui.New(periods, startIdx, a.pricingEngine()).WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan)
+	m := tui.New(periods, startIdx, a.pricingEngine()).WithNow(now).
+		WithQuota(func() []quota.Sample {
+			return append(a.claudeQuotaSamples(a.Now()), a.codexQuotaSamples(a.Now())...)
+		}).
+		WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan)
+	if *watch {
+		// Live mode: every few seconds re-scan + rebuild and advance the clock, so an
+		// ongoing session grows and liveness decays without leaving the explorer.
+		m = m.WithWatch(3*time.Second, a.Now, buildPeriods)
+	}
 	if resolve := a.promptResolver(); resolve != nil {
 		m = m.WithPromptResolver(resolve)
+	}
+	if name := a.sessionNameResolver(); name != nil {
+		m = m.WithNameResolver(name)
 	}
 	if err := tui.RunModel(m, a.Out); err != nil {
 		fmt.Fprintf(a.Err, "aispend: tui: %v\n", err)
@@ -126,6 +149,26 @@ func (a *App) promptResolver() func(event.AgentEvent) (string, bool) {
 			if path, ok := cx[e.Evidence.SourcePathHash]; ok {
 				return codex.PromptBefore(path, e.Evidence.SourceLine)
 			}
+		}
+		return "", false
+	}
+}
+
+// sessionNameResolver builds a lazy session-title resolver mirroring promptResolver:
+// snapshot Claude Code sources (hash → real path) once, then re-read the human title
+// (summary, else first prompt) from the matching log on drill-in. nil when no Claude
+// Code sources are present. Local read-only — no network, no new persistence.
+func (a *App) sessionNameResolver() func(event.AgentEvent) (string, bool) {
+	cc := sourceMap(claudecode.New(a.Resolver))
+	if len(cc) == 0 {
+		return nil
+	}
+	return func(e event.AgentEvent) (string, bool) {
+		if e.Provider != "claude_code" {
+			return "", false
+		}
+		if path, ok := cc[e.Evidence.SourcePathHash]; ok {
+			return claudecode.SessionName(path)
 		}
 		return "", false
 	}

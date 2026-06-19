@@ -38,7 +38,7 @@ One spend command, calendar-only windows (no rolling window):
 
 ```
 aispend                        # DEFAULT CHANNEL → interactive TUI; falls back to `today` off a TTY / in the offline build
-aispend tui [--period P]       # the interactive explorer: arrow sessions → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them)
+aispend tui [--period P] [--watch]   # interactive explorer: day-grouped session list (live badge + legend) → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them). --watch live-refreshes in place (periodic re-scan + clock advance). Visual times render in LOCAL tz; the backend/ledger stays UTC.
 aispend report --period <today|yesterday|week|month|"last week"|"last month"|
                          quarter|"this year"|"N days"|"since YYYY-MM-DD"|
                          YYYY-MM-DD..YYYY-MM-DD|all> [--by G] [--view V] [--json]

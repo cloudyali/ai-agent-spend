@@ -21,12 +21,18 @@ type AgentEvent struct {
 	EventID       string `json:"event_id"`
 	SessionID     string `json:"session_id"`
 	PromptID      string `json:"prompt_id,omitempty"`
-	Provider      string `json:"provider"`
-	Surface       string `json:"surface"`
-	IdentityHash  string `json:"identity_hash"`
-	Project       string `json:"project,omitempty"`
-	Repo          string `json:"repo,omitempty"`
-	CWDHash       string `json:"cwd_hash,omitempty"`
+	// SubagentID is the Claude Code subagent worker id when this turn came from a
+	// subagents/agent-*.jsonl transcript. The turn's SessionID is rolled up to the
+	// parent session (resolved from the path at scan time, since paths are hashed in
+	// the ledger), so subagent spend folds into the parent's total. Empty otherwise.
+	// Additive; does not bump SchemaVersion.
+	SubagentID   string `json:"subagent_id,omitempty"`
+	Provider     string `json:"provider"`
+	Surface      string `json:"surface"`
+	IdentityHash string `json:"identity_hash"`
+	Project      string `json:"project,omitempty"`
+	Repo         string `json:"repo,omitempty"`
+	CWDHash      string `json:"cwd_hash,omitempty"`
 	// GitBranch is the branch on the session line (Claude Code logs it per turn);
 	// durable, stored as-is. GitSHA is the commit that was HEAD at the turn's
 	// timestamp, reconstructed best-effort at scan time from the repo's reflog (the

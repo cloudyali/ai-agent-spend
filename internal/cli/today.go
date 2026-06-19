@@ -9,6 +9,7 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +17,9 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
+	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
+	"github.com/agentspend/ai-agent-spend/internal/quota"
 	"github.com/agentspend/ai-agent-spend/internal/store"
 )
 
@@ -130,12 +134,107 @@ func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config
 		}
 	}
 
+	// Plan headroom — the weekly / 5h wall, read from the provider's local usage
+	// snapshot. A point-in-time reading shown with its as-of, NOT part of the ledger;
+	// absent or stale-past-reset → nothing rather than a guess.
+	qt := quota.NewTracker()
+	for _, s := range a.claudeQuotaSamples(now) {
+		qt.Observe(s)
+	}
+	for _, s := range a.codexQuotaSamples(now) {
+		qt.Observe(s)
+	}
+	claudeShown := false
+	for _, s := range qt.Active(now) {
+		fmt.Fprintf(a.Out, "  %s %s · %s\n", paint(color, cBold, quotaProviderLabel(s.Provider)), s.Line(now), s.Freshness(now))
+		if s.Provider == "claude" {
+			claudeShown = true
+		}
+	}
+	// You code in Claude but we have no weekly window on disk → say so, don't stay
+	// silent (a "not computable" the tool can explain, never a guess).
+	if !claudeShown && providers["claude_code"] {
+		fmt.Fprintf(a.Out, "  %s unknown — no local usage snapshot\n", paint(color, cBold, "Claude weekly"))
+	}
+
 	// Honesty footer: how to get an ROI, or which providers it omits.
 	if dailyFee == 0 {
 		fmt.Fprintln(a.Out, "  (set a subscription plan for ROI — see `aispend plans`)")
 	} else if len(uncovered) > 0 {
 		fmt.Fprintf(a.Out, "  note: %s not in the ROI (no plan set)\n", joinProviderLabels(uncovered))
 	}
+}
+
+// claudeQuotaSamples reads Claude Code's local usage snapshot (best-effort): absent or
+// unparseable → no samples, so the plan-headroom gauge degrades to nothing rather than
+// guess. observedAt falls back to now when the file's mtime can't be read. Reading a
+// local file only — no network, so the offline promise holds.
+func (a *App) claudeQuotaSamples(now time.Time) []quota.Sample {
+	path := a.Resolver.ClaudeUsagePath()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	observed := now
+	if fi, e := os.Stat(path); e == nil {
+		observed = fi.ModTime()
+	}
+	return quota.ParseClaudeRateLimits(b, observed)
+}
+
+// maxQuotaScanFiles caps how many recent Codex rollouts we scan for a rate_limits
+// sample. The freshest window lives in the most recently written session(s), and
+// exec-mode runs log rate_limits:null, so we walk newest-first until one is populated.
+const maxQuotaScanFiles = 8
+
+// codexQuotaSamples reads Codex's plan-limit windows from the rate_limits block its
+// rollout logs already carry (newest session first), reusing quota.ParseCodex. It is
+// best-effort: no Codex data, or only exec-mode nulls, yields no samples (the gauge
+// degrades to nothing). Local read-only — no network, no new persistence.
+func (a *App) codexQuotaSamples(now time.Time) []quota.Sample {
+	srcs, err := codex.New(a.Resolver).Sources()
+	if err != nil || len(srcs) == 0 {
+		return nil
+	}
+	type aged struct {
+		s  provider.Source
+		mt time.Time
+	}
+	all := make([]aged, len(srcs))
+	for i, s := range srcs {
+		var mt time.Time
+		if fi, e := os.Stat(s.RawPath); e == nil {
+			mt = fi.ModTime()
+		}
+		all[i] = aged{s, mt}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].mt.After(all[j].mt) }) // newest first
+
+	tr := quota.NewTracker()
+	for i, a2 := range all {
+		if i >= maxQuotaScanFiles {
+			break
+		}
+		recs, e := provider.ReadJSONL("codex", a2.s)
+		if e != nil {
+			continue
+		}
+		for _, r := range recs {
+			tr.ObserveCodex(r.Raw)
+		}
+		if len(tr.Active(now)) > 0 {
+			break // a populated window found; older rollouts can't be fresher
+		}
+	}
+	return tr.Active(now)
+}
+
+// quotaProviderLabel capitalizes a quota provider key for display ("claude" → "Claude").
+func quotaProviderLabel(p string) string {
+	if p == "" {
+		return p
+	}
+	return strings.ToUpper(p[:1]) + p[1:]
 }
 
 // dailyPlanFee sums each present provider's prorated daily subscription fee

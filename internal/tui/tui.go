@@ -19,6 +19,7 @@ import (
 
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
+	"github.com/agentspend/ai-agent-spend/internal/quota"
 )
 
 // Period is one selectable window: a label, the events that fall in it, and the
@@ -88,6 +89,11 @@ type Model struct {
 	// prompt behind a turn from the original session log on demand; nil hides the
 	// prompt section in the explain view.
 	promptResolver func(event.AgentEvent) (string, bool)
+	// nameResolver (optional; WithNameResolver) recovers a human session title from the
+	// original log; resolved once on drill-in into the receipt, nil → no title line.
+	nameResolver func(event.AgentEvent) (string, bool)
+	selName      string
+	selNameOK    bool
 	// The resolved prompt for the open turn, rendered in a scrollable viewport so a
 	// long prompt scrolls instead of burying the evidence above it. Resolved once on
 	// drill-in (openExplain), not re-read each render.
@@ -104,6 +110,25 @@ type Model struct {
 	today     time.Time
 	setPlan   func(provider, planID string, start time.Time) []Period
 	picker    planPicker
+
+	// now is the reference clock for the day-grouped session list: it powers the
+	// Today/Yesterday headers and the live badge. Zero when unset (e.g. in tests),
+	// which renders absolute day labels and no live session — keeping output
+	// deterministic. Set via WithNow from the cli.
+	now time.Time
+
+	// watch-mode (optional; enabled via WithWatch): every watchInt the model calls
+	// reload for fresh periods and nowFn to advance the clock, refreshing in place so
+	// an ongoing session grows and liveness decays without leaving the list.
+	watchInt time.Duration
+	nowFn    func() time.Time
+	reload   func() []Period
+
+	// quota (optional; enabled via WithQuota): the provider's plan-limit windows read
+	// from its local usage snapshot — a reported point-in-time gauge, separate from the
+	// ledger. quotaFn re-reads on each refresh so a watch tick keeps it current.
+	quotaFn func() []quota.Sample
+	quota   []quota.Sample
 }
 
 // WithPlanPicker enables the in-explorer plan picker (the `p` key): providers is
@@ -115,6 +140,47 @@ func (m Model) WithPlanPicker(providers []ProviderChoice, plans []PlanChoice, to
 	m.plans = plans
 	m.today = today
 	m.setPlan = setPlan
+	return m
+}
+
+// WithQuota enables the plan-limit gauge in the list header: fn returns the freshest
+// quota samples (the cli reads them from the provider's local usage snapshot). They
+// re-read on every refresh, so a watch tick keeps them current; absent or
+// expired-past-reset samples simply don't render. It's a reported gauge, separate
+// from the ledger.
+func (m Model) WithQuota(fn func() []quota.Sample) Model {
+	m.quotaFn = fn
+	m.refresh()
+	return m
+}
+
+// WithNow sets the reference clock for the day-grouped session list — the relative
+// day headers (Today/Yesterday) and the live badge. Without it the list groups by
+// absolute date and shows no live session. The cli passes the scan's now; tests pin it.
+func (m Model) WithNow(now time.Time) Model {
+	m.now = now
+	m.refresh() // rebuild rows so day-grouping + liveness use the new clock
+	return m
+}
+
+// WithWatch turns the explorer into a live view: every interval it calls reload to
+// pull fresh periods (a re-scan + rebuild, in the cli) and nowFn to advance the
+// clock, so an ongoing session grows and liveness decays in place. nowFn may be nil
+// (clock not advanced); a zero interval disables ticking. Wiring lives in the cli so
+// this package stays filesystem-free and unit-testable.
+func (m Model) WithWatch(interval time.Duration, nowFn func() time.Time, reload func() []Period) Model {
+	m.watchInt = interval
+	m.nowFn = nowFn
+	m.reload = reload
+	return m
+}
+
+// WithNameResolver injects an optional, lazy session-title re-reader: given a
+// representative turn it returns the session's human name (Claude Code summary, else
+// first prompt), resolved once on drill-in. nil hides the receipt's title line.
+// Wiring lives in the cli, keeping this package filesystem-free and unit-testable.
+func (m Model) WithNameResolver(fn func(event.AgentEvent) (string, bool)) Model {
+	m.nameResolver = fn
 	return m
 }
 
@@ -138,8 +204,12 @@ type sessionStat struct {
 	repo      string
 	provider  string
 	byModel   map[string]int64
+	subagents map[string]bool // distinct subagent worker ids rolled up under this session
 	evs       []event.AgentEvent
 }
+
+// subCount is how many distinct Claude Code subagents rolled up under this session.
+func (s sessionStat) subCount() int { return len(s.subagents) }
 
 // --- color language: a muted, low-saturation palette via AdaptiveColor, so it
 // stays legible and easy on the eyes on BOTH light and dark terminal backgrounds.
@@ -171,6 +241,9 @@ func (m *Model) refresh() {
 	m.avail = availableViews(m.events(), m.period().HasPlan)
 	m.curView = ensureView(m.curView, m.avail)
 	m.rows = m.buildRows()
+	if m.quotaFn != nil {
+		m.quota = m.quotaFn() // re-read the plan-limit snapshot so a watch tick keeps it fresh
+	}
 }
 
 func (m Model) period() Period {
@@ -184,25 +257,27 @@ func (m Model) events() []event.AgentEvent { return m.period().Events }
 
 func (m Model) label() string { return m.period().Label }
 
-// periodDates renders the active window's actual date span in UTC — a single date
-// ("Jun 19") or a range ("Jun 15–Jun 21"). Callers guard the unbounded "all" window,
-// so both bounds are non-zero here.
+// periodDates renders the active window's date span in the LOCAL display zone — a
+// single date ("Jun 19") or a range ("Jun 15–Jun 21"). The bounds are UTC instants;
+// this only chooses the display zone. Callers guard the unbounded "all" window, so
+// both bounds are non-zero here.
 func periodDates(since, until time.Time) string {
-	s, u := since.UTC(), until.UTC()
+	s, u := since.In(time.Local), until.In(time.Local)
 	if s.Format("20060102") == u.Format("20060102") {
 		return s.Format("Jan 2")
 	}
 	return s.Format("Jan 2") + "–" + u.Format("Jan 2")
 }
 
-// periodDatesUTC is the active window's date span with a UTC tag, or "" when the
-// window is unbounded ("all"), where the label alone conveys the span.
-func (m Model) periodDatesUTC() string {
+// periodSpanLabel is the active window's date span tagged with the local zone
+// abbreviation (e.g. "Jun 15–Jun 21 IST"), or "" when the window is unbounded
+// ("all"), where the label alone conveys the span.
+func (m Model) periodSpanLabel() string {
 	p := m.period()
 	if p.Since.IsZero() && p.Until.IsZero() {
 		return ""
 	}
-	return periodDates(p.Since, p.Until) + " UTC"
+	return periodDates(p.Since, p.Until) + " " + p.Since.In(time.Local).Format("MST")
 }
 
 func (m Model) view() string { return m.curView }
@@ -235,18 +310,63 @@ func (m Model) buildRows() []sessionStat {
 			rows[i].micros = alloc[rows[i].id]
 			rows[i].hasView = per.Amortized[rows[i].provider] > 0 // covered by a plan
 		}
-		sort.SliceStable(rows, func(i, j int) bool { return rows[i].micros > rows[j].micros })
 	}
-	return rows
+	// Day-grouped ordering: most-recent day first, the live session leading its day,
+	// then priciest-first. A single-day period reduces to the legacy cost ordering, so
+	// existing single-day behavior (and its tests) is unchanged.
+	return orderForDayList(rows, m.now, time.Local, liveWindow)
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+// tickMsg is the watch-mode heartbeat; each one reloads fresh data and re-arms.
+type tickMsg time.Time
+
+// tickCmd schedules the next watch tick, or nil when watch is off.
+func (m Model) tickCmd() tea.Cmd {
+	if m.watchInt <= 0 {
+		return nil
+	}
+	return tea.Tick(m.watchInt, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
+// applyReload advances the clock and pulls fresh periods (keeping the selected window
+// by label), then rebuilds rows. Total by design: an empty reload keeps the current
+// data, and the cursor is clamped so a shrunk list can never be indexed past its end.
+func (m *Model) applyReload() {
+	if m.nowFn != nil {
+		m.now = m.nowFn()
+	}
+	if m.reload != nil {
+		if ps := m.reload(); len(ps) > 0 {
+			label := m.period().Label
+			m.periods = ps
+			m.pIdx = 0
+			for i, p := range ps {
+				if p.Label == label {
+					m.pIdx = i
+					break
+				}
+			}
+		}
+	}
+	m.refresh()
+	if m.cursor >= len(m.rows) {
+		m.cursor = len(m.rows) - 1
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+}
+
+func (m Model) Init() tea.Cmd { return m.tickCmd() }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.buildPromptViewport() // re-fit the prompt box to the new size
+	case tickMsg:
+		m.applyReload() // watch heartbeat: refresh in place, then re-arm
+		return m, m.tickCmd()
 	case tea.KeyMsg:
 		// q and ctrl+c quit from anywhere — including drill-downs — so q is never
 		// "back" (esc/←/h/backspace are). The plan picker owns its keys, so q is not
@@ -373,6 +493,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				if len(m.rows) > 0 {
 					m.sel = m.rows[m.cursor]
+					m.selName, m.selNameOK = "", false
+					if m.nameResolver != nil && len(m.sel.evs) > 0 {
+						m.selName, m.selNameOK = m.nameResolver(m.sel.evs[0]) // resolve the title once, on drill-in
+					}
 					m.selFiles = receiptFiles(m.sel.evs) // freeze the receipt's lists
 					m.selTurns = topTurns(m.sel.evs, 5)
 					m.recCursor = 0 // start on the priciest file (or the top turn when fileless)
@@ -410,7 +534,7 @@ func (m Model) listView() string {
 	var b strings.Builder
 
 	hdr := " · " + m.label()
-	if d := m.periodDatesUTC(); d != "" {
+	if d := m.periodSpanLabel(); d != "" {
 		hdr += " · " + d
 	}
 	hdr += fmt.Sprintf("   ·   %d sessions", len(m.rows))
@@ -426,14 +550,28 @@ func (m Model) listView() string {
 		parts = append(parts, "p set plan")
 	}
 	parts = append(parts, "q quit")
-	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n\n")
+	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n")
+	if anyLive(m.rows, m.now, liveWindow) { // a special legend, only when something is live
+		b.WriteString(stOutput.Render("  ●") + stFaint.Render(" "+liveLegendText(liveWindow)) + "\n")
+	}
+	b.WriteString("\n")
+
+	// Plan-limit gauges (the weekly/5h wall) — a reported snapshot, shown above the
+	// sessions and before the empty check so the wall is visible even on a quiet day,
+	// with an explicit "unknown" line when Claude activity has no local snapshot.
+	if ql := m.quotaLines(); len(ql) > 0 {
+		for _, line := range ql {
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("\n")
+	}
 
 	if len(m.rows) == 0 {
 		b.WriteString(stFaint.Render("  no sessions in "+m.label()) + "\n")
 		return b.String()
 	}
 
-	if db := durationBar(m.events(), m.period().Since, m.period().Until); db != "" { // spend-over-time across the period
+	if db := durationBar(m.events(), m.period().Since, m.period().Until, time.Local); db != "" { // spend-over-time across the period
 		b.WriteString(db + "\n\n")
 	}
 
@@ -445,24 +583,48 @@ func (m Model) listView() string {
 		barW = 28
 	}
 	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%9s  %-*s  %-15s  %-18s  %6s  %s",
-		"COST", barW, "SHARE", "WHEN (UTC)", "PROJECT", "TURNS", "MODEL")) + "\n")
+		"COST", barW, "SHARE", "WHEN · SPAN", "PROJECT", "TURNS", "MODEL")) + "\n")
 
-	maxMicros := m.rows[0].micros
+	var maxMicros int64
+	daySubtotal := map[string]int64{}
+	for _, r := range m.rows {
+		if r.micros > maxMicros {
+			maxMicros = r.micros
+		}
+		daySubtotal[dayKey(r.last, time.Local)] += r.micros
+	}
 	start, end := m.windowRange(len(m.rows))
+	prevDay := ""
 	for i := start; i < end; i++ {
 		r := m.rows[i]
+		if dk := dayKey(r.last, time.Local); dk != prevDay {
+			prevDay = dk
+			b.WriteString("  " + stBold.Render(dayLabel(r.last, m.now, time.Local)) + stFaint.Render(" · "+money(daySubtotal[dk])) + "\n")
+		}
 		cost := money(r.micros)
 		if !r.hasView {
 			cost = "—"
 		}
 		bar := spendBar(r.micros, maxMicros, barW)
-		meta := fmt.Sprintf("%-15s  %-18s  %6s  %s",
-			fmtTime(r.first), trunc(orDash(r.repo), 18), comma(int64(r.turns)), trunc(humanModel(r.dominant()), 12))
-		if i == m.cursor {
-			b.WriteString(stSel.Render(fmt.Sprintf("▶ %9s  %s  %s", cost, bar, meta)) + "\n")
-			continue
+		live := isLive(r.last, m.now, liveWindow)
+		when := clockTime(r.first, time.Local) + " " + elapsed(sessionSpan(r))
+		if live {
+			when = "live " + elapsed(sessionSpan(r))
 		}
-		b.WriteString("  " + stBold.Render(fmt.Sprintf("%9s", cost)) + "  " + styleBar(bar) + "  " + stFaint.Render(meta) + "\n")
+		model := trunc(humanModel(r.dominant()), 12)
+		if n := r.subCount(); n > 0 {
+			model += fmt.Sprintf(" ⋮%d sub", n) // subagents rolled up under this session
+		}
+		meta := fmt.Sprintf("%-15s  %-18s  %6s  %s",
+			when, trunc(orDash(r.repo), 18), comma(int64(r.turns)), model)
+		switch {
+		case i == m.cursor:
+			b.WriteString(stSel.Render(fmt.Sprintf("▶ %9s  %s  %s", cost, bar, meta)) + "\n")
+		case live:
+			b.WriteString(stOutput.Render("● ") + stBold.Render(fmt.Sprintf("%9s", cost)) + "  " + styleBar(bar) + "  " + stFaint.Render(meta) + "\n")
+		default:
+			b.WriteString("  " + stBold.Render(fmt.Sprintf("%9s", cost)) + "  " + styleBar(bar) + "  " + stFaint.Render(meta) + "\n")
+		}
 	}
 	if end < len(m.rows) {
 		b.WriteString(stFaint.Render(fmt.Sprintf("  … +%d more ↓", len(m.rows)-end)) + "\n")
@@ -514,8 +676,22 @@ func (m Model) headerLine(view string) string {
 
 func (m Model) windowRange(n int) (int, int) {
 	visible := m.h - 7
-	if durationBar(m.events(), m.period().Since, m.period().Until) != "" {
+	if durationBar(m.events(), m.period().Since, m.period().Until, time.Local) != "" {
 		visible -= 2 // the spend bar + its blank line also sit above the rows
+	}
+	if anyLive(m.rows, m.now, liveWindow) {
+		visible-- // the live legend line sits above the rows too
+	}
+	if n := len(m.quotaLines()); n > 0 {
+		visible -= n + 1 // plan-limit gauge lines + their separating blank
+	}
+	// Day-group headers cost a line each: one day needs a single header, but several
+	// days can put a header before nearly every row, so halve the row budget then —
+	// never overflowing the viewport (TestModel_ListFitsHeightWithDurationBar guards it).
+	if distinctSessionDays(m.rows, time.Local) > 1 {
+		visible /= 2
+	} else {
+		visible--
 	}
 	if m.h <= 0 || visible >= n {
 		return 0, n
@@ -558,9 +734,16 @@ func (m Model) receiptView() string {
 
 	var b strings.Builder
 	b.WriteString(m.breadcrumb() + "\n\n")
+	if m.selNameOK { // the session's human title leads the receipt when we can recover it
+		b.WriteString(stBold.Render(trunc(m.selName, 64)) + "\n")
+	}
 	b.WriteString(fmt.Sprintf("%s · %s · %s → %s UTC\n",
 		stBold.Render(orDash(s.repo)), providerLabel(s.provider), fmtTime(s.first), fmtTime(s.last)))
-	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed", len(s.evs), turnsWord(len(s.evs)), elapsed(s.last.Sub(s.first)))) + "\n")
+	subNote := ""
+	if n := s.subCount(); n > 0 {
+		subNote = fmt.Sprintf(" · ⋮%d sub", n)
+	}
+	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed%s", len(s.evs), turnsWord(len(s.evs)), elapsed(s.last.Sub(s.first)), subNote)) + "\n")
 	if vcs := sessionVCSLine(s.evs); vcs != "" {
 		b.WriteString("  branch      " + stFaint.Render(vcs) + "\n")
 	}
@@ -775,6 +958,12 @@ func groupSessions(events []event.AgentEvent, view string) []sessionStat {
 		}
 		g.turns++
 		g.evs = append(g.evs, e)
+		if e.SubagentID != "" {
+			if g.subagents == nil {
+				g.subagents = map[string]bool{}
+			}
+			g.subagents[e.SubagentID] = true
+		}
 		if e.TSStart.Before(g.first) {
 			g.first = e.TSStart
 		}
@@ -1110,7 +1299,7 @@ func (m Model) receiptHint() string {
 // shown on the list is never "lost" deeper in. The leaf segment is emphasized.
 func (m Model) breadcrumb() string {
 	period := m.label()
-	if d := m.periodDatesUTC(); d != "" {
+	if d := m.periodSpanLabel(); d != "" {
 		period += " · " + d
 	}
 	segs := []string{period, orDash(m.sel.repo)}
@@ -1201,8 +1390,8 @@ func sparkline(vals []int64) string {
 // durationBar renders a spend-over-time bar for the current period: api-equivalent
 // spend bucketed across the events' span by an adaptive calendar unit, with the
 // peak bucket labelled. Empty when there's no priced spend.
-func durationBar(events []event.AgentEvent, since, until time.Time) string {
-	vals, unit, start := bucketSpend(events, since, until)
+func durationBar(events []event.AgentEvent, since, until time.Time, loc *time.Location) string {
+	vals, unit, start := bucketSpend(events, since, until, loc)
 	if len(vals) <= 1 { // a single bucket isn't a chart worth showing
 		return ""
 	}
@@ -1228,7 +1417,10 @@ func durationBar(events []event.AgentEvent, since, until time.Time) string {
 // [since,until] when bounded — so the unit tracks the window the user picked, not
 // where the data happens to sit (a quarter reads "by week" even if you only worked a
 // few days). The unbounded "all" window (zero bounds) falls back to the events' span.
-func bucketSpend(events []event.AgentEvent, since, until time.Time) ([]int64, string, time.Time) {
+func bucketSpend(events []event.AgentEvent, since, until time.Time, loc *time.Location) ([]int64, string, time.Time) {
+	if loc == nil {
+		loc = time.Local
+	}
 	// sessRep is each session's earliest dated turn, so a priced turn whose log line
 	// carried no parseable timestamp can still be placed on the timeline — folded onto
 	// its own session's known day — instead of being dropped. Without this the bar
@@ -1241,7 +1433,7 @@ func bucketSpend(events []event.AgentEvent, since, until time.Time) ([]int64, st
 		if e.TSStart.IsZero() || apiMicros(e) <= 0 {
 			continue
 		}
-		t := e.TSStart.UTC()
+		t := e.TSStart // absolute instant; bucketing converts to the display zone
 		if lo.IsZero() || t.Before(lo) {
 			lo = t
 		}
@@ -1258,11 +1450,11 @@ func bucketSpend(events []event.AgentEvent, since, until time.Time) ([]int64, st
 	// The axis is the period window when bounded, else the events' own span.
 	axisLo, axisHi := lo, hi
 	if !since.IsZero() && !until.IsZero() {
-		axisLo, axisHi = since.UTC(), until.UTC()
+		axisLo, axisHi = since, until
 	}
 	unit := chooseUnit(axisHi.Sub(axisLo))
-	start := truncateTo(axisLo, unit)
-	n := bucketIndex(start, unit, axisHi) + 1
+	start := truncateTo(axisLo, unit, loc)
+	n := bucketIndex(start, unit, axisHi, loc) + 1
 	if n < 1 {
 		n = 1
 	}
@@ -1272,7 +1464,7 @@ func bucketSpend(events []event.AgentEvent, since, until time.Time) ([]int64, st
 		if a <= 0 {
 			continue
 		}
-		t := e.TSStart.UTC()
+		t := e.TSStart          // absolute instant; bucketing converts to the display zone
 		if e.TSStart.IsZero() { // undated priced turn → fold onto its session's day (else the period's earliest)
 			r, ok := sessRep[e.SessionID]
 			if !ok {
@@ -1280,7 +1472,7 @@ func bucketSpend(events []event.AgentEvent, since, until time.Time) ([]int64, st
 			}
 			t = r
 		}
-		if i := bucketIndex(start, unit, t); i >= 0 && i < n {
+		if i := bucketIndex(start, unit, t, loc); i >= 0 && i < n {
 			vals[i] += a
 		}
 	}
@@ -1300,30 +1492,42 @@ func chooseUnit(span time.Duration) string {
 	}
 }
 
-func truncateTo(t time.Time, unit string) time.Time {
-	t = t.UTC()
+// truncateTo aligns t to the start of its bucket IN THE DISPLAY ZONE loc (nil ⇒
+// local), so bucket boundaries fall on local midnights/hours/Mondays — the instant is
+// still absolute, only the calendar grid is the user's. Backend windows stay UTC.
+func truncateTo(t time.Time, unit string, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.Local
+	}
+	t = t.In(loc)
 	switch unit {
 	case "hour":
-		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, loc)
 	case "week":
-		d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7)) // back to Monday
 	case "month":
-		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, loc)
 	default: // day
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 	}
 }
 
-func bucketIndex(start time.Time, unit string, t time.Time) int {
-	t = t.UTC()
+// bucketIndex returns which bucket t falls in, counting from start. hour/day/week use
+// the absolute elapsed span (start is a loc-aligned instant); month counts calendar
+// months in loc so the grid matches the local year/month.
+func bucketIndex(start time.Time, unit string, t time.Time, loc *time.Location) int {
 	switch unit {
 	case "hour":
 		return int(t.Sub(start) / time.Hour)
 	case "week":
 		return int(t.Sub(start) / (7 * 24 * time.Hour))
 	case "month":
-		return (t.Year()-start.Year())*12 + int(t.Month()) - int(start.Month())
+		if loc == nil {
+			loc = time.Local
+		}
+		lt := t.In(loc)
+		return (lt.Year()-start.Year())*12 + int(lt.Month()) - int(start.Month())
 	default: // day
 		return int(t.Sub(start) / (24 * time.Hour))
 	}
@@ -1629,13 +1833,64 @@ func providerLabel(p string) string {
 	}
 }
 
-// timeLayout renders a 12-hour wall-clock with an am/pm marker (e.g. "Jun 17
-// 7:42am"). fmtTime renders in UTC: AgentSpend is UTC end-to-end (billing data and
-// event timestamps are UTC), so every surface shows UTC for clean reconciliation —
-// the WHEN column header and the receipt window are labelled "UTC".
+// timeLayout renders a 12-hour wall-clock with an am/pm marker (e.g. "Jun 17 7:42am").
+// VISUAL times render in the user's LOCAL zone while the backend stays UTC end-to-end
+// (event timestamps, windows, dedupe and pricing are all UTC for clean
+// reconciliation); the display layer just chooses the zone to show. Span labels carry
+// the local zone abbreviation so the window is unambiguous.
 const timeLayout = "Jan 02 3:04pm"
 
-func fmtTime(t time.Time) string { return t.UTC().Format(timeLayout) }
+// fmtTimeIn renders an instant's wall clock in the display zone loc (nil ⇒ local).
+func fmtTimeIn(t time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	return t.In(loc).Format(timeLayout)
+}
+
+// fmtTime renders in the user's local zone — the visual default everywhere.
+func fmtTime(t time.Time) string { return fmtTimeIn(t, time.Local) }
+
+// quotaProviderTitle capitalizes a quota provider key for the gauge ("claude" → "Claude").
+func quotaProviderTitle(p string) string {
+	if p == "" {
+		return p
+	}
+	return strings.ToUpper(p[:1]) + p[1:]
+}
+
+// quotaLines builds the plan-limit gauge block for the list header: one line per active
+// sample, plus an explicit "unknown" line when the user has Claude activity but no
+// Claude window snapshot — so the gauge explains its blank rather than vanishing.
+// Returned lines are pre-styled; the count is also the height budget (windowRange).
+func (m Model) quotaLines() []string {
+	qt := quota.NewTracker()
+	for _, s := range m.quota {
+		qt.Observe(s)
+	}
+	var out []string
+	claudeShown := false
+	for _, s := range qt.Active(m.now) {
+		out = append(out, "  "+stBold.Render(quotaProviderTitle(s.Provider))+" "+stFaint.Render(s.Line(m.now)))
+		if s.Provider == "claude" {
+			claudeShown = true
+		}
+	}
+	if !claudeShown && m.hasProvider("claude_code") {
+		out = append(out, "  "+stBold.Render("Claude weekly")+" "+stFaint.Render("unknown — no local usage snapshot"))
+	}
+	return out
+}
+
+// hasProvider reports whether any session in the current rows came from provider p.
+func (m Model) hasProvider(p string) bool {
+	for _, r := range m.rows {
+		if r.provider == p {
+			return true
+		}
+	}
+	return false
+}
 
 func elapsed(d time.Duration) string {
 	if d < 0 {

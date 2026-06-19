@@ -66,6 +66,42 @@ func TestNormalize_MapsAssistantTurn(t *testing.T) {
 	}
 }
 
+// A subagent transcript (.../<parent>/subagents/agent-<worker>.jsonl) rolls up under
+// its parent session, derived from the in-memory RawPath at scan time.
+func TestNormalize_SubagentRollsUpToParent(t *testing.T) {
+	n := ClaudeCode{GOOS: "linux", IdentityHash: "id"}
+	r := provider.RawRecord{
+		Provider: "claude_code",
+		Source:   provider.Source{PathHash: "ph", RawPath: "/h/.claude/projects/proj/PARENT123/subagents/agent-w1.jsonl", Kind: "session_jsonl"},
+		Line:     1,
+		Raw:      []byte(opusLine),
+	}
+	ev, err := n.Normalize(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ev.SessionID != "PARENT123" {
+		t.Errorf("subagent turn should roll up to its parent session, got SessionID=%q (raw was sess_1)", ev.SessionID)
+	}
+	if ev.SubagentID != "w1" {
+		t.Errorf("SubagentID = %q, want w1", ev.SubagentID)
+	}
+}
+
+func TestNormalize_NonSubagentKeepsItsSession(t *testing.T) {
+	n := ClaudeCode{GOOS: "linux", IdentityHash: "id"}
+	r := provider.RawRecord{
+		Provider: "claude_code",
+		Source:   provider.Source{PathHash: "ph", RawPath: "/h/.claude/projects/proj/SESS9.jsonl", Kind: "session_jsonl"},
+		Line:     1,
+		Raw:      []byte(opusLine),
+	}
+	ev, _ := n.Normalize(r)
+	if ev.SessionID != "sess_1" || ev.SubagentID != "" {
+		t.Errorf("a normal session record keeps its own session, got SessionID=%q sub=%q", ev.SessionID, ev.SubagentID)
+	}
+}
+
 // Files touched: file_path/notebook_path from the turn's tool_use inputs, made
 // repo-relative (no absolute/home leak), deduped + sorted. Bash (command, no
 // file) is ignored; a path outside the repo degrades to its base name.

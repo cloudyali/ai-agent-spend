@@ -37,6 +37,17 @@ func TestAppHome_OverrideThenDefault(t *testing.T) {
 	})
 }
 
+func TestClaudeUsagePath(t *testing.T) {
+	def := Resolver{GOOS: "linux", Home: "/home/dev", Env: fakeEnv(nil)}
+	if got := slash(def.ClaudeUsagePath()); got != "/home/dev/.claude/usage-exact.json" {
+		t.Errorf("default = %q, want /home/dev/.claude/usage-exact.json", got)
+	}
+	ov := Resolver{GOOS: "linux", Home: "/home/dev", Env: fakeEnv(map[string]string{"CLAUDE_CONFIG_DIR": "/opt/claude"})}
+	if got := slash(ov.ClaudeUsagePath()); got != "/opt/claude/usage-exact.json" {
+		t.Errorf("override = %q, want /opt/claude/usage-exact.json", got)
+	}
+}
+
 func TestProviderRoots_ClaudeCode(t *testing.T) {
 	t.Run("default dotdir, all OSes", func(t *testing.T) {
 		for _, goos := range []string{"linux", "darwin", "windows"} {
