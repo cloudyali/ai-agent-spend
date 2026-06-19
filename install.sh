@@ -21,6 +21,7 @@ set -u
 # --- pure helpers (unit-tested by install_test.sh; keep them side-effect free) ---
 
 # detect_os maps `uname -s` to the GoReleaser .Os token used in archive names.
+# shellcheck disable=SC2120  # $1 is an optional test seam; prod calls with no args (uname -s)
 detect_os() {
 	os="${1:-$(uname -s)}"
 	case "$os" in
@@ -34,6 +35,7 @@ detect_os() {
 }
 
 # detect_arch maps `uname -m` to the GoReleaser .Arch token.
+# shellcheck disable=SC2120  # $1 is an optional test seam; prod calls with no args (uname -m)
 detect_arch() {
 	arch="${1:-$(uname -m)}"
 	case "$arch" in

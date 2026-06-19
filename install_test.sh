@@ -26,7 +26,7 @@ check() {
 	fi
 }
 # expect_fail passes when the wrapped command returns non-zero.
-# shellcheck disable=SC2329  # invoked indirectly via check() as "$@"
+# shellcheck disable=SC2317,SC2329  # invoked indirectly via check() as "$@"
 expect_fail() {
 	if "$@" >/dev/null 2>&1; then
 		return 1
