@@ -1,8 +1,7 @@
-// `aispend top` — the bridge from "my spend is high" to "explain why". It ranks
-// the priciest turns (default) or sessions in a calendar window and prints each
-// with its id, so the obvious next step is a copy-paste `explain <id>` /
-// `explain session:<id>`. Discovery is its job; the opaque id stays the
-// reproducibility primitive. See design-documents/08-cli-tui-concept.md.
+// `aispend top` — the bridge from "my spend is high" to "where did it go". It ranks
+// the priciest turns (default) or sessions in a calendar window and prints each with
+// its id; to open a turn or session to its full evidence, launch the interactive
+// explorer (`aispend`) and drill in. See design-documents/08-cli-tui-concept.md.
 package cli
 
 import (
@@ -99,11 +98,11 @@ func (a *App) renderTop(events []event.AgentEvent, limit int, bySessions bool, l
 			i+1, usd(m.Micros, m.Currency), e.EventID, shortModel(e.Model), sess,
 			comma(e.Tokens.Input), comma(e.Tokens.Output), comma(e.Tokens.CacheRead))
 	}
-	fmt.Fprintln(a.Out, "\n  → `aispend explain <id>` for the full receipt · `--sessions` to rank sessions")
+	fmt.Fprintln(a.Out, "\n  → open `aispend` (the explorer) and drill in for the full evidence · `--sessions` to rank sessions")
 }
 
 // renderTopSessions ranks whole sessions by summed api-equivalent. Sessionless
-// turns aren't addressable via `explain session:`, so they're excluded here.
+// turns aren't addressable as sessions, so they're excluded here.
 func (a *App) renderTopSessions(events []event.AgentEvent, limit int) {
 	type agg struct {
 		id     string
@@ -149,5 +148,5 @@ func (a *App) renderTopSessions(events []event.AgentEvent, limit int) {
 		fmt.Fprintf(a.Out, "  %2d  %9s  %-10s %d %s · %s\n",
 			i+1, usd(g.micros, "USD"), shortSession(g.id), g.turns, unit, modelList(g.models))
 	}
-	fmt.Fprintln(a.Out, "\n  → `aispend explain session:<id>` for the receipt (or session:max)")
+	fmt.Fprintln(a.Out, "\n  → open `aispend` (the explorer) and drill into a session for its receipt")
 }

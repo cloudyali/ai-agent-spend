@@ -18,9 +18,16 @@ import (
 
 	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/agentspend/ai-agent-spend/internal/provider/claudecode"
+	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
 	"github.com/agentspend/ai-agent-spend/internal/store"
 	"github.com/agentspend/ai-agent-spend/internal/tui"
 )
+
+// tuiBuilt reports that the interactive TUI is linked into this build, so the
+// no-arg default (cmdDefault) may open it. The offline build sets it false.
+const tuiBuilt = true
 
 func (a *App) cmdTui(args []string) int {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
@@ -61,7 +68,7 @@ func (a *App) cmdTui(args []string) int {
 			}
 			evs := eventsInWindow(all, win)
 			amort, hasPlan := a.amortizedByProvider(evs, win, plans)
-			ps = append(ps, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan})
+			ps = append(ps, tui.Period{Label: win.Label, Events: evs, Amortized: amort, HasPlan: hasPlan, Since: win.Since, Until: win.Until})
 		}
 		return ps
 	}
@@ -86,11 +93,58 @@ func (a *App) cmdTui(args []string) int {
 	}
 
 	m := tui.New(periods, startIdx, a.pricingEngine()).WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan)
+	if resolve := a.promptResolver(); resolve != nil {
+		m = m.WithPromptResolver(resolve)
+	}
 	if err := tui.RunModel(m, a.Out); err != nil {
 		fmt.Fprintf(a.Err, "aispend: tui: %v\n", err)
 		return 1
 	}
 	return 0
+}
+
+// promptResolver builds the explain view's lazy prompt re-reader. It snapshots the
+// user's Claude Code session paths (hash → real path) once for this TUI session,
+// then for a turn re-opens the matching log and recovers the human prompt behind it.
+// Nothing is persisted, and only enumerated source paths are ever opened — the event
+// supplies a content hash, never a path, so a foreign or forged hash simply misses
+// rather than coercing an out-of-tree read. Returns nil when no Claude Code sources
+// are present (the explain view then shows no prompt section).
+func (a *App) promptResolver() func(event.AgentEvent) (string, bool) {
+	cc := sourceMap(claudecode.New(a.Resolver))
+	cx := sourceMap(codex.New(a.Resolver))
+	if len(cc) == 0 && len(cx) == 0 {
+		return nil
+	}
+	return func(e event.AgentEvent) (string, bool) {
+		switch e.Provider {
+		case "claude_code":
+			if path, ok := cc[e.Evidence.SourcePathHash]; ok {
+				return claudecode.PromptBefore(path, e.Evidence.SourceLine)
+			}
+		case "codex":
+			if path, ok := cx[e.Evidence.SourcePathHash]; ok {
+				return codex.PromptBefore(path, e.Evidence.SourceLine)
+			}
+		}
+		return "", false
+	}
+}
+
+// sourceMap snapshots a provider's enumerated session files as hash → real path, so
+// the explain view can re-open the matching log by its (already-hashed) source path.
+// Returns nil on enumeration error or when the provider has no sources, so the event
+// only ever supplies a hash key — never a path — and a foreign hash simply misses.
+func sourceMap(p provider.Provider) map[string]string {
+	srcs, err := p.Sources()
+	if err != nil || len(srcs) == 0 {
+		return nil
+	}
+	m := make(map[string]string, len(srcs))
+	for _, s := range srcs {
+		m[s.PathHash] = s.RawPath
+	}
+	return m
 }
 
 // planChoices builds the plan catalog for the picker, with an explicit "API / no

@@ -2,40 +2,8 @@ package cli
 
 import (
 	"os"
-	"strings"
 	"testing"
-	"time"
 )
-
-// arbitrageLine must say the honest thing in both directions: a saving when cache
-// reads beat the no-cache bill, and an *added* cost when 1-hour cache writes (2×
-// input) exceed what not caching would have cost.
-func TestArbitrageLine(t *testing.T) {
-	if got := arbitrageLine(10_000_000, 8_400_000); got != "without cache ≈ $10.00 · saved 84%" {
-		t.Errorf("positive savings = %q", got)
-	}
-	if got := arbitrageLine(5_000_000, -5_000_000); !strings.Contains(got, "cost +100%") || !strings.Contains(got, "exceeded") {
-		t.Errorf("negative savings should read as an added cost, got %q", got)
-	}
-}
-
-func TestHumanizeDuration(t *testing.T) {
-	cases := []struct {
-		d    time.Duration
-		want string
-	}{
-		{-time.Second, "0s"},
-		{30 * time.Second, "30s"},
-		{42 * time.Minute, "42m"},
-		{90 * time.Minute, "1h30m"},
-		{26 * time.Hour, "1d2h"},
-	}
-	for _, c := range cases {
-		if got := humanizeDuration(c.d); got != c.want {
-			t.Errorf("humanizeDuration(%v) = %q, want %q", c.d, got, c.want)
-		}
-	}
-}
 
 func TestRoiStr(t *testing.T) {
 	if got := roiStr(518.3); got != "518×" {

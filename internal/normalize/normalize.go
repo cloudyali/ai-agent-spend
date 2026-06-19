@@ -42,6 +42,15 @@ type ClaudeCode struct {
 	IdentityHash string                                     // hashed identity, computed once per scan
 	Attribute    func(cwd string) (project, costTag string) // optional; from internal/config
 	RepoRoot     func(filePath string) string               // optional; resolves a file to its repo root dir (.git/.aispend.toml). Attributes Cowork sessions whose cwd is the desktop outputs dir.
+	// HeadAt (optional) reconstructs the commit that was HEAD of a repo at an
+	// instant, from its reflog — the seam EnrichVCS uses to recover GitSHA (the
+	// session log has none). nil disables SHA enrichment, keeping the golden/unit
+	// tests filesystem-free.
+	HeadAt func(repoRoot string, t time.Time) (string, bool)
+	// Churn (optional) returns per-file line churn for a commit range — the one
+	// git-binary dependency. nil disables churn capture; EnrichVCS then leaves
+	// SessionChurn empty and the heatmap degrades to cost-only.
+	Churn func(repoRoot, fromSHA, toSHA string, files []string) []event.FileChurn
 }
 
 const (
@@ -71,6 +80,7 @@ type ccLine struct {
 	CostUSD   *float64  `json:"costUSD"`   // a cost Claude Code sometimes writes itself; pointer so absent ≠ 0
 	Timestamp time.Time `json:"timestamp"`
 	CWD       string    `json:"cwd"`
+	GitBranch string    `json:"gitBranch"` // branch the turn ran on; the SHA is reconstructed later
 	Message   struct {
 		ID      string      `json:"id"`
 		Role    string      `json:"role"`
@@ -146,6 +156,7 @@ func (n ClaudeCode) Normalize(rec provider.RawRecord) (event.AgentEvent, error) 
 		Project:       project,
 		Repo:          repo,
 		CostTag:       costTag,
+		GitBranch:     line.GitBranch,
 		CWDHash:       hashCWD(line.CWD, n.GOOS),
 		Model:         canonicalModel(line.Message.Model),
 		Mode:          "agent",
@@ -455,4 +466,205 @@ func (n ClaudeCode) repoRootOf(filePath string) string {
 		return ""
 	}
 	return n.RepoRoot(filePath)
+}
+
+// gitProbe is a sentinel filename joined onto a cwd so the RepoRoot hook (which
+// walks up from a path's parent dir) starts its search at the cwd itself. The file
+// need not exist — RepoRoot only stats .git/.aispend.toml up the tree.
+const gitProbe = ".aispend-git-probe"
+
+// VCSEnricher (optional) stamps git provenance that isn't on a single line. ClaudeCode
+// implements it to recover GitSHA: the session log carries no commit, so the SHA is
+// reconstructed from the repo's reflog (the injected HeadAt) at each turn's timestamp.
+// The scan pipeline applies it after dedup/attribution, before pricing; providers
+// without it pass through unchanged.
+type VCSEnricher interface {
+	EnrichVCS(events []event.AgentEvent, recs []provider.RawRecord) []event.AgentEvent
+}
+
+// EnrichVCS resolves each event's repo root from the raw records (the real paths,
+// which the hashed ledger no longer holds) and stamps GitSHA = HeadAt(root, turn
+// time), best-effort and per turn — two turns in one session can land on different
+// commits. It is a no-op without a HeadAt hook; a turn whose repo can't be resolved,
+// or whose commit predates the reflog, keeps GitSHA empty (never a guessed SHA).
+// GitBranch is set in Normalize and left untouched here.
+func (n ClaudeCode) EnrichVCS(events []event.AgentEvent, recs []provider.RawRecord) []event.AgentEvent {
+	if n.HeadAt == nil {
+		return events
+	}
+	roots := n.repoRootsByFile(recs)
+	if len(roots) == 0 {
+		return events
+	}
+	for i := range events {
+		root := roots[events[i].Evidence.SourcePathHash]
+		if root == "" {
+			continue
+		}
+		if sha, ok := n.HeadAt(root, events[i].TSStart); ok {
+			events[i].GitSHA = sha
+		}
+	}
+	if n.Churn != nil {
+		n.stampSessionChurn(events, roots)
+	}
+	return events
+}
+
+// stampSessionChurn records per-file line churn once per session, on the earliest
+// turn (the representative event), over the commit range the session spanned (first
+// turn's SHA → last turn's SHA). It runs only when both endpoints resolved to
+// different commits — i.e. a commit landed during the session — so churn is shown
+// only where git can prove it; otherwise SessionChurn is left empty (cost-only
+// heatmap). Sessionless turns are skipped, and stamping once avoids any per-turn
+// double count in a per-file rollup.
+func (n ClaudeCode) stampSessionChurn(events []event.AgentEvent, roots map[string]string) {
+	type span struct {
+		firstIdx, lastIdx int
+		first, last       time.Time
+	}
+	spans := map[string]*span{}
+	var order []string
+	for i := range events {
+		sid := events[i].SessionID
+		if sid == "" {
+			continue
+		}
+		sp := spans[sid]
+		if sp == nil {
+			spans[sid] = &span{firstIdx: i, lastIdx: i, first: events[i].TSStart, last: events[i].TSStart}
+			order = append(order, sid)
+			continue
+		}
+		if events[i].TSStart.Before(sp.first) {
+			sp.first, sp.firstIdx = events[i].TSStart, i
+		}
+		if !events[i].TSStart.Before(sp.last) {
+			sp.last, sp.lastIdx = events[i].TSStart, i
+		}
+	}
+	for _, sid := range order {
+		sp := spans[sid]
+		from, to := events[sp.firstIdx].GitSHA, events[sp.lastIdx].GitSHA
+		if from == "" || to == "" || from == to {
+			continue
+		}
+		root := roots[events[sp.firstIdx].Evidence.SourcePathHash]
+		if root == "" {
+			continue
+		}
+		// Scope the diff to the files the session actually touched; with no files an
+		// unfiltered numstat would return the whole range's churn — unrelated work
+		// wrongly attributed to this sitting.
+		files := sessionFilesUnion(events, sid)
+		if len(files) == 0 {
+			continue
+		}
+		if churn := n.Churn(root, from, to, files); len(churn) > 0 {
+			events[sp.firstIdx].SessionChurn = churn
+		}
+	}
+}
+
+// sessionFilesUnion returns the sorted, de-duplicated repo-relative files a session
+// touched across its turns — the scope for its churn diff.
+func sessionFilesUnion(events []event.AgentEvent, sid string) []string {
+	seen := map[string]bool{}
+	var files []string
+	for i := range events {
+		if events[i].SessionID != sid {
+			continue
+		}
+		for _, f := range events[i].Files {
+			if !seen[f] {
+				seen[f] = true
+				files = append(files, f)
+			}
+		}
+	}
+	sort.Strings(files)
+	return files
+}
+
+// repoRootsByFile resolves the real repo root for each transcript file (keyed by
+// source path hash): the cwd's repo when the cwd is itself inside one (terminal
+// sessions), else the dominant root among the files the session edited (Cowork's
+// placeholder cwd, or cwd-less subagent turns). Mirrors AttributeProjects' signal so
+// SHA and project attribution agree. Returns nil without a RepoRoot hook.
+func (n ClaudeCode) repoRootsByFile(recs []provider.RawRecord) map[string]string {
+	if n.RepoRoot == nil {
+		return nil
+	}
+	type attrLine struct {
+		CWD     string `json:"cwd"`
+		Message struct {
+			Content []struct {
+				Type  string `json:"type"`
+				Input struct {
+					FilePath     string `json:"file_path"`
+					Path         string `json:"path"`
+					NotebookPath string `json:"notebook_path"`
+				} `json:"input"`
+			} `json:"content"`
+		} `json:"message"`
+	}
+	cwdRoot := map[string]string{}
+	fileTally := map[string]map[string]int{}
+	for _, r := range recs {
+		key := r.Source.PathHash
+		if key == "" {
+			continue
+		}
+		var line attrLine
+		if json.Unmarshal(r.Raw, &line) != nil {
+			continue
+		}
+		if _, seen := cwdRoot[key]; !seen && line.CWD != "" {
+			if root := n.RepoRoot(filepath.Join(line.CWD, gitProbe)); root != "" {
+				cwdRoot[key] = root
+			}
+		}
+		for _, c := range line.Message.Content {
+			if c.Type != "tool_use" {
+				continue
+			}
+			p := c.Input.FilePath
+			if p == "" {
+				p = c.Input.Path
+			}
+			if p == "" {
+				p = c.Input.NotebookPath
+			}
+			if p == "" {
+				continue
+			}
+			if root := n.repoRootOf(p); root != "" {
+				if fileTally[key] == nil {
+					fileTally[key] = map[string]int{}
+				}
+				fileTally[key][root]++
+			}
+		}
+	}
+	out := map[string]string{}
+	for k, r := range cwdRoot {
+		out[k] = r
+	}
+	for k, tally := range fileTally {
+		if out[k] == "" {
+			out[k] = dominantRoot(tally)
+		}
+	}
+	return out
+}
+
+// dominantRoot returns the most-hit repo root, ties broken by path for determinism.
+func dominantRoot(tally map[string]int) string {
+	best, bestN := "", 0
+	for root, hits := range tally {
+		if hits > bestN || (hits == bestN && root < best) {
+			best, bestN = root, hits
+		}
+	}
+	return best
 }

@@ -10,6 +10,7 @@
     "project": "payments",
     "repo": "payments",
     "cwd_hash": "1b215c62825d4698c4170aa07cfbdee626823aafb4ee2be21a65e6b8ad56c514",
+    "git_branch": "main",
     "model": "claude-opus-4",
     "mode": "agent",
     "tokens": {
@@ -65,6 +66,7 @@
     "project": "payments",
     "repo": "payments",
     "cwd_hash": "1b215c62825d4698c4170aa07cfbdee626823aafb4ee2be21a65e6b8ad56c514",
+    "git_branch": "main",
     "model": "claude-sonnet-4",
     "mode": "agent",
     "tokens": {

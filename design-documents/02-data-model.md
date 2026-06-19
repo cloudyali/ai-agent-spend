@@ -29,7 +29,9 @@ type AgentEvent struct {
     Project       string    `json:"project,omitempty"`
     Repo          string    `json:"repo,omitempty"`
     CWDHash       string    `json:"cwd_hash,omitempty"`
-    CostTag       string    `json:"cost_tag,omitempty"` // from .aispend.toml
+    GitBranch     string    `json:"git_branch,omitempty"` // branch off the session line (§9)
+    GitSHA        string    `json:"git_sha,omitempty"`    // HEAD at the turn, reflog-reconstructed best-effort (§9)
+    CostTag       string    `json:"cost_tag,omitempty"`   // from .aispend.toml
     Model         string    `json:"model"`
     Mode          string    `json:"mode,omitempty"`     // agent | chat
     Tokens        Tokens    `json:"tokens"`
@@ -37,10 +39,19 @@ type AgentEvent struct {
     Evidence      Evidence  `json:"evidence"`
     Tools         []string  `json:"tools,omitempty"`
     MCPServers    []string  `json:"mcp_servers,omitempty"`
+    Files         []string  `json:"files,omitempty"`         // repo-relative paths the turn operated on
+    SessionChurn  []FileChurn `json:"session_churn,omitempty"` // per-file line churn, once per session (§9)
     Activity      string    `json:"activity,omitempty"` // classifier deferred to 0B; empty in 0A
     TSStart       time.Time `json:"ts_start"`
     TSEnd         time.Time `json:"ts_end"`
     ActiveMS      int64     `json:"active_ms,omitempty"`
+}
+
+// FileChurn is the net line delta a session made to one repo-relative file.
+type FileChurn struct {
+    Path    string `json:"path"`
+    Added   int    `json:"added"`
+    Removed int    `json:"removed"`
 }
 
 type Tokens struct {
@@ -54,6 +65,14 @@ server resolves to people later, only via consented mapping), `CostTag` (the
 attribution primitive, §4), `SchemaVersion` (forward-compatible ingestion), and
 `Surface` (the two-surface tag — `coding_agent` now, `server_api` at the
 CloudYali tier).
+
+The VCS fields — `GitBranch`, `GitSHA`, `Files`, `SessionChurn` — link a turn to the
+code it changed (the spend → shipped-work seam). All four are **additive** (no
+`SchemaVersion` bump): `GitBranch`/`Files` come from the normalizer, `GitSHA` and
+`SessionChurn` from the best-effort scan-time `EnrichVCS` pass (reflog + `git diff`).
+They are empty when unresolvable — never guessed. The mechanics, the offline/zero-dep
+boundary, and the report/receipt surfaces live in [09-session-view.md](09-session-view.md)
+§"Linking sessions to code".
 
 ## 2. `Money` — integer micro-units, never a float
 

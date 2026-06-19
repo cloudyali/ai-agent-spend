@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/provider"
@@ -80,6 +81,33 @@ func TestNormalize_FilesTouched(t *testing.T) {
 	}
 	if strings.Contains(strings.Join(ev.Files, ","), "/Users/") {
 		t.Errorf("absolute/home path leaked into Files: %v", ev.Files)
+	}
+}
+
+// gitBranch rides on every Claude Code line; we capture it verbatim (GitSHA is
+// resolved later, at scan time, from the repo's reflog — never here).
+func TestNormalize_CapturesGitBranch(t *testing.T) {
+	n := ClaudeCode{GOOS: "linux", IdentityHash: "id_test"}
+
+	withBranch := `{"type":"assistant","uuid":"a1","sessionId":"s","timestamp":"2026-06-14T10:00:05Z","cwd":"/Users/dev/payments","gitBranch":"feature/payments-retry","message":{"id":"m1","role":"assistant","model":"claude-opus-4","content":[],"usage":{"input_tokens":1}}}`
+	ev, err := n.Normalize(rec(withBranch, 1))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ev.GitBranch != "feature/payments-retry" {
+		t.Errorf("GitBranch = %q, want feature/payments-retry", ev.GitBranch)
+	}
+	if ev.GitSHA != "" {
+		t.Errorf("GitSHA must stay empty in normalize (resolved at scan), got %q", ev.GitSHA)
+	}
+
+	// No gitBranch on the line → empty, not asserted.
+	ev2, err := n.Normalize(rec(opusLine, 2))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ev2.GitBranch != "" {
+		t.Errorf("GitBranch = %q, want empty when absent", ev2.GitBranch)
 	}
 }
 
@@ -325,6 +353,224 @@ func TestAttributeProjects_RealRepoNeverOverwritten(t *testing.T) {
 	if got[0].Repo != "payments" {
 		t.Errorf("real repo = %q, want left as 'payments'", got[0].Repo)
 	}
+}
+
+// EnrichVCS stamps GitSHA best-effort by asking the injected HeadAt what commit was
+// HEAD at each turn's timestamp, resolving the repo root from the raw records (cwd
+// for terminal sessions, dominant edited-file root for Cowork/no-cwd turns).
+func TestEnrichVCS_StampsSHAPerTurnTimestamp(t *testing.T) {
+	noon := mustTime(t, "2026-06-14T12:00:00Z")
+	// HEAD was shaOld before noon, shaNew at/after noon — proves per-turn resolution.
+	headAt := func(root string, ts time.Time) (string, bool) {
+		if root != "/repo/payments" {
+			return "", false
+		}
+		if ts.Before(noon) {
+			return "sha_old", true
+		}
+		return "sha_new", true
+	}
+	repoRoot := underRoots("/repo/payments", "/repo/web")
+	n := ClaudeCode{GOOS: "linux", RepoRoot: repoRoot, HeadAt: headAt}
+
+	mk := func(ph, ts string) (event.AgentEvent, provider.RawRecord) {
+		raw := `{"type":"assistant","sessionId":"S","timestamp":"` + ts + `","cwd":"/repo/payments","message":{"id":"m` + ph + `","role":"assistant","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/payments/x.go"}}],"usage":{"input_tokens":1}}}`
+		r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: ph}, Raw: []byte(raw)}
+		ev, err := n.Normalize(r)
+		if err != nil {
+			t.Fatalf("normalize: %v", err)
+		}
+		return ev, r
+	}
+	evEarly, rEarly := mk("early", "2026-06-14T09:00:00Z")
+	evLate, rLate := mk("late", "2026-06-14T15:00:00Z")
+
+	out := n.EnrichVCS([]event.AgentEvent{evEarly, evLate}, []provider.RawRecord{rEarly, rLate})
+	if out[0].GitSHA != "sha_old" {
+		t.Errorf("early turn GitSHA = %q, want sha_old", out[0].GitSHA)
+	}
+	if out[1].GitSHA != "sha_new" {
+		t.Errorf("late turn GitSHA = %q, want sha_new", out[1].GitSHA)
+	}
+}
+
+func TestEnrichVCS_CoworkResolvesViaEditedFiles(t *testing.T) {
+	// Cowork cwd is the desktop outputs dir (no repo); the SHA must resolve via the
+	// dominant edited-file root, same signal AttributeProjects uses for the project.
+	headAt := func(root string, _ time.Time) (string, bool) {
+		if root == "/repo/web" {
+			return "sha_web", true
+		}
+		return "", false
+	}
+	n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/web"), HeadAt: headAt}
+	cwd := "/Users/x/Library/Application Support/Claude/local-agent-mode-sessions/ws/conv/local_s/outputs"
+	raw := `{"type":"assistant","sessionId":"S","timestamp":"2026-06-14T10:00:00Z","cwd":"` + cwd + `","message":{"id":"m","role":"assistant","model":"claude-opus-4-8","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/web/a.tsx"}}],"usage":{"input_tokens":1}}}`
+	r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: "fileC"}, Raw: []byte(raw)}
+	ev, err := n.Normalize(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := n.EnrichVCS([]event.AgentEvent{ev}, []provider.RawRecord{r})
+	if out[0].GitSHA != "sha_web" {
+		t.Errorf("Cowork GitSHA = %q, want sha_web (via edited-file root)", out[0].GitSHA)
+	}
+}
+
+func TestEnrichVCS_BestEffortNoOps(t *testing.T) {
+	raw := `{"type":"assistant","sessionId":"S","timestamp":"2026-06-14T10:00:00Z","cwd":"/repo/payments","message":{"id":"m","role":"assistant","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/payments/x.go"}}],"usage":{"input_tokens":1}}}`
+	r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: "fileD"}, Raw: []byte(raw)}
+
+	t.Run("no HeadAt hook → untouched", func(t *testing.T) {
+		n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/payments")}
+		ev, _ := n.Normalize(r)
+		out := n.EnrichVCS([]event.AgentEvent{ev}, []provider.RawRecord{r})
+		if out[0].GitSHA != "" {
+			t.Errorf("GitSHA = %q, want empty without a HeadAt hook", out[0].GitSHA)
+		}
+	})
+
+	t.Run("repo not resolvable / HeadAt misses → empty, not asserted", func(t *testing.T) {
+		n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/somewhere/else"),
+			HeadAt: func(string, time.Time) (string, bool) { return "", false }}
+		ev, _ := n.Normalize(r)
+		out := n.EnrichVCS([]event.AgentEvent{ev}, []provider.RawRecord{r})
+		if out[0].GitSHA != "" {
+			t.Errorf("GitSHA = %q, want empty when unresolved", out[0].GitSHA)
+		}
+	})
+}
+
+// Churn is captured once per session, over the commit range the session spanned
+// (first turn's SHA → last turn's SHA), and stamped on the representative (earliest)
+// event so a per-file rollup never double-counts it.
+func TestEnrichVCS_StampsSessionChurnOncePerSession(t *testing.T) {
+	noon := mustTime(t, "2026-06-14T12:00:00Z")
+	headAt := func(root string, ts time.Time) (string, bool) {
+		if root != "/repo/pay" {
+			return "", false
+		}
+		if ts.Before(noon) {
+			return "sha1", true
+		}
+		return "sha2", true
+	}
+	var gotFrom, gotTo string
+	var gotFiles []string
+	churn := func(root, from, to string, files []string) []event.FileChurn {
+		gotFrom, gotTo, gotFiles = from, to, files
+		return []event.FileChurn{{Path: "x.go", Added: 5, Removed: 2}}
+	}
+	n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/pay"), HeadAt: headAt, Churn: churn}
+	mk := func(ph, ts string) (event.AgentEvent, provider.RawRecord) {
+		raw := `{"type":"assistant","sessionId":"S","timestamp":"` + ts + `","cwd":"/repo/pay","message":{"id":"m` + ph + `","role":"assistant","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/pay/x.go"}}],"usage":{"input_tokens":1}}}`
+		r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: ph}, Raw: []byte(raw)}
+		ev, err := n.Normalize(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ev, r
+	}
+	e1, r1 := mk("a", "2026-06-14T09:00:00Z")
+	e2, r2 := mk("b", "2026-06-14T15:00:00Z")
+
+	out := n.EnrichVCS([]event.AgentEvent{e1, e2}, []provider.RawRecord{r1, r2})
+	if len(out[0].SessionChurn) != 1 || out[0].SessionChurn[0].Added != 5 {
+		t.Errorf("churn should be stamped on the earliest event, got %+v", out[0].SessionChurn)
+	}
+	if out[1].SessionChurn != nil {
+		t.Errorf("churn must be stamped once per session, not on later turns: %+v", out[1].SessionChurn)
+	}
+	if gotFrom != "sha1" || gotTo != "sha2" {
+		t.Errorf("churn range = %s..%s, want sha1..sha2", gotFrom, gotTo)
+	}
+	if len(gotFiles) != 1 || gotFiles[0] != "x.go" {
+		t.Errorf("churn files = %v, want [x.go] (repo-relative union)", gotFiles)
+	}
+}
+
+func TestEnrichVCS_NoChurnWhenNoCommitDuringSession(t *testing.T) {
+	headAt := func(string, time.Time) (string, bool) { return "samesha", true }
+	called := false
+	churn := func(string, string, string, []string) []event.FileChurn { called = true; return nil }
+	n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/pay"), HeadAt: headAt, Churn: churn}
+	mk := func(ph, ts string) (event.AgentEvent, provider.RawRecord) {
+		raw := `{"type":"assistant","sessionId":"S","timestamp":"` + ts + `","cwd":"/repo/pay","message":{"id":"m` + ph + `","role":"assistant","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/pay/x.go"}}],"usage":{"input_tokens":1}}}`
+		r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: ph}, Raw: []byte(raw)}
+		ev, err := n.Normalize(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ev, r
+	}
+	e1, r1 := mk("a", "2026-06-14T09:00:00Z")
+	e2, r2 := mk("b", "2026-06-14T15:00:00Z")
+	out := n.EnrichVCS([]event.AgentEvent{e1, e2}, []provider.RawRecord{r1, r2})
+	if called {
+		t.Error("Churn must not run when the session stayed on one commit (fromSHA==toSHA)")
+	}
+	if out[0].SessionChurn != nil {
+		t.Errorf("no churn expected, got %+v", out[0].SessionChurn)
+	}
+}
+
+// A session that committed but edited no files must NOT get churn: with no files to
+// scope to, a numstat would return the whole repo's range churn — unrelated work
+// wrongly attributed to this sitting. So Churn is skipped entirely.
+func TestEnrichVCS_NoChurnWhenSessionTouchedNoFiles(t *testing.T) {
+	noon := mustTime(t, "2026-06-14T12:00:00Z")
+	headAt := func(_ string, ts time.Time) (string, bool) {
+		if ts.Before(noon) {
+			return "sha1", true
+		}
+		return "sha2", true
+	}
+	called := false
+	churn := func(string, string, string, []string) []event.FileChurn {
+		called = true
+		return []event.FileChurn{{Path: "unrelated.go", Added: 99}}
+	}
+	n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/pay"), HeadAt: headAt, Churn: churn}
+	mk := func(ph, ts string) (event.AgentEvent, provider.RawRecord) {
+		raw := `{"type":"assistant","sessionId":"S","timestamp":"` + ts + `","cwd":"/repo/pay","message":{"id":"m` + ph + `","role":"assistant","model":"claude-opus-4","content":[],"usage":{"input_tokens":1}}}`
+		r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: ph}, Raw: []byte(raw)}
+		ev, err := n.Normalize(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ev, r
+	}
+	e1, r1 := mk("a", "2026-06-14T09:00:00Z")
+	e2, r2 := mk("b", "2026-06-14T15:00:00Z")
+	out := n.EnrichVCS([]event.AgentEvent{e1, e2}, []provider.RawRecord{r1, r2})
+	if called {
+		t.Error("Churn must not run for a session that edited no files (would attribute unrelated repo churn)")
+	}
+	if out[0].SessionChurn != nil {
+		t.Errorf("no churn expected, got %+v", out[0].SessionChurn)
+	}
+}
+
+// underRoots returns a fake RepoRoot hook: a path resolves to the first known root
+// that contains it (mirrors walking up to a .git dir).
+func underRoots(roots ...string) func(string) string {
+	return func(p string) string {
+		for _, r := range roots {
+			if p == r || strings.HasPrefix(p, r+"/") {
+				return r
+			}
+		}
+		return ""
+	}
+}
+
+func mustTime(t *testing.T, s string) time.Time {
+	t.Helper()
+	ts, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ts
 }
 
 func TestEventID_StableAndLineSensitive(t *testing.T) {

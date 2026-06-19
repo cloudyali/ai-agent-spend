@@ -103,13 +103,6 @@ func aggregateReport(events []event.AgentEvent, by, view string) reportAgg {
 			agg.skModels[name]++
 			continue
 		}
-		key := groupKey(e, by)
-		if groups[key] == nil {
-			groups[key] = &aggRow{key: key}
-			order = append(order, key)
-		}
-		groups[key].micros += m.Micros
-		groups[key].count++
 		agg.total += m.Micros
 		agg.n++
 		agg.currency = m.Currency
@@ -122,6 +115,14 @@ func aggregateReport(events []event.AgentEvent, by, view string) reportAgg {
 		}
 		agg.confWeighted += e.Evidence.ConfidenceScore * float64(w)
 		agg.confBasis += w
+		for _, c := range groupContributions(e, by, m.Micros) {
+			if groups[c.key] == nil {
+				groups[c.key] = &aggRow{key: c.key}
+				order = append(order, c.key)
+			}
+			groups[c.key].micros += c.amount
+			groups[c.key].count++
+		}
 	}
 	rows := make([]*aggRow, 0, len(order))
 	for _, k := range order {
@@ -130,6 +131,36 @@ func aggregateReport(events []event.AgentEvent, by, view string) reportAgg {
 	sort.Slice(rows, func(i, j int) bool { return rows[i].micros > rows[j].micros })
 	agg.rows = rows
 	return agg
+}
+
+// contribution is one event's cost charged to one group.
+type contribution struct {
+	key    string
+	amount int64
+}
+
+// groupContributions maps an event to its (group, cost) contributions. Every
+// dimension except "file" is 1:1 — one group, the full amount — so a grouped total
+// reconciles trivially with the by-model total. "file" fans out: a turn that touched
+// N files contributes to each, its cost split N ways (integer division, with the
+// rounding remainder placed on the first — sorted — file) so the file rows still sum
+// to the grand total. A turn that touched no files lands in "(no files)" with its
+// full cost, so the split never drops or duplicates spend.
+func groupContributions(e event.AgentEvent, by string, micros int64) []contribution {
+	if by != "file" {
+		return []contribution{{groupKey(e, by), micros}}
+	}
+	if len(e.Files) == 0 {
+		return []contribution{{"(no files)", micros}}
+	}
+	n := int64(len(e.Files))
+	base := micros / n
+	out := make([]contribution, len(e.Files))
+	for i, f := range e.Files {
+		out[i] = contribution{key: f, amount: base}
+	}
+	out[0].amount += micros - base*n // exact remainder, deterministically on the first file
+	return out
 }
 
 // confidence is the spend-weighted mean confidence (0 when nothing priced).
@@ -198,9 +229,14 @@ func attachComponents(res *reportResult, events []event.AgentEvent, by string, e
 		if !ok {
 			continue
 		}
-		g := groupKey(e, by)
-		perGroup[g] = addComponents(perGroup[g], c)
 		total = addComponents(total, c)
+		// The per-token-class breakdown reconciles with a row only for 1:1 groupings.
+		// The file view splits a turn's cost across its files, so a per-file token
+		// split would be a fabricated decomposition — omit it (the total still stands).
+		if by != "file" {
+			g := groupKey(e, by)
+			perGroup[g] = addComponents(perGroup[g], c)
+		}
 	}
 	for i := range res.Groups {
 		if c, ok := perGroup[res.Groups[i].Key]; ok && c.Total().Micros > 0 {

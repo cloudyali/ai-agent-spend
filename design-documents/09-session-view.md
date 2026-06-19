@@ -41,6 +41,13 @@ for the record:
   explainable primitive there is — you can't click it to its evidence). ccusage
   already prints the pretty blocks; copying them is parity, not moat.
 
+  > **Update (2026-06-18).** This cut still stands for the *calendar streak grid*. A
+  > different primitive — a **per-file cost+churn heatmap on the receipt** — does ship
+  > (see "Linking sessions to code" below). It dodges every objection above: it's
+  > scoped to one sitting (not a year of cells), each row is a real file that drills
+  > to its turns/evidence (not an opaque cell), and the bar encodes *cost* (what we
+  > want reined in), with git line-churn beside it — not a streak that rewards more.
+
 The temporal view survives only if we **reframe it from streak to spike** (below).
 
 ## The session receipt (the hero)
@@ -63,6 +70,53 @@ selector: `explain session:3f9c`.
   window.
 - Session ids surfaced beside notable rows in `report` / `top`, OSC-8 hyperlinked
   where the terminal supports it (click → explain), per 08's craft rules.
+
+## Linking sessions to code (2026-06-18, t-wada TDD)
+
+The receipt answers "what did this sitting cost"; linking it to code answers "what did
+it cost *to ship this*." Three signals, all **additive** to the schema (no
+`SchemaVersion` bump), all **best-effort** — absent rather than guessed:
+
+- **Branch** — `event.GitBranch`, read straight off the Claude Code line (it logs a
+  branch per turn). Durable.
+- **Commit SHA** — `event.GitSHA`. The log carries no SHA, so it's reconstructed at
+  scan time from the repo's reflog (`.git/logs/HEAD`): the commit that was HEAD at the
+  turn's timestamp. `internal/vcs.HeadAt` is **pure-Go, no git binary, no network**, so
+  the `offline` build and `doctor --network` are untouched. Empty when the repo is
+  gone, the turn predates the reflog, or the reflog rotated (90-day default).
+- **Churn** — `event.SessionChurn` (`[]FileChurn`), per-file `+added/−removed` from
+  `git diff --numstat` between the session's **first and last commit**, captured once
+  per session via `vcs.Numstat`. This is the **one** git-binary dependency, isolated
+  behind a hook and still a local read. Honesty note: it counts only churn *committed
+  during the session*; a sitting whose work wasn't committed mid-session shows no churn
+  (the heatmap degrades to cost-only) rather than over-attributing uncommitted edits.
+
+Because the ledger hashes paths (`CWDHash`, `SourcePathHash`), the real repo location
+can't be recovered after the fact — so SHA and churn are resolved at **scan** time
+(`normalize.EnrichVCS`, after attribution, before pricing) and frozen into the event,
+never computed lazily at `explain`.
+
+**Surfaces.** New report facets: `--by branch` and `--by commit` (1:1 groupings that
+reconcile to the by-model total — cost per feature / per PR), and `--by file` (fan-out:
+a turn's cost splits equally across the files it touched, so file rows still sum to the
+grand total; fileless turns bucket as `(no files)`). The receipt gains a `branch · SHA`
+line and the per-file **cost+churn heatmap**: a cost-shaded intensity bar + `+adds/−dels`,
+top files first, each a real path. Plain-ASCII / `NO_COLOR` / non-TTY degradation holds
+(no escape into a pipe), per the craft rules.
+
+**Receipt navigation — one cursor, tab as an accelerator.** The heatmap and the
+top-turns table are a single ↑/↓ list: the cursor (`recCursor`) walks every file, then
+flows straight into the turns, and ↵ opens whatever's highlighted — a file (→ file
+view) or a turn (→ its evidence). The earlier model made the two a pair of
+`tab`-switched *focus panes*, which read worse — the turns below the heatmap looked
+inert because ↑/↓ drove only the focused files and reaching the turns took a
+non-obvious `tab`. So ↑/↓ now flows across both, and `tab` is kept purely as an
+**accelerator**: a one-key jump between the top of the files and the first turn, so a
+long heatmap isn't in the way (no-op when only one section exists). The heatmap also
+keeps **at least the five priciest files** visible (or all, when fewer) even on a
+short terminal — the signal never collapses to a row or two — clamping the window to
+the last file once the cursor crosses into the turns so the rows just above them stay
+in view.
 
 ## The temporal view, reframed: spike, not streak
 

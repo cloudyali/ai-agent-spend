@@ -177,6 +177,108 @@ func TestBuildReportResult_ComponentsGatedByView(t *testing.T) {
 	}
 }
 
+// gitEvent builds a priced event carrying branch/commit/file provenance.
+func gitEvent(apiMicros int64, branch, sha string, files ...string) event.AgentEvent {
+	m := event.USD(apiMicros)
+	return event.AgentEvent{
+		Model: "claude-opus-4", Provider: "claude_code",
+		GitBranch: branch, GitSHA: sha, Files: files,
+		CostViews: event.CostViews{APIEquivalent: &m},
+		Evidence:  event.Evidence{CostMethod: "token_priced", ConfidenceScore: 0.95},
+	}
+}
+
+func rowByKey(agg reportAgg, key string) (*aggRow, bool) {
+	for _, r := range agg.rows {
+		if r.key == key {
+			return r, true
+		}
+	}
+	return nil, false
+}
+
+// --by branch / --by commit are ordinary 1:1 groupings (one row per event), so
+// their totals must reconcile exactly with the same window's --by model total —
+// the no-double-count / no-drop invariant. Empty provenance buckets to a sentinel.
+func TestAggregateReport_ByBranchAndCommit(t *testing.T) {
+	events := []event.AgentEvent{
+		gitEvent(100_000, "main", "aaaaaaaaaaaa1111"),
+		gitEvent(200_000, "feature/x", "bbbbbbbbbbbb2222"),
+		gitEvent(50_000, "", ""), // no branch / no commit → sentinels
+	}
+	byModel := aggregateReport(events, "model", "api_equivalent")
+
+	for _, tc := range []struct {
+		by, sentinel string
+		want         map[string]int64
+	}{
+		{"branch", "(no branch)", map[string]int64{"main": 100_000, "feature/x": 200_000, "(no branch)": 50_000}},
+		{"commit", "(no commit)", map[string]int64{"aaaaaaaaaaaa1111": 100_000, "bbbbbbbbbbbb2222": 200_000, "(no commit)": 50_000}},
+	} {
+		t.Run(tc.by, func(t *testing.T) {
+			agg := aggregateReport(events, tc.by, "api_equivalent")
+			if agg.total != byModel.total {
+				t.Errorf("--by %s total %d != by-model total %d (must reconcile)", tc.by, agg.total, byModel.total)
+			}
+			for key, want := range tc.want {
+				r, ok := rowByKey(agg, key)
+				if !ok || r.micros != want {
+					t.Errorf("--by %s row %q = %v (want %d)", tc.by, key, r, want)
+				}
+			}
+		})
+	}
+}
+
+// --by file fans out: a turn touching N files contributes to N rows, its cost split
+// across them so the file rows still sum to the grand total (reconciliation holds);
+// a fileless turn lands in "(no files)". Per-row count is the number of touching turns.
+func TestAggregateReport_ByFileFanOut(t *testing.T) {
+	events := []event.AgentEvent{
+		gitEvent(300_000, "", "", "a.go", "b.go", "c.go"), // 100k each
+		gitEvent(100_000, "", "", "a.go"),                 // a.go again
+		gitEvent(70_000, "", ""),                          // no files
+	}
+	byModel := aggregateReport(events, "model", "api_equivalent")
+	agg := aggregateReport(events, "file", "api_equivalent")
+
+	if agg.total != byModel.total || agg.total != 470_000 {
+		t.Fatalf("file total %d != model total %d (want 470000)", agg.total, byModel.total)
+	}
+	var sum int64
+	for _, r := range agg.rows {
+		sum += r.micros
+	}
+	if sum != agg.total {
+		t.Errorf("file rows sum %d != total %d (split must reconcile)", sum, agg.total)
+	}
+	if r, _ := rowByKey(agg, "a.go"); r == nil || r.micros != 200_000 || r.count != 2 {
+		t.Errorf("a.go row = %+v, want micros=200000 count=2", r)
+	}
+	if r, _ := rowByKey(agg, "(no files)"); r == nil || r.micros != 70_000 {
+		t.Errorf("(no files) row = %+v, want micros=70000", r)
+	}
+	if agg.n != 3 {
+		t.Errorf("priced event count = %d, want 3 (count is events, not touches)", agg.n)
+	}
+}
+
+// The integer split must reconcile exactly even when cost doesn't divide evenly;
+// the remainder lands on the first (sorted) file rather than vanishing.
+func TestAggregateReport_ByFileSplitRemainder(t *testing.T) {
+	agg := aggregateReport([]event.AgentEvent{gitEvent(301_000, "", "", "a.go", "b.go", "c.go")}, "file", "api_equivalent")
+	var sum int64
+	for _, r := range agg.rows {
+		sum += r.micros
+	}
+	if sum != 301_000 {
+		t.Errorf("remainder lost: rows sum %d, want 301000", sum)
+	}
+	if r, _ := rowByKey(agg, "a.go"); r == nil || r.micros != 100_334 {
+		t.Errorf("first file = %+v, want 100334 (100333 + remainder 1... )", r)
+	}
+}
+
 func mustWindow(t *testing.T, spec string) window {
 	t.Helper()
 	w, err := parsePeriod(spec, fixedNow())
@@ -212,6 +314,43 @@ func TestReportJSON_CLI(t *testing.T) {
 	}
 	if sum != r.TotalMicros {
 		t.Errorf("group micros %d != total %d", sum, r.TotalMicros)
+	}
+}
+
+// End-to-end through the CLI: --by file fans out yet the file rows still reconcile
+// to the grand total, exercising cmdReport → buildReportResult on the real ledger.
+func TestReportJSON_ByFileCLI(t *testing.T) {
+	setupHome(t)
+	run(t, "scan")
+	out, _, code := run(t, "report", "--period", "all", "--by", "file", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	var r reportResult
+	if err := json.Unmarshal([]byte(out), &r); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	if r.GroupBy != "file" {
+		t.Errorf("group_by = %q, want file", r.GroupBy)
+	}
+	var sum int64
+	for _, g := range r.Groups {
+		sum += g.CostMicros
+	}
+	if sum != r.TotalMicros {
+		t.Errorf("file rows %d != total %d (fan-out split must reconcile)", sum, r.TotalMicros)
+	}
+}
+
+// The branch/commit facets run through the CLI table path without error.
+func TestReport_ByBranchCommitCLI(t *testing.T) {
+	setupHome(t)
+	run(t, "scan")
+	for _, by := range []string{"branch", "commit"} {
+		out, _, code := run(t, "report", "--period", "all", "--by", by)
+		if code != 0 || !strings.Contains(out, "by "+by) {
+			t.Errorf("report --by %s: code=%d out=%s", by, code, out)
+		}
 	}
 }
 

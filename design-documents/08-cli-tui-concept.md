@@ -47,6 +47,14 @@ A full Bubble Tea TUI drags in a dependency tree that cuts against "zero-depende
   layer (`NO_COLOR` / non-TTY / `TERM=dumb` → plain ASCII). Still pending here:
   composition stripes inside the `report` table and `aispend top`.
 - **Next** — `tui` with drill-to-receipt, the pivot key, facet bar, period scrub (lipgloss; reach for Bubble Tea only if needed).
+  - **Update (2026-06-18): shipped, and promoted to the _default channel_.** The
+    interactive explorer (`internal/tui`, Bubble Tea, behind `!offline`) ships with
+    period scrub, the `v` view lens, the in-explorer plan picker, and drill-to-receipt.
+    A bare `aispend` now opens it (`cmdDefault`); off a TTY or in the offline build
+    (`tuiBuilt=false`) it falls back to the static `today` glance. The TUI receipt
+    carries the same VCS linkage as the static one — branch · SHA + per-file cost+churn
+    heatmap. The earlier zero-dependency caution still holds: Bubble Tea pulls
+    `net/url`+`net/netip`, so it stays compiled out of the air-gapped `offline` build.
 - **Later** — `watch` live meter, `compare` pane, OSC-8 links, shareable report card.
 
 Decided (2026-06-17): **primary user = the individual founder** → the default

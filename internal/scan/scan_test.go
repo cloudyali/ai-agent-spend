@@ -84,6 +84,44 @@ func TestScan_CountsAndStores(t *testing.T) {
 	}
 }
 
+// The pipeline stamps GitSHA best-effort: when the normalizer has a reflog hook,
+// the enrich stage resolves each turn's repo and records the commit that was HEAD.
+func TestScan_EnrichesGitSHABestEffort(t *testing.T) {
+	st := store.NewMemStore()
+	sc := &Scanner{
+		Provider: &fakeProvider{recs: []provider.RawRecord{rec(2, opusLine)}},
+		Normalizer: normalize.ClaudeCode{
+			GOOS: "linux", IdentityHash: "id",
+			RepoRoot: func(p string) string {
+				if strings.HasPrefix(p, "/x/payments") {
+					return "/x/payments"
+				}
+				return ""
+			},
+			HeadAt: func(root string, _ time.Time) (string, bool) {
+				if root == "/x/payments" {
+					return "deadbeefcafe1234", true
+				}
+				return "", false
+			},
+		},
+		Pricing: pricing.NewEngine(),
+		Plan:    pricing.Plan{Kind: "api"},
+		Store:   st, Sink: st,
+		Now: func() time.Time { return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC) },
+	}
+	if _, err := sc.Run(); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := st.Query(store.Filter{})
+	if len(got) != 1 {
+		t.Fatalf("stored %d events, want 1", len(got))
+	}
+	if got[0].GitSHA != "deadbeefcafe1234" {
+		t.Errorf("GitSHA = %q, want deadbeefcafe1234 (enriched in pipeline)", got[0].GitSHA)
+	}
+}
+
 // Two JSONL lines for one Claude Code response (same message.id + requestId):
 // a streaming placeholder (input 1) and the full turn (input 12400). The scan
 // must keep only the full one — the bug this guards against is summing them.

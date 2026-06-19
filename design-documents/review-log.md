@@ -764,3 +764,97 @@ files that edited no git repo (deliverable generation / planning / pure-reasonin
 — genuinely unattributable, correctly left honest rather than guessed. Optional future
 polish: link edit-less child turns to their parent transcript; relabel `outputs` →
 a clearer "cowork (no repo)". **Cowork capture + attribution: done.**
+
+### Session 17 — link sessions to code (branch · SHA · files · churn)
+
+Goal: tie spend to shipped work. Added git provenance to `AgentEvent` (all additive,
+no `SchemaVersion` bump) and surfaced it. t-wada throughout — RED confirmed before each
+GREEN; goldens regenerated (only additive `git_branch: "main"` on `basic_session`).
+
+- **`GitBranch`** — parsed from the Claude Code line in `normalize` (it logs a branch
+  per turn).
+- **`GitSHA`** — the log has none, so `internal/vcs.HeadAt` reconstructs it best-effort
+  from `.git/logs/HEAD` (the commit that was HEAD at the turn's timestamp). **Pure-Go,
+  no git binary, no network** — offline build + `doctor --network` untouched. Handles
+  `.git`-file worktree/submodule indirection (incl. relative gitdir).
+- **`SessionChurn`** (`[]FileChurn`) — per-file `+/−` from `git diff --numstat` between
+  the session's first and last commit, via `vcs.Numstat` (the **one** git-binary dep,
+  behind a hook; local read only). Stamped **once per session** (representative event)
+  so a `--by file` rollup can't double-count it. Counts only churn committed *during*
+  the session — absent (not over-attributed) otherwise.
+- Enrichment is `normalize.EnrichVCS`, a new scan stage after attribution, before
+  pricing (pricing is pure, so order changes no number). Repo root resolved from the
+  raw records (cwd for terminal sessions, dominant edited-file root for Cowork/no-cwd),
+  reusing the AttributeProjects signal — the hashed ledger can't recover paths later.
+  SHA is per-turn; two turns in one sitting can land on different commits.
+- **Surfaces.** `report --by branch|commit` (1:1, reconcile to the by-model total) and
+  `--by file` (fan-out: cost splits equally across a turn's files so rows still sum to
+  the total; `(no files)` bucket; commit shown short, kept whole in grouping). Receipt
+  gains a `branch · SHA` line and a per-file **cost+churn heatmap** (cost-shaded bar +
+  `+adds/−dels`). 09-session-view.md records why this per-file heatmap ships though the
+  *streak* grid stayed cut.
+
+✅ Unit-verified here: `event` 100%, `vcs` 94–95% (incl. a real-git `Numstat`
+integration test, skipped where git absent), `normalize` 88%, `scan` 91%; `cli` 78.8%→
+81.1% (new fns 88–100%; `shortSHA`/`sessionVCSLine` 100%, `costBar` 87.5%). `go vet` +
+`gofmt -l` clean; full suite green.
+
+✅ **End-to-end with real git**: built the binary, made a repo with two timestamped
+commits, synthesized a session straddling them → `explain session:` showed
+`branch feature/smoke · 49d057d5e3`, heatmap `████████ $4.50 app.go +3/-1` (real
+`git diff`), and `--by commit` split $4.35/$0.15 across the two real SHAs, reconciling
+to $4.50.
+
+Honest limits: churn misses *uncommitted* work (by design — no fabrication); SHA
+recovery is bounded by reflog retention, so backfill of old sessions may be empty;
+churn surfaces on the receipt only (a `--by file` churn column is deferred). `cli`
+sits at 81.1% (pre-existing shortfall vs the 85% floor; the *changed* code is ≥88%) —
+lifting it means testing unrelated legacy command handlers, deferred.
+
+**Code review (technical-code-reviewing skill).** One MEDIUM found and fixed:
+`stampSessionChurn` would call `Numstat` with an empty file list for a session that
+committed but edited no files, and `git diff` with no `--` filter returns the whole
+range's churn — unrelated work attributed to the sitting. Guard added (skip when the
+session touched no files) + `TestEnrichVCS_NoChurnWhenSessionTouchedNoFiles`. No other
+HIGH/MEDIUM: errors all checked, no goroutines/shared state, div-by-N guarded by the
+`len==0` checks, naming/interfaces idiomatic.
+
+**Security review (manual — the `/security-review` command requires a git CWD, which
+this session didn't have).** `vcs.Numstat` uses `exec.Command("git", …)` with **no
+shell** (no metachar injection) and a `--` separator so a hostile filename can't be
+read as a git flag. Defense-in-depth fix: `HeadAt` now validates that the reflog's
+new-object-id is hex (`isHexSHA`, 7–64) before returning it, so a crafted
+`.git/logs/HEAD` can't slip a `--option`-shaped token into `git diff`
+(`TestHeadAt_RejectsNonHexNewSHA`). No network (offline build/`doctor --network`
+intact), no new deps, no secrets logged. Privacy note: `GitBranch` is stored raw (like
+the existing `Repo` basename) — branch names can carry codenames; absolute paths stay
+hashed (`CWDHash`). `GitSHA` is itself a hash; churn is line counts only.
+
+### Session 18 — TUI becomes the default channel + carries the VCS linkage
+
+User directive: "default channel is the TUI, not commands." Two changes, t-wada throughout.
+
+- **TUI receipt VCS linkage.** `internal/tui` `receiptView` gained a `branch · short-SHA`
+  line and a per-file **cost+churn heatmap** (cost-shaded `spendBar`/`styleBar` + git
+  `+adds/-dels`), mirroring the static `explain session:` receipt. New pure helpers
+  (`sessionVCSLine`, `shortSHA`, `receiptHeatmap`, `fileCosts`, `churnMap`) replace the
+  flat `topFiles` line; per-file cost is the same equal-split that reconciles with the
+  session total. `TestModel_ReceiptVCSHeatmap` asserts branch/short-SHA/file/churn and
+  that the full 40-char SHA is shortened. Existing receipt/nav tests stay green.
+- **No-arg → TUI.** `dispatch` now routes a bare `aispend` to `cmdDefault`, which opens
+  the TUI when it's linked (`tuiBuilt`, a build-tagged const: true in `!offline`, false
+  in `tui_offline.go`) **and** stdout is a TTY; otherwise it falls back to the static
+  `today` glance — so pipes, CI, and the air-gapped offline build never hit a dead TUI
+  or bleed escapes. `help` still prints usage. Updated the existing no-arg assertion +
+  `usage()` (default-channel note; the stale `G (group)` line now lists branch|commit|file).
+
+✅ Verified here: `internal/tui` 86.0%, `internal/cli` green; full default suite green;
+**offline build compiles + vets + tests** (`go build/vet/test -tags offline`), confirming
+the no-arg path falls back without the TUI. `go vet` + `gofmt -l` clean.
+
+**Code review (technical-code-reviewing).** No HIGH/MEDIUM: the new helpers are pure
+(div-by-N guarded by `len==0`, no nil writes, no ignored errors); `cmdDefault` is a
+two-branch selector with no new external input. **Security review (manual; `/security-review`
+needs a git CWD this session lacks).** No new attack surface — the TUI only reads
+already-stored events; no exec, no network, no new deps in the changed paths; the
+offline build's zero-`net/*` guarantee is preserved (TUI stays compiled out).

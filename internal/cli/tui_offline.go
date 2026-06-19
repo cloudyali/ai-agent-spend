@@ -8,6 +8,10 @@ package cli
 
 import "fmt"
 
+// tuiBuilt is false in the offline build: the TUI is compiled out, so the no-arg
+// default (cmdDefault) falls straight back to the static `today` glance.
+const tuiBuilt = false
+
 func (a *App) cmdTui(_ []string) int {
 	fmt.Fprintln(a.Err, "aispend: `tui` is unavailable in the offline build (it would link a terminal-UI dependency that pulls net/*). Use `aispend top`, `aispend today`, or `aispend report`.")
 	return 1

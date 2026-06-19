@@ -115,6 +115,15 @@ func (s *Scanner) Run() (Summary, error) {
 		normalized = a.AttributeProjects(normalized, recs)
 	}
 
+	// Git SHA enrichment (best-effort) runs after attribution, so the repo root is
+	// resolvable, and before pricing — pricing is a pure function of the event, so
+	// the order changes no number. The session log carries no commit; the enricher
+	// reconstructs it from the repo's reflog. Providers without a VCSEnricher, or a
+	// normalizer with no reflog hook wired, pass through unchanged.
+	if e, ok := s.Normalizer.(normalize.VCSEnricher); ok {
+		normalized = e.EnrichVCS(normalized, recs)
+	}
+
 	var events []event.AgentEvent
 	for i := range normalized {
 		ev := normalized[i]

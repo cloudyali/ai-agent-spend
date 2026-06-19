@@ -37,26 +37,43 @@ gofmt -l internal/ && go vet ./...
 One spend command, calendar-only windows (no rolling window):
 
 ```
+aispend                        # DEFAULT CHANNEL → interactive TUI; falls back to `today` off a TTY / in the offline build
+aispend tui [--period P]       # the interactive explorer: arrow sessions → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them)
 aispend report --period <today|yesterday|week|month|"last week"|"last month"|
                          quarter|"this year"|"N days"|"since YYYY-MM-DD"|
                          YYYY-MM-DD..YYYY-MM-DD|all> [--by G] [--view V] [--json]
-                         # --by: model|repo|provider|cost_tag|session
+                         # --by: model|repo|provider|cost_tag|session|branch|commit|file
 aispend today                  # arbitrage-first daily glance: ROI, cache savings, hourly spike bar
-aispend explain <event-id>     # the hero: every number → its evidence + cost breakdown
-aispend explain session:<id|max|last>   # the session receipt (explain, one level up)
 aispend scan | doctor | plans
+                                # NOTE: the `explain` command was removed — per-turn/session evidence
+                                # now lives in the TUI drill (receipt → file → turn). Offline/non-TTY
+                                # builds have no receipt surface.
 aispend pricing [refresh]       # show the active rate source; `refresh` pulls live LiteLLM rates
 ```
+
+The **TUI is the default channel**: a bare `aispend` opens the interactive explorer
+(`cmdDefault`); off a TTY or in the `offline` build (where the TUI is compiled out,
+`tuiBuilt=false`) it falls back to the static `today` glance, which carries the same
+numbers. `aispend help` still prints usage. Per-turn and per-session evidence lives
+**only in the TUI** now (the CLI `explain` command was removed): drill session →
+receipt → file → turn, each ↵ one level deeper. The receipt is one continuous ↑/↓
+cursor (`recCursor`) over the file heatmap followed by the top turns — it flows from
+the files straight into the turns, with `tab` as an accelerator that jumps between the
+two sections (top of files ↔ first turn), and ↵ opens whatever is highlighted: a file
+(→ file view) or a turn (→ evidence). The heatmap keeps at least the five priciest
+files visible (or all, when fewer) so it never collapses on a short terminal. The
+receipt carries the VCS linkage (branch · SHA + per-file cost+churn heatmap).
+Offline/non-TTY builds (no TUI) therefore have no receipt surface.
 
 Rich static surfaces are **hand-rolled, zero-dependency ANSI** (no Bubble Tea /
 lipgloss / x/term — keeps the offline-build + `doctor --network` promise). They
 degrade to plain ASCII off a TTY, under `NO_COLOR`, or with `TERM=dumb`, and never
-bleed an escape code into a pipe. `today` + the session receipt share the web
+bleed an escape code into a pipe. `today` + the TUI receipt share the web
 color language (cache-read blue, cache-write amber, output teal, input purple) and
 the `pricing.WithoutCache` primitive for the `without cache ≈ $X · saved Y%` line.
 The interactive TUI (`tui`/`watch`) stays deferred — see `08-cli-tui-concept.md`.
 
-Pricing is **offline-first**: `scan`/`report`/`explain` price against a fresh
+Pricing is **offline-first**: `scan`/`report` price against a fresh
 (≤24h) LiteLLM cache at `~/.aispend/pricing/litellm.json` when present, else the
 embedded table. Only `aispend pricing refresh` touches the network (one inbound GET
 of a public file — `doctor --network` discloses it; the `offline` build compiles out
@@ -66,8 +83,33 @@ any model LiteLLM doesn't list. `ParseLiteLLM` canonicalizes upstream ids
 then the extensible `modelAliases` map for dotted versions) so overlay keys land on
 the same ids the engine prices by; zero-priced LiteLLM stubs are excluded.
 
-`report --json` (token-priced views) and `explain` both surface a per-token-class
-cost breakdown: input / output / cache-read / cache-write / cache-write-1h.
+`report --json` (token-priced views) and the TUI's turn-level explain view both
+surface a per-token-class cost breakdown: input / output / cache-read / cache-write / cache-write-1h.
+
+## VCS linkage (sessions ↔ code)
+
+Events carry git provenance so spend ties to shipped work. `event.GitBranch` is read
+straight off the Claude Code line (it logs a branch per turn). `event.GitSHA` is the
+commit that was HEAD at the turn's timestamp — the log has no SHA, so it's
+reconstructed **best-effort** at scan time from the repo's reflog (`.git/logs/HEAD`)
+by `internal/vcs.HeadAt`, **pure-Go, no git binary, no network** (the `offline` build
+and `doctor --network` are untouched). `event.SessionChurn` is per-file line churn
+(`git diff --numstat` between the session's first and last commit), captured once per
+session via `vcs.Numstat` — the **one** git-binary dependency, isolated behind a hook
+and still a local read. All three degrade to empty rather than guess: no repo, a
+timestamp before the reflog, reflog expiry, or no git → the field is simply absent.
+Because the ledger hashes paths (`CWDHash`, `SourcePathHash`), the real repo location
+isn't recoverable later, so SHA + churn must be resolved at scan and frozen in the
+event — never lazily at `explain` time.
+
+Enrichment runs in the scan pipeline as `normalize.EnrichVCS` (after attribution,
+before pricing; pricing is pure so order changes no number). New report facets group
+on this: `--by branch`, `--by commit` (1:1, reconcile to the by-model total), and
+`--by file` (fan-out — a turn's cost splits equally across the files it touched, so
+file rows still sum to the total; fileless turns bucket as `(no files)`). The session
+receipt adds a `branch · SHA` line and a per-file **cost+churn heatmap** (cost-shaded
+bar + `+adds/-dels`), each row a real file that drills to evidence — not a vanity grid
+(09-session-view.md reverses the earlier streak-heatmap cut on those grounds).
 
 ## Cache pricing (the subtle part)
 

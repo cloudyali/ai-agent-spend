@@ -1,6 +1,7 @@
 // Package cli is the aispend command surface: a zero-dependency, stdlib-flag
 // dispatch wiring provider → normalize → price → store and rendering the results.
-// `explain` is the hero — a number a user can't open is a number they won't trust.
+// The interactive TUI is where a number opens to its evidence (session → file →
+// turn) — a number a user can't open is a number they won't trust.
 //
 // Built on the standard library `flag` package (not cobra) to keep the binary a
 // pure-Go, dependency-free static artifact. See
@@ -29,10 +30,14 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
 	"github.com/agentspend/ai-agent-spend/internal/scan"
 	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/agentspend/ai-agent-spend/internal/vcs"
 )
 
-// Version is overwritten at release time via -ldflags.
-const Version = "0.1.0-dev"
+// Version is overwritten at release time via -ldflags (-X). It must stay a `var`,
+// not a `const`: the Go linker's -X flag can only patch package-level string
+// variables, so a const would silently ignore the release stamp and always
+// report the dev value. See .goreleaser.yaml (ldflags) and .github/workflows/release.yml.
+var Version = "0.1.0-dev"
 
 // App holds resolved dependencies; constructed from the environment, overridable
 // in tests (which set HOME / AISPEND_HOME to temp dirs).
@@ -56,8 +61,7 @@ func nowUTC() time.Time { return time.Now().UTC() }
 
 func (a *App) dispatch(args []string) int {
 	if len(args) == 0 {
-		a.usage()
-		return 0
+		return a.cmdDefault()
 	}
 	switch cmd, rest := args[0], args[1:]; cmd {
 	case "scan":
@@ -70,8 +74,6 @@ func (a *App) dispatch(args []string) int {
 		return a.cmdTop(rest)
 	case "tui":
 		return a.cmdTui(rest)
-	case "explain":
-		return a.cmdExplain(rest)
 	case "doctor":
 		return a.cmdDoctor(rest)
 	case "plans":
@@ -89,6 +91,18 @@ func (a *App) dispatch(args []string) int {
 		a.usage()
 		return 2
 	}
+}
+
+// cmdDefault is the no-argument entrypoint. The TUI is the default channel, so a
+// bare `aispend` opens the interactive explorer — but only when it can: the TUI
+// needs a TTY and is compiled out of the offline build (tuiBuilt is false there).
+// Otherwise it falls back to the static `today` glance, which carries the same
+// numbers and never bleeds escapes into a pipe. `aispend help` still prints usage.
+func (a *App) cmdDefault() int {
+	if tuiBuilt && isTTY(a.Out) {
+		return a.cmdTui(nil)
+	}
+	return a.cmdToday(nil)
 }
 
 func (a *App) eventsPath() string { return filepath.Join(a.Resolver.AppHome(), "events.json") }
@@ -164,7 +178,7 @@ func (a *App) cmdScan(args []string) int {
 		p provider.Provider
 		n normalize.Normalizer
 	}{
-		{claudecode.New(a.Resolver), normalize.ClaudeCode{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr, RepoRoot: a.repoRoot}},
+		{claudecode.New(a.Resolver), normalize.ClaudeCode{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr, RepoRoot: a.repoRoot, HeadAt: vcs.HeadAt, Churn: vcs.Numstat}},
 		{codex.New(a.Resolver), &normalize.Codex{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr}},
 	}
 
@@ -230,7 +244,7 @@ func (a *App) cmdScan(args []string) int {
 func (a *App) cmdReport(args []string) int {
 	fs := flag.NewFlagSet("report", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
-	by := fs.String("by", "model", "group by: model|repo|provider|cost_tag|session")
+	by := fs.String("by", "model", "group by: model|repo|provider|cost_tag|session|branch|commit|file")
 	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|billed|effective_allocated|marginal")
 	periodSpec := fs.String("period", "week", `calendar window: today|yesterday|week|month|"last week"|"last month"|quarter|"this year"|"N days"|"since YYYY-MM-DD"|YYYY-MM-DD..YYYY-MM-DD|all`)
 	jsonOut := fs.Bool("json", false, "emit the report as JSON instead of a table (metered views only)")
@@ -371,7 +385,7 @@ func (a *App) renderReport(events []event.AgentEvent, by, view string, since, un
 			if dash(view) != "api-equivalent" {
 				fmt.Fprint(a.Out, " — try --view api_equivalent")
 			} else {
-				fmt.Fprint(a.Out, " — run `aispend explain <id>` to see which views are populated")
+				fmt.Fprint(a.Out, " — these turns carry no priced cost in this view")
 			}
 			fmt.Fprintln(a.Out, ")")
 			return
@@ -551,87 +565,6 @@ func planStartsAfter(plan pricing.Plan, until time.Time) bool {
 		!plan.StartDate.IsZero() && !plan.StartDate.Before(until)
 }
 
-// --- explain (the hero) ---
-
-func (a *App) cmdExplain(args []string) int {
-	if len(args) < 1 {
-		fmt.Fprintln(a.Err, "usage: aispend explain <event-id | session:<id|max|last>>")
-		return 2
-	}
-	st, err := a.openStore()
-	if err != nil {
-		fmt.Fprintf(a.Err, "aispend: %v\n", err)
-		return 1
-	}
-
-	// Human selector: `explain session:<id|max|last>` — a session-level receipt.
-	// You name the sitting; aispend resolves the id (08/09-*-concept.md). The raw
-	// event-id path below stays the reproducibility primitive.
-	if sel, ok := strings.CutPrefix(args[0], "session:"); ok {
-		events, err := st.Query(store.Filter{})
-		if err != nil {
-			fmt.Fprintf(a.Err, "aispend: %v\n", err)
-			return 1
-		}
-		sid, err := resolveSessionID(events, sel)
-		if err != nil {
-			fmt.Fprintf(a.Err, "aispend: %v\n", err)
-			return 1
-		}
-		a.renderSessionReceipt(sessionEvents(events, sid), a.pricingEngine())
-		return 0
-	}
-
-	e, err := st.Get(args[0])
-	if err != nil {
-		fmt.Fprintf(a.Err, "aispend: %v\n", err)
-		return 1
-	}
-	a.renderExplain(e, a.pricingEngine())
-	return 0
-}
-
-func (a *App) renderExplain(e event.AgentEvent, eng *pricing.Engine) {
-	// Prefer the tool-reported cost as the headline when present (cost_method
-	// "reported"); otherwise fall back to the computed api-equivalent.
-	amount := "n/a"
-	switch {
-	case e.CostViews.Reported != nil:
-		amount = usd(e.CostViews.Reported.Micros, e.CostViews.Reported.Currency)
-	case e.CostViews.APIEquivalent != nil:
-		amount = usd(e.CostViews.APIEquivalent.Micros, e.CostViews.APIEquivalent.Currency)
-	}
-	fmt.Fprintf(a.Out, "  %s  %s · %s · %s in / %s out / %s cache-read\n",
-		amount, providerLabel(e.Provider), e.Model, comma(e.Tokens.Input), comma(e.Tokens.Output), comma(e.Tokens.CacheRead))
-
-	src := e.Evidence.SourcePathHash
-	if len(src) > 12 {
-		src = src[:12] + "…"
-	}
-	fmt.Fprintf(a.Out, "  source   %s#L%d  (path hashed in storage)\n", src, e.Evidence.SourceLine)
-	fmt.Fprintf(a.Out, "  parser   %s %s\n", e.Evidence.ParserName, e.Evidence.ParserVersion)
-	fmt.Fprintf(a.Out, "  priced   %s table, priced_at %s\n", e.Evidence.PricingTableVersion, e.Evidence.PricedAt.Format("2006-01-02"))
-	fmt.Fprintf(a.Out, "  method   %s     confidence %.2f\n", e.Evidence.CostMethod, e.Evidence.ConfidenceScore)
-	// Cost breakdown: where the api-equivalent number actually comes from. For a
-	// cache-heavy session the cache-read line dwarfs input/output — invisible until
-	// you split it out. Shown only when the model is priced (else there's no split).
-	if c, ok := eng.Components(e.Model, e.Tokens); ok {
-		cur := c.Input.Currency
-		line := fmt.Sprintf("  cost     input %s · output %s · cache-read %s · cache-write %s",
-			usd(c.Input.Micros, cur), usd(c.Output.Micros, cur), usd(c.CacheRead.Micros, cur), usd(c.CacheWrite.Micros, cur))
-		if c.CacheWrite1h.Micros > 0 { // 1-hour tier (2× input) only when present
-			line += " · cache-write-1h " + usd(c.CacheWrite1h.Micros, cur)
-		}
-		fmt.Fprintln(a.Out, line)
-	}
-	fmt.Fprintf(a.Out, "  views    %s\n", viewsLine(e))
-	missing := "none"
-	if len(e.Evidence.KnownMissingFields) > 0 {
-		missing = strings.Join(e.Evidence.KnownMissingFields, ", ")
-	}
-	fmt.Fprintf(a.Out, "  missing  %s\n", missing)
-}
-
 // --- plans ---
 
 func (a *App) cmdPlans(_ []string) int {
@@ -696,7 +629,7 @@ func (a *App) cmdPricingRefresh(cache string) int {
 	}
 	fmt.Fprintf(a.Out, "Refreshed %d model prices from LiteLLM → cached at %s\n", models, cache)
 	if repriced > 0 {
-		fmt.Fprintf(a.Out, "Re-priced %d stored events — report / explain reflect these rates now.\n", repriced)
+		fmt.Fprintf(a.Out, "Re-priced %d stored events — report reflects these rates now.\n", repriced)
 	} else {
 		fmt.Fprintln(a.Out, "No stored events yet — run `aispend scan` and it will price against these rates.")
 	}
@@ -813,6 +746,16 @@ func groupKey(e event.AgentEvent, by string) string {
 			return e.SessionID
 		}
 		return "(no session)"
+	case "branch":
+		if e.GitBranch != "" {
+			return e.GitBranch
+		}
+		return "(no branch)"
+	case "commit":
+		if e.GitSHA != "" {
+			return e.GitSHA
+		}
+		return "(no commit)"
 	default:
 		return e.Model
 	}
@@ -823,10 +766,26 @@ func groupKey(e event.AgentEvent, by string) string {
 // (grouping, JSON, `explain session:<id>` prefix-matching); other dimensions pass
 // through unchanged.
 func displayKey(by, key string) string {
-	if by == "session" {
+	switch by {
+	case "session":
 		return shortSession(key)
+	case "commit":
+		return shortSHA(key)
 	}
 	return key
+}
+
+// shortSHA renders a commit as its first 10 hex chars — enough to identify and to
+// paste into a future `explain commit:<prefix>` — leaving sentinel buckets like
+// "(no commit)" untouched. The full SHA is preserved in grouping and JSON.
+func shortSHA(sha string) string {
+	if strings.HasPrefix(sha, "(") {
+		return sha
+	}
+	if r := []rune(sha); len(r) > 10 {
+		return string(r[:10])
+	}
+	return sha
 }
 
 // shortSession renders a session id as a short, copy-pasteable prefix — enough to
@@ -840,25 +799,6 @@ func shortSession(id string) string {
 		return string(r[:8]) + "…"
 	}
 	return id
-}
-
-func viewsLine(e event.AgentEvent) string {
-	part := func(name string, m *event.Money) string {
-		if m == nil {
-			return name + " n/a"
-		}
-		return name + " " + usd(m.Micros, m.Currency)
-	}
-	parts := []string{part("api-equivalent", e.CostViews.APIEquivalent)}
-	if e.CostViews.Reported != nil { // only show when the tool actually wrote a cost
-		parts = append(parts, part("reported", e.CostViews.Reported))
-	}
-	parts = append(parts,
-		part("estimated", e.CostViews.Estimated),
-		part("billed", e.CostViews.Billed),
-		part("effective-allocated", e.CostViews.EffectiveAllocated),
-	)
-	return strings.Join(parts, " · ")
 }
 
 func usd(micros int64, currency string) string {
@@ -997,15 +937,13 @@ func comma(n int64) string {
 func (a *App) usage() {
 	fmt.Fprintf(a.Out, `aispend %s — local, explainable AI-coding spend
 
-Usage: aispend <command>
+Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it shows `+"`today`"+`)
 
   scan [--verbose]              import & price new sessions (no network); --verbose shows skips
   report [--period P] [flags]   spend over a calendar window (default: this week)
   today                         arbitrage-first daily glance: ROI, cache savings, hourly spikes
-  top [--period P] [--sessions] priciest turns (or sessions) in a window → ids to explain
-  tui [--period P]              interactive explorer: arrow through sessions, ↵ to drill (not in offline build)
-  explain <event-id>            open any number to its full evidence
-  explain session:<id|max|last> the session receipt: window, composition, arbitrage, top turns
+  top [--period P] [--sessions] priciest turns (or sessions) in a window
+  tui [--period P]              interactive explorer: arrow sessions, ↵ to drill to the receipt → file → turn evidence (not in offline build)
   doctor [--network] [--paths]  prove the trust promise / show data locations
   plans                         list known subscription plans (seeded prices)
   pricing [refresh]             show the active rate source; 'refresh' pulls live LiteLLM rates
@@ -1015,7 +953,7 @@ Usage: aispend <command>
   P (period): today | yesterday | week | month | "last week" | "last month" |
               quarter | "last quarter" | "this year" | "last year" | "N days" (e.g. "90 days") |
               "since YYYY-MM-DD" | YYYY-MM-DD..YYYY-MM-DD | all   (always calendar time, never rolling)
-  G (group):  model | repo | provider | cost_tag | session
+  G (group):  model | repo | provider | cost_tag | session | branch | commit | file
   V (view):   api_equivalent | reported | estimated | billed | effective_allocated | marginal
   --json:     emit the report as JSON instead of a table (metered views only)
 

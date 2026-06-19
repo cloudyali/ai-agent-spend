@@ -51,7 +51,7 @@ func run(t *testing.T, args ...string) (string, string, int) {
 }
 
 func TestRun_EndToEnd(t *testing.T) {
-	home := setupHome(t)
+	setupHome(t)
 
 	// scan
 	out, errs, code := run(t, "scan")
@@ -72,33 +72,10 @@ func TestRun_EndToEnd(t *testing.T) {
 		t.Errorf("report failed: code=%d out=%s", code, out)
 	}
 
-	// explain — fetch a real id from the persisted store
-	st, err := store.OpenFileStore(filepath.Join(home, ".aispend", "events.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	evs, _ := st.Query(store.Filter{})
-	if len(evs) != 2 {
-		t.Fatalf("expected 2 stored events, got %d", len(evs))
-	}
-	id := evs[0].EventID
-	out, _, code = run(t, "explain", id)
-	if code != 0 {
-		t.Fatalf("explain exit %d", code)
-	}
-	for _, want := range []string{
-		"Claude Code · claude-opus-4", "parser   claude_code v1", "method   token_priced", "path hashed in storage",
-		// cost-component breakdown: opus rates on 12,400 in / 3,100 out / 8,900 cache-read
-		"cost     input $0.19", "output $0.23", "cache-read $0.01", "cache-write $0.00",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("explain output missing %q:\n%s", want, out)
-		}
-	}
-
-	// explain a missing id → error exit
-	if _, _, code = run(t, "explain", "evt_nope"); code == 0 {
-		t.Error("explain of missing id should be non-zero")
+	// explain has been removed — per-turn/session evidence now lives in the TUI, so
+	// the CLI treats `explain` as any other unknown command (exit 2).
+	if _, _, c := run(t, "explain", "evt_whatever"); c != 2 {
+		t.Errorf("explain should be an unknown command now, exit=%d want 2", c)
 	}
 
 	// doctor --network
@@ -115,9 +92,8 @@ func TestRun_EndToEnd(t *testing.T) {
 	}
 }
 
-// A fresh LiteLLM cache overlays the embedded table: `pricing` reports the source,
-// and `scan` prices against the overlaid rates (proving the whole chain — cache →
-// ParseLiteLLM → NewEngineWithRates → pricing → explain).
+// A fresh LiteLLM cache overlays the embedded table: `pricing` reports the source.
+// (The overlay's effect on actual pricing is covered by TestRepriceStored_AppliesNewRates.)
 func TestRun_PricingLiteLLMOverlay(t *testing.T) {
 	home := setupHome(t)
 	appHome := filepath.Join(home, ".aispend")
@@ -135,23 +111,6 @@ func TestRun_PricingLiteLLMOverlay(t *testing.T) {
 		t.Errorf("pricing with a fresh cache should report LiteLLM: code=%d out=%s", c, out)
 	}
 
-	run(t, "scan") // prices with the overlay in effect
-	st, err := store.OpenFileStore(filepath.Join(appHome, "events.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	evs, _ := st.Query(store.Filter{})
-	var id string
-	for _, e := range evs {
-		if strings.Contains(e.Model, "opus") {
-			id = e.EventID
-		}
-	}
-	out, _, _ := run(t, "explain", id)
-	// opus input 12,400 × $10/Mtok = $0.124 → "$0.12" (vs embedded $5 → $0.06)
-	if !strings.Contains(out, "input $0.12") {
-		t.Errorf("explain should price with the LiteLLM overlay ($10/Mtok):\n%s", out)
-	}
 }
 
 // repriceStored re-prices already-stored events in place with the current engine,
@@ -266,17 +225,17 @@ func TestRun_MoreCommands(t *testing.T) {
 	if out, _, _ := run(t, "help"); !strings.Contains(out, "Usage:") {
 		t.Errorf("help: %s", out)
 	}
-	if out, _, c := run(t); c != 0 || !strings.Contains(out, "Usage:") {
-		t.Errorf("no args should print usage: code=%d out=%s", c, out)
+	// The TUI is the default channel: a bare `aispend` opens it on a TTY, and off a
+	// TTY (as here, and in the offline build) falls back to the static `today` glance
+	// — never the usage screen (that's `help`).
+	if out, _, c := run(t); c != 0 || !strings.Contains(out, "aispend today") || strings.Contains(out, "Usage:") {
+		t.Errorf("no args off a TTY should fall back to `today`, not usage: code=%d out=%s", c, out)
 	}
 	if _, _, c := run(t, "report", "--bogusflag"); c != 2 {
 		t.Errorf("bad flag exit=%d, want 2", c)
 	}
 	if _, _, c := run(t, "report", "--period", "garbage"); c != 2 {
 		t.Errorf("bad --period exit=%d, want 2", c)
-	}
-	if _, _, c := run(t, "explain"); c != 2 {
-		t.Errorf("explain without id exit=%d, want 2", c)
 	}
 }
 
@@ -567,108 +526,60 @@ func TestReport_BySession(t *testing.T) {
 	}
 }
 
-// The session receipt is `explain` one level up (09-session-view.md): one sitting
-// rendered with its window+duration, total, per-token-class composition, the
-// arbitrage line, and the top costly turns as drillable event ids.
-func TestRenderSessionReceipt(t *testing.T) {
-	eng := pricing.NewEngine()
-	base := time.Date(2026, 6, 14, 10, 0, 0, 0, time.UTC)
-	mk := func(id string, ts time.Time, model string, tk event.Tokens) event.AgentEvent {
-		e := event.AgentEvent{EventID: id, SessionID: "3f9c1a2b-xyz", Provider: "claude_code", Model: model, Tokens: tk, TSStart: ts, TSEnd: ts.Add(30 * time.Second)}
-		if err := eng.Price(&e, pricing.Plan{Kind: "api"}); err != nil {
-			t.Fatal(err)
+// report --by branch|commit|file: the VCS facets. Branch/commit are ordinary 1:1
+// groupings (reconcile to the by-model total); a commit id is shortened in the table
+// yet kept whole for grouping; --by file fans out so per-file rows still sum to the
+// grand total and a fileless turn shows under "(no files)".
+func TestReport_ByVCSFacets(t *testing.T) {
+	full := "9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"
+	events := []event.AgentEvent{
+		gitEvent(300_000, "feature/retry", full, "a.go", "b.go"),
+		gitEvent(100_000, "feature/retry", full, "a.go"),
+		gitEvent(60_000, "", ""), // no branch/commit/files → sentinels
+	}
+	render := func(by string) string {
+		var buf bytes.Buffer
+		a := &App{Out: &buf, Now: time.Now}
+		until := time.Now()
+		a.renderReport(events, by, "api_equivalent", until.AddDate(0, 0, -7), until, "this week", apiPlans(), len(events))
+		return buf.String()
+	}
+
+	t.Run("branch", func(t *testing.T) {
+		out := render("branch")
+		if !strings.Contains(out, "by branch") || !strings.Contains(out, "feature/retry") || !strings.Contains(out, "(no branch)") {
+			t.Errorf("branch view missing header/branch/sentinel:\n%s", out)
 		}
-		return e
-	}
-	events := []event.AgentEvent{
-		mk("evt_a", base, "claude-opus-4-8", event.Tokens{Input: 12_400, Output: 3_100, CacheRead: 8_900_000}), // cache-read dominated
-		mk("evt_b", base.Add(42*time.Minute), "claude-sonnet-4", event.Tokens{Input: 2_000, Output: 500}),
-	}
-	var buf bytes.Buffer
-	a := &App{Out: &buf, Now: time.Now}
-	a.renderSessionReceipt(events, eng)
-	got := buf.String()
-	for _, want := range []string{
-		"session 3f9c1a2b", // shortened id in the header
-		"2026-06-14 10:00", // window start
-		"(42m)",            // wall-clock span
-		"2 turns",
-		"composition", "cache-read", // cache-read is the dominant class
-		"arbitrage", "without cache", "saved",
-		"top turns", "evt_a", // a drillable event id
-		"local_only · offline",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("receipt missing %q:\n%s", want, got)
+	})
+	t.Run("commit shortens in table, keeps full in grouping", func(t *testing.T) {
+		if got := groupKey(events[0], "commit"); got != full {
+			t.Errorf("groupKey commit = %q, want the full sha", got)
 		}
-	}
+		out := render("commit")
+		if !strings.Contains(out, "by commit") || !strings.Contains(out, "9f3c1a2b7d") {
+			t.Errorf("commit view should show the short sha:\n%s", out)
+		}
+		if strings.Contains(out, full) {
+			t.Errorf("table must shorten the sha, not print all 40 chars:\n%s", out)
+		}
+	})
+	t.Run("file fan-out shows files and the no-files bucket", func(t *testing.T) {
+		out := render("file")
+		if !strings.Contains(out, "by file") || !strings.Contains(out, "a.go") || !strings.Contains(out, "(no files)") {
+			t.Errorf("file view missing header/file/sentinel:\n%s", out)
+		}
+	})
 }
 
-// A session with no priceable turn must read "not computable", never an asserted
-// $0 (09-session-view.md acceptance bar; the nil-cost discipline).
-func TestRenderSessionReceipt_UnpricedReadsNotComputable(t *testing.T) {
-	eng := pricing.NewEngine()
-	base := time.Date(2026, 6, 14, 2, 0, 0, 0, time.UTC)
-	events := []event.AgentEvent{
-		{EventID: "evt_x", SessionID: "deadbeef", Provider: "claude_code", Model: "mystery-model", TSStart: base, TSEnd: base},
+func TestShortSHA(t *testing.T) {
+	if got := shortSHA("(no commit)"); got != "(no commit)" {
+		t.Errorf("sentinel must pass through, got %q", got)
 	}
-	var buf bytes.Buffer
-	a := &App{Out: &buf, Now: time.Now}
-	a.renderSessionReceipt(events, eng)
-	got := buf.String()
-	if !strings.Contains(got, "not computable") {
-		t.Errorf("an unpriceable session must read not-computable, not $0:\n%s", got)
+	if got := shortSHA("abcd"); got != "abcd" {
+		t.Errorf("short sha must pass through, got %q", got)
 	}
-	if strings.Contains(got, "$0.00") {
-		t.Errorf("must not assert a phantom $0.00:\n%s", got)
-	}
-}
-
-// resolveSessionID drives the `explain session:<sel>` selector grammar: a prefix,
-// "max" (priciest), or "last" (most recent) — and clear errors otherwise.
-func TestResolveSessionID(t *testing.T) {
-	big := event.USD(1000)
-	small := event.USD(10)
-	t0 := time.Date(2026, 6, 14, 9, 0, 0, 0, time.UTC)
-	t1 := time.Date(2026, 6, 14, 18, 0, 0, 0, time.UTC)
-	events := []event.AgentEvent{
-		{SessionID: "aaaa1111", CostViews: event.CostViews{APIEquivalent: &small}, TSStart: t1}, // most recent
-		{SessionID: "bbbb2222", CostViews: event.CostViews{APIEquivalent: &big}, TSStart: t0},   // priciest
-		{SessionID: "", CostViews: event.CostViews{APIEquivalent: &big}, TSStart: t1},           // not addressable
-	}
-	if got, err := resolveSessionID(events, "max"); err != nil || got != "bbbb2222" {
-		t.Errorf("max = %q, %v; want bbbb2222", got, err)
-	}
-	if got, err := resolveSessionID(events, "last"); err != nil || got != "aaaa1111" {
-		t.Errorf("last = %q, %v; want aaaa1111 (latest turn)", got, err)
-	}
-	if got, err := resolveSessionID(events, "bbbb"); err != nil || got != "bbbb2222" {
-		t.Errorf("prefix bbbb = %q, %v; want bbbb2222", got, err)
-	}
-	if _, err := resolveSessionID(events, "zzzz"); err == nil {
-		t.Error("a non-matching prefix should error")
-	}
-	if _, err := resolveSessionID(nil, "max"); err == nil {
-		t.Error("no sessions should error, not panic")
-	}
-}
-
-// End-to-end: `explain session:<prefix>` / :max / :last render a receipt from the
-// scanned store, raw-id explain still works, and a bad selector exits non-zero.
-func TestExplainSessionSelectors_EndToEnd(t *testing.T) {
-	setupHome(t)
-	run(t, "scan")
-	if out, _, c := run(t, "explain", "session:s"); c != 0 || !strings.Contains(out, "session s") || !strings.Contains(out, "top turns") {
-		t.Errorf("explain session:s: c=%d out=%s", c, out)
-	}
-	if out, _, c := run(t, "explain", "session:max"); c != 0 || !strings.Contains(out, "total") {
-		t.Errorf("explain session:max: c=%d out=%s", c, out)
-	}
-	if out, _, c := run(t, "explain", "session:last"); c != 0 || !strings.Contains(out, "total") {
-		t.Errorf("explain session:last: c=%d out=%s", c, out)
-	}
-	if _, _, c := run(t, "explain", "session:zzzz"); c == 0 {
-		t.Error("a non-matching session selector should exit non-zero")
+	if got := shortSHA("0123456789abcdef"); got != "0123456789" {
+		t.Errorf("long sha = %q, want first 10 chars", got)
 	}
 }
 
@@ -803,7 +714,7 @@ func TestRenderTop_Turns(t *testing.T) {
 	a := &App{Out: &buf, Now: time.Now}
 	a.renderTop(events, 10, false, "this week", len(events))
 	got := buf.String()
-	for _, want := range []string{"aispend top", "this week", "priciest turns", "evt_big", "$5.00", "evt_mid", "$1.00", "explain"} {
+	for _, want := range []string{"aispend top", "this week", "priciest turns", "evt_big", "$5.00", "evt_mid", "$1.00", "drill in"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("top missing %q:\n%s", want, got)
 		}
@@ -827,7 +738,7 @@ func TestRenderTop_Sessions(t *testing.T) {
 	a := &App{Out: &buf, Now: time.Now}
 	a.renderTop(events, 10, true, "this week", len(events))
 	got := buf.String()
-	for _, want := range []string{"priciest sessions", "3f9c", "a17d", "$5.00", "$4.00", "explain session:"} {
+	for _, want := range []string{"priciest sessions", "3f9c", "a17d", "$5.00", "$4.00", "drill into a session"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("top --sessions missing %q:\n%s", want, got)
 		}

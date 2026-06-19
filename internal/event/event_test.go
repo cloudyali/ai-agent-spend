@@ -135,3 +135,69 @@ func TestSchemaVersion_IsStable(t *testing.T) {
 		t.Errorf("SchemaVersion = %d, want 1 (bump intentionally + update docs/goldens)", SchemaVersion)
 	}
 }
+
+func TestAgentEvent_GitFields(t *testing.T) {
+	t.Run("branch and sha round-trip under their json keys", func(t *testing.T) {
+		e := newSampleEvent()
+		e.GitBranch = "feature/payments-retry"
+		e.GitSHA = "9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"
+		b, err := json.Marshal(e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(b)
+		if !strings.Contains(s, `"git_branch":"feature/payments-retry"`) {
+			t.Errorf("expected git_branch in JSON, got %s", s)
+		}
+		if !strings.Contains(s, `"git_sha":"9f3c1a2b7d4e5f60718293a4b5c6d7e8f9012345"`) {
+			t.Errorf("expected git_sha in JSON, got %s", s)
+		}
+		var back AgentEvent
+		if err := json.Unmarshal(b, &back); err != nil {
+			t.Fatal(err)
+		}
+		if back.GitBranch != e.GitBranch || back.GitSHA != e.GitSHA {
+			t.Errorf("round-trip lost git fields: branch=%q sha=%q", back.GitBranch, back.GitSHA)
+		}
+	})
+
+	t.Run("empty git fields are omitted (additive, not asserted)", func(t *testing.T) {
+		e := newSampleEvent() // no git fields set
+		s := string(mustMarshal(t, e))
+		if strings.Contains(s, "git_branch") || strings.Contains(s, "git_sha") {
+			t.Errorf("empty git fields must be omitted, got %s", s)
+		}
+	})
+}
+
+func TestAgentEvent_SessionChurn(t *testing.T) {
+	t.Run("round-trips under session_churn", func(t *testing.T) {
+		e := newSampleEvent()
+		e.SessionChurn = []FileChurn{{Path: "src/app.go", Added: 12, Removed: 3}}
+		b := mustMarshal(t, e)
+		if !strings.Contains(string(b), `"session_churn":[{"path":"src/app.go","added":12,"removed":3}]`) {
+			t.Errorf("unexpected session_churn shape: %s", b)
+		}
+		var back AgentEvent
+		if err := json.Unmarshal(b, &back); err != nil {
+			t.Fatal(err)
+		}
+		if len(back.SessionChurn) != 1 || back.SessionChurn[0] != e.SessionChurn[0] {
+			t.Errorf("round-trip lost churn: %+v", back.SessionChurn)
+		}
+	})
+	t.Run("empty churn is omitted", func(t *testing.T) {
+		if strings.Contains(string(mustMarshal(t, newSampleEvent())), "session_churn") {
+			t.Error("empty session_churn must be omitted")
+		}
+	})
+}
+
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}

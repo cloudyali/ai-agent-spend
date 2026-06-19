@@ -17,29 +17,41 @@ const SchemaVersion = 1
 
 // AgentEvent is the normalized, priced, provenance-carrying unit of AI-coding spend.
 type AgentEvent struct {
-	SchemaVersion int       `json:"schema_version"`
-	EventID       string    `json:"event_id"`
-	SessionID     string    `json:"session_id"`
-	PromptID      string    `json:"prompt_id,omitempty"`
-	Provider      string    `json:"provider"`
-	Surface       string    `json:"surface"`
-	IdentityHash  string    `json:"identity_hash"`
-	Project       string    `json:"project,omitempty"`
-	Repo          string    `json:"repo,omitempty"`
-	CWDHash       string    `json:"cwd_hash,omitempty"`
-	CostTag       string    `json:"cost_tag,omitempty"`
-	Model         string    `json:"model"`
-	Mode          string    `json:"mode,omitempty"`
-	Tokens        Tokens    `json:"tokens"`
-	CostViews     CostViews `json:"cost_views"`
-	Evidence      Evidence  `json:"evidence"`
-	Tools         []string  `json:"tools,omitempty"`
-	MCPServers    []string  `json:"mcp_servers,omitempty"`
-	Files         []string  `json:"files,omitempty"`    // repo-relative paths the turn operated on (Edit/Write/Read/…)
-	Activity      string    `json:"activity,omitempty"` // classifier deferred to 0B
-	TSStart       time.Time `json:"ts_start"`
-	TSEnd         time.Time `json:"ts_end"`
-	ActiveMS      int64     `json:"active_ms,omitempty"`
+	SchemaVersion int    `json:"schema_version"`
+	EventID       string `json:"event_id"`
+	SessionID     string `json:"session_id"`
+	PromptID      string `json:"prompt_id,omitempty"`
+	Provider      string `json:"provider"`
+	Surface       string `json:"surface"`
+	IdentityHash  string `json:"identity_hash"`
+	Project       string `json:"project,omitempty"`
+	Repo          string `json:"repo,omitempty"`
+	CWDHash       string `json:"cwd_hash,omitempty"`
+	// GitBranch is the branch on the session line (Claude Code logs it per turn);
+	// durable, stored as-is. GitSHA is the commit that was HEAD at the turn's
+	// timestamp, reconstructed best-effort at scan time from the repo's reflog (the
+	// log itself carries no SHA) — empty when unresolvable. Both are additive and do
+	// not bump SchemaVersion. See design-documents/02-data-model.md §1.
+	GitBranch  string    `json:"git_branch,omitempty"`
+	GitSHA     string    `json:"git_sha,omitempty"`
+	CostTag    string    `json:"cost_tag,omitempty"`
+	Model      string    `json:"model"`
+	Mode       string    `json:"mode,omitempty"`
+	Tokens     Tokens    `json:"tokens"`
+	CostViews  CostViews `json:"cost_views"`
+	Evidence   Evidence  `json:"evidence"`
+	Tools      []string  `json:"tools,omitempty"`
+	MCPServers []string  `json:"mcp_servers,omitempty"`
+	Files      []string  `json:"files,omitempty"` // repo-relative paths the turn operated on (Edit/Write/Read/…)
+	// SessionChurn is per-file line churn (added/removed) for the whole session,
+	// recovered best-effort at scan from `git diff` between the session's first and
+	// last commit. It is stamped once per session (on the representative event), nil
+	// elsewhere and whenever git/commits are unavailable — never a fabricated count.
+	SessionChurn []FileChurn `json:"session_churn,omitempty"`
+	Activity     string      `json:"activity,omitempty"` // classifier deferred to 0B
+	TSStart      time.Time   `json:"ts_start"`
+	TSEnd        time.Time   `json:"ts_end"`
+	ActiveMS     int64       `json:"active_ms,omitempty"`
 }
 
 // Tokens is the usage breakdown; cache reads/writes are priced differently.
@@ -52,6 +64,15 @@ type Tokens struct {
 	CacheRead    int64 `json:"cache_read"`
 	CacheWrite   int64 `json:"cache_write"`
 	CacheWrite1h int64 `json:"cache_write_1h,omitempty"`
+}
+
+// FileChurn is the net line delta a session made to one repo-relative file
+// (added/removed), from git. It pairs with the per-file cost in the session
+// receipt's heatmap; the cost says how much was spent, the churn how much changed.
+type FileChurn struct {
+	Path    string `json:"path"`
+	Added   int    `json:"added"`
+	Removed int    `json:"removed"`
 }
 
 // Money is an integer count of millionths of a currency unit. 1 USD = 1e6 micros.
