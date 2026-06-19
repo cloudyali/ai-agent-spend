@@ -17,6 +17,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/agentspend/ai-agent-spend/internal/chain"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
 	"github.com/agentspend/ai-agent-spend/internal/quota"
@@ -42,6 +43,7 @@ const (
 	modeFile    // a single file's receipt: the turns (evidence) that touched it
 	modeExplain // a single turn's evidence + cost breakdown (the in-TUI `explain`)
 	modePlan    // the in-explorer plan picker (set the subscription without leaving the TUI)
+	modeChain   // the prompt-chain: the session's turns in time order with a cumulative gutter
 )
 
 // amortizedView is the period-level allocation lens (the subscription-arbitrage
@@ -94,6 +96,10 @@ type Model struct {
 	nameResolver func(event.AgentEvent) (string, bool)
 	selName      string
 	selNameOK    bool
+	// chainData is the drilled session's prompt-chain, built on `c` from the receipt;
+	// chainCursor is the ↑/↓ position over its turns.
+	chainData   chain.Chain
+	chainCursor int
 	// The resolved prompt for the open turn, rendered in a scrollable viewport so a
 	// long prompt scrolls instead of burying the evidence above it. Resolved once on
 	// drill-in (openExplain), not re-read each render.
@@ -409,6 +415,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else if ti := m.recCursor - nf; ti >= 0 && ti < len(m.selTurns) {
 					m.openExplain(m.selTurns[ti], modeReceipt)
 				}
+			case "c":
+				// Toggle into the prompt-chain: the session's turns in time order with a
+				// cumulative-cost gutter, grouped by the prompt that drove them.
+				m.chainData = chain.Build(m.sel.evs)
+				m.chainCursor = 0
+				m.mode = modeChain
 			}
 			return m, nil
 		case modeFile:
@@ -439,6 +451,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				var cmd tea.Cmd
 				m.promptVP, cmd = m.promptVP.Update(msg)
 				return m, cmd
+			}
+			return m, nil
+		case modeChain:
+			ts := m.chainData.Turns
+			switch msg.String() {
+			case "esc", "left", "h", "backspace":
+				m.mode = modeReceipt
+			case "up", "k":
+				if m.chainCursor > 0 {
+					m.chainCursor--
+				}
+			case "down", "j":
+				if m.chainCursor < len(ts)-1 {
+					m.chainCursor++
+				}
+			case "tab":
+				m.chainCursor = nextPromptTurn(ts, m.chainCursor) // jump to the next prompt
+			case "enter":
+				if m.chainCursor >= 0 && m.chainCursor < len(ts) {
+					if e, ok := m.eventByID(ts[m.chainCursor].EventID); ok {
+						m.openExplain(e, modeChain)
+					}
+				}
 			}
 			return m, nil
 		case modePlan:
@@ -518,6 +553,8 @@ func (m Model) View() string {
 		return m.explainView()
 	case modePlan:
 		return m.picker.View()
+	case modeChain:
+		return m.chainView()
 	default:
 		return m.listView()
 	}
@@ -1290,7 +1327,7 @@ func (m Model) receiptHint() string {
 	if len(m.selFiles) > 0 && len(m.selTurns) > 0 {
 		parts = append(parts, "tab files/turns")
 	}
-	parts = append(parts, "↑/↓ move", "↵ open", "esc back", "q quit")
+	parts = append(parts, "↑/↓ move", "↵ open", "c chain", "esc back", "q quit")
 	return strings.Join(parts, " · ")
 }
 
@@ -1306,6 +1343,8 @@ func (m Model) breadcrumb() string {
 	switch m.mode {
 	case modeFile:
 		segs = append(segs, m.selFile.path)
+	case modeChain:
+		segs = append(segs, "chain")
 	case modeExplain:
 		when := fmtTime(m.selTurn.TSStart)
 		if m.explainBack == modeFile {
@@ -1643,6 +1682,88 @@ func receiptFiles(evs []event.AgentEvent) []fileRow {
 // fileWindow clamps a file list of length n to budget rows, sliding to keep cursor
 // visible — the receipt's vertical analogue of windowRange. budget ≤ 0 (size
 // unknown) or ≥ n shows everything.
+// chainView renders the drilled session's prompt-chain: its turns in time order with a
+// running cumulative-cost gutter, a "p<N>" marker on the first turn of each prompt
+// group (Claude PromptIDs; Codex has none, so it reads as one flat chain), and the
+// cursor's turn highlighted. ↵ opens that turn's evidence. Long chains page via
+// fileWindow; ASCII-degrades like every other surface.
+func (m Model) chainView() string {
+	c := m.chainData
+	var b strings.Builder
+	b.WriteString(m.breadcrumb() + "\n\n")
+	b.WriteString(stBold.Render("CHAIN") + stFaint.Render(fmt.Sprintf("  %d %s · %s",
+		len(c.Turns), turnsWord(len(c.Turns)), money(c.TotalMicros))) + "\n")
+	b.WriteString(stFaint.Render("  ↑/↓ turn · tab prompt · ↵ evidence · esc back") + "\n\n")
+	if len(c.Turns) == 0 {
+		return b.String() + stFaint.Render("  (no turns)") + "\n"
+	}
+	b.WriteString("  " + stFaint.Render(fmt.Sprintf("%-3s %10s  %-8s  %s", "", "CUM", "WHEN", "MODEL · COST")) + "\n")
+
+	groupNo := map[string]int{}
+	for i, g := range c.Groups {
+		groupNo[g.PromptID] = i + 1
+	}
+	budget := m.h - 9
+	if budget < 1 {
+		budget = len(c.Turns) // no window size yet → show all (tests, pipes)
+	}
+	start, end := fileWindow(len(c.Turns), m.chainCursor, budget)
+	prevPID, havePrev := "", false
+	if start > 0 {
+		prevPID, havePrev = c.Turns[start-1].PromptID, true
+	}
+	for i := start; i < end; i++ {
+		t := c.Turns[i]
+		pr := ""
+		if t.PromptID != "" && (!havePrev || t.PromptID != prevPID) { // first turn of a prompt group
+			pr = fmt.Sprintf("p%d", groupNo[t.PromptID])
+		}
+		prevPID, havePrev = t.PromptID, true
+		cost := money(t.CostMicros)
+		if !t.HasCost {
+			cost = "~" + cost // not computable — the gutter doesn't count it
+		}
+		line := fmt.Sprintf("%-3s %10s  %-8s  %s · %s",
+			pr, money(t.CumMicros), clockTime(t.TS, time.Local), trunc(humanModel(t.Model), 12), cost)
+		if i == m.chainCursor {
+			b.WriteString(stSel.Render("▶ "+line) + "\n")
+		} else {
+			b.WriteString("  " + stFaint.Render(line) + "\n")
+		}
+	}
+	if end < len(c.Turns) {
+		b.WriteString(stFaint.Render(fmt.Sprintf("  … +%d more ↓", len(c.Turns)-end)) + "\n")
+	}
+	return b.String()
+}
+
+// nextPromptTurn returns the index of the first turn of the next prompt group after
+// cursor, wrapping to the top from the last group. One group (or empty PromptIDs, e.g.
+// Codex) wraps to 0 — a harmless no-op when already there.
+func nextPromptTurn(turns []chain.Turn, cursor int) int {
+	if cursor < 0 || cursor >= len(turns) {
+		return 0
+	}
+	cur := turns[cursor].PromptID
+	for j := cursor + 1; j < len(turns); j++ {
+		if turns[j].PromptID != cur {
+			return j
+		}
+	}
+	return 0
+}
+
+// eventByID finds the drilled session's event for a chain turn, so ↵ can open its
+// evidence. A foreign/missing id → not ok, and the caller no-ops.
+func (m Model) eventByID(id string) (event.AgentEvent, bool) {
+	for _, e := range m.sel.evs {
+		if e.EventID == id {
+			return e, true
+		}
+	}
+	return event.AgentEvent{}, false
+}
+
 func fileWindow(n, cursor, budget int) (start, end int) {
 	if budget <= 0 || budget >= n {
 		return 0, n

@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/agentspend/ai-agent-spend/internal/chain"
 	"github.com/agentspend/ai-agent-spend/internal/event"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
 	"github.com/agentspend/ai-agent-spend/internal/quota"
@@ -1376,6 +1377,63 @@ func TestModel_ListShowsSubagentRollup(t *testing.T) {
 	m = nm.(Model)
 	if v := m.View(); !strings.Contains(v, "⋮2 sub") {
 		t.Errorf("the session row should show the rolled-up subagent count (⋮2 sub):\n%s", v)
+	}
+}
+
+func TestNextPromptTurn(t *testing.T) {
+	ts := []chain.Turn{{PromptID: "p1"}, {PromptID: "p1"}, {PromptID: "p2"}, {PromptID: "p2"}}
+	if got := nextPromptTurn(ts, 0); got != 2 {
+		t.Errorf("from group p1 should jump to p2's first turn (2), got %d", got)
+	}
+	if got := nextPromptTurn(ts, 2); got != 0 {
+		t.Errorf("from the last group should wrap to 0, got %d", got)
+	}
+	if got := nextPromptTurn(nil, 0); got != 0 {
+		t.Errorf("empty turns → 0, got %d", got)
+	}
+}
+
+// `c` opens the prompt-chain from the receipt; tab jumps prompt-to-prompt; ↵ opens a
+// turn's evidence and esc returns to the chain.
+func TestModel_ChainViewFromReceipt(t *testing.T) {
+	eng := pricing.NewEngine()
+	now := time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC)
+	mk := func(id, pid string, min int, in int64) event.AgentEvent {
+		e := priced(t, eng, "evt_"+id, "s1", "payments", "claude-opus-4-8", now.Add(time.Duration(min)*time.Minute), event.Tokens{Input: in})
+		e.PromptID = pid
+		return e
+	}
+	evs := []event.AgentEvent{mk("a", "p1", 0, 1_000_000), mk("b", "p1", 1, 2_000_000), mk("c", "p2", 2, 500_000)}
+	m := New([]Period{{Label: "today", Events: evs}}, 0, eng)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = nm.(Model)
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // list → receipt
+	m = nm.(Model)
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}}) // receipt → chain
+	m = nm.(Model)
+	if m.mode != modeChain {
+		t.Fatalf("c should open the chain view, got mode %v", m.mode)
+	}
+	v := m.View()
+	for _, want := range []string{"CHAIN", "p1", "p2"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("chain view missing %q:\n%s", want, v)
+		}
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab}) // jump to next prompt (the p2 turn, index 2)
+	m = nm.(Model)
+	if m.chainCursor != 2 {
+		t.Errorf("tab should jump to the next prompt group's first turn (2), got %d", m.chainCursor)
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter}) // open that turn's evidence
+	m = nm.(Model)
+	if m.mode != modeExplain {
+		t.Fatalf("enter should open the turn's evidence, got %v", m.mode)
+	}
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // back to the chain
+	m = nm.(Model)
+	if m.mode != modeChain {
+		t.Errorf("esc from evidence should return to the chain, got %v", m.mode)
 	}
 }
 

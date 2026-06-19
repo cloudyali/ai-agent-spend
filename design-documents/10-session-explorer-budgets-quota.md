@@ -158,7 +158,14 @@ The 09 receipt is the **itemized bill** — top-N costly turns, ranked. What the
 asked for is the **GPS replay of the drive**: walk the conversation in order and watch
 the meter climb. `PromptID` already groups assistant/tool turns under the user prompt
 that triggered them — that *is* the chain, for free. Add a **chain view** as a sibling
-drill from the receipt (toggle `c` / `r`).
+drill from the receipt (toggle `c`).
+
+> **Shipped (2026-06-19).** `c` on the receipt opens `modeChain`: `chain.Build(sel.evs)`
+> rendered as the turns in time order with a running cumulative-cost gutter and a `p<N>`
+> marker on each prompt group's first turn (Claude PromptIDs; Codex, with none, reads as
+> one flat chain). `↑/↓` walks the turns, `tab` jumps prompt-to-prompt, `↵` opens the
+> turn's evidence (esc back to the chain), `~` flags a not-priced turn, and long chains
+> page via `fileWindow`. Cross-session `←/→` travel is the remaining bit (deferred).
 
 ```
 CHAIN  rajgad · feat/heatmap › session bd34e22a   ↑↓ turn · tab prompt · ↵ evidence
@@ -390,10 +397,10 @@ purpose:
 - [ ] Session list groups by calendar day; live sessions detected by recency + mtime and
       pinned; cross-midnight sessions listed once under start day with span.
 - [x] Subagent transcripts roll up under the parent session exactly once (2026-06-19)
-      — reconciles to the by-model total; indented *drillable* children is a later refinement
-      (reconciles to the by-model total).
-- [ ] Chain view orders turns by time, groups by `PromptID`, shows a cumulative-cost
-      gutter, reuses the `↑/↓` + `tab` + `↵` model, and travels sessions with `←/→`.
+      — reconciles to the by-model total; indented *drillable* children is a later refinement.
+- [x] Chain view orders turns by time, groups by `PromptID`, shows a cumulative-cost
+      gutter, reuses the `↑/↓` + `tab` + `↵` model (2026-06-19); cross-session `←/→`
+      travel is deferred.
 - [ ] Budgets measure `CostViews.APIEquivalent` only, default off, calendar-aligned,
       scoped by existing group keys; show pace not just level; never claim enforcement;
       exclude + disclose `nil`-cost providers.
