@@ -156,6 +156,13 @@ func (a *App) cmdTui(args []string) int {
 		}).
 		WithTrailerSettings(toTUITrailers(trailerCfg), func(ts tui.TrailerSettings) error {
 			return config.SetTrailers(".", fromTUITrailers(ts))
+		}).
+		WithPending(func() (tui.Pending, bool) {
+			u, branch, ok := trailer.Preview(".", a.pendingUsage)
+			if !ok {
+				return tui.Pending{}, false
+			}
+			return tui.Pending{Branch: branch, Micros: u.Cost.Micros, Turns: u.Requests}, true
 		})
 	if *watch {
 		// Live mode: every few seconds re-scan + rebuild and advance the clock, so an

@@ -142,14 +142,9 @@ func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config
 	priced := 0
 	sessions := map[string]bool{}
 	providers := map[string]bool{}
-	hourMax := now.Hour()
-	hours := make([]int64, hourMax+1) // 00:00 .. the current hour (future hours don't exist yet)
 	for _, e := range events {
 		if m := e.CostViews.APIEquivalent; m != nil {
 			apiTotal += m.Micros
-			if h := e.TSStart.In(now.Location()).Hour(); h >= 0 && h <= hourMax {
-				hours[h] += m.Micros
-			}
 		}
 		if w, ok := eng.WithoutCache(e.Model, e.Tokens); ok {
 			withoutTotal += w.Micros
@@ -193,16 +188,13 @@ func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config
 	}
 	fmt.Fprintln(a.Out, stat)
 
-	// Hourly spike bar — catch the hour that ran away.
+	// Hourly spike bar — catch the hour that ran away. Bucketed in LOCAL time (the
+	// ledger stays UTC) so it matches the TUI and the "visual times are local" rule.
 	if apiTotal > 0 {
-		peakH, peakV := 0, int64(-1)
-		for h, v := range hours {
-			if v > peakV {
-				peakH, peakV = h, v
-			}
-		}
-		if peakV > 0 {
-			fmt.Fprintf(a.Out, "  by hour  %s  peak %02d:00 · %s\n", sparkline(hours), peakH, usd(peakV, "USD"))
+		hours, peakIdx := hourlyBuckets(events, startOfDay(now), now, time.Local)
+		if hours[peakIdx] > 0 {
+			peakHour := truncHour(startOfDay(now), time.Local).Add(time.Duration(peakIdx) * time.Hour).Hour()
+			fmt.Fprintf(a.Out, "  by hour  %s  peak %02d:00 · %s\n", sparkline(hours), peakHour, usd(hours[peakIdx], "USD"))
 		}
 	}
 
@@ -345,4 +337,40 @@ func joinProviderLabels(ps []string) string {
 		out[i] = providerLabel(p)
 	}
 	return strings.Join(out, ", ")
+}
+
+// hourlyBuckets buckets api-equivalent spend by LOCAL clock-hour across [winStart, now],
+// returning per-hour micros and the peak index. Display-zone bucketing (loc injected
+// for testability; the cli passes time.Local) keeps the hourly bar consistent with the
+// TUI while the ledger instants stay UTC. Half-hour-offset zones (e.g. IST) bucket
+// correctly because boundaries are taken on the local clock, not by absolute truncation.
+func hourlyBuckets(events []event.AgentEvent, winStart, now time.Time, loc *time.Location) (hours []int64, peakIdx int) {
+	start := truncHour(winStart, loc)
+	n := int(truncHour(now, loc).Sub(start)/time.Hour) + 1
+	if n < 1 {
+		n = 1
+	}
+	hours = make([]int64, n)
+	for _, e := range events {
+		m := e.CostViews.APIEquivalent
+		if m == nil || e.TSStart.IsZero() {
+			continue
+		}
+		if idx := int(truncHour(e.TSStart, loc).Sub(start) / time.Hour); idx >= 0 && idx < n {
+			hours[idx] += m.Micros
+		}
+	}
+	for i, v := range hours {
+		if v > hours[peakIdx] {
+			peakIdx = i
+		}
+	}
+	return hours, peakIdx
+}
+
+// truncHour returns t floored to the start of its hour in loc (on the local clock, so
+// fractional-offset zones like IST land on their own :00 boundary).
+func truncHour(t time.Time, loc *time.Location) time.Time {
+	lt := t.In(loc)
+	return time.Date(lt.Year(), lt.Month(), lt.Day(), lt.Hour(), 0, 0, 0, loc)
 }

@@ -94,6 +94,14 @@ func (t TrailerSettings) costLabel() string {
 	return t.CostName
 }
 
+// Pending is the uncommitted trailer spend on the current branch — the read-only
+// "next commit" preview surfaced in the list header when WithPending is wired.
+type Pending struct {
+	Branch string
+	Micros int64
+	Turns  int
+}
+
 // Model is the Bubble Tea model. Update/View are pure over messages, so the whole
 // interaction is testable by feeding tea.KeyMsg values — no terminal required.
 type Model struct {
@@ -180,6 +188,12 @@ type Model struct {
 	budgetPace budget.Pace
 	budgetSet  bool
 
+	// pending (optional; WithPending): the read-only "pending commit" preview — the
+	// uncommitted trailer spend on the current branch. Re-read on each refresh.
+	pendingFn func() (Pending, bool)
+	pending   Pending
+	pendingOK bool
+
 	// setBudget (optional; WithBudgetSetter) persists a new monthly ceiling and returns
 	// the recomputed pace, enabling the in-explorer budget editor (the `b` key).
 	// budgetBuf is the in-progress amount; budgetErr a transient validation message.
@@ -233,6 +247,15 @@ func (m Model) WithQuota(fn func() []quota.Sample) Model {
 // default → nothing renders.
 func (m Model) WithBudget(fn func() (budget.Pace, bool)) Model {
 	m.budgetFn = fn
+	m.refresh()
+	return m
+}
+
+// WithPending enables the "pending commit" line in the list header: fn returns the
+// uncommitted trailer spend on the current branch (the cli reads it from cwd) and
+// whether there's anything pending. Re-read on each refresh; off by default.
+func (m Model) WithPending(fn func() (Pending, bool)) Model {
+	m.pendingFn = fn
 	m.refresh()
 	return m
 }
@@ -356,6 +379,9 @@ func (m *Model) refresh() {
 	}
 	if m.budgetFn != nil {
 		m.budgetPace, m.budgetSet = m.budgetFn() // re-pace on each refresh / watch tick
+	}
+	if m.pendingFn != nil {
+		m.pending, m.pendingOK = m.pendingFn() // re-read the pending-commit preview
 	}
 }
 
@@ -2234,7 +2260,18 @@ func (m Model) gaugeLines() []string {
 	if m.budgetSet {
 		out = append(out, m.budgetGaugeLine())
 	}
+	if m.pendingOK {
+		out = append(out, m.pendingLine())
+	}
 	return append(out, m.quotaLines()...)
+}
+
+// pendingLine renders the read-only "pending commit" preview: the uncommitted trailer
+// spend on the current branch — what the next commit would be stamped with.
+func (m Model) pendingLine() string {
+	p := m.pending
+	return "  " + stBold.Render("pending commit") +
+		stFaint.Render(fmt.Sprintf(" %s: %s · %d turns (uncommitted)", p.Branch, money(p.Micros), p.Turns))
 }
 
 // budgetGaugeLine renders the monthly budget as PACE, not just level: used $ and %,

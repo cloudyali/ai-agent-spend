@@ -587,6 +587,8 @@ func TestShortSHA(t *testing.T) {
 // api-equivalent total, the plan $/day + ROI, the cache-savings headline, the
 // turns/sessions/top-model strip, and an hourly spike bar (09-session-view.md).
 func TestRenderToday_ArbitrageFirst(t *testing.T) {
+	defer func(l *time.Location) { time.Local = l }(time.Local)
+	time.Local = time.UTC // pin: the hourly bar is now local-tz, so make it deterministic
 	eng := pricing.NewEngine()
 	now := time.Date(2026, 6, 17, 14, 30, 0, 0, time.UTC)
 	mk := func(sid, model string, hour int, tk event.Tokens) event.AgentEvent {
