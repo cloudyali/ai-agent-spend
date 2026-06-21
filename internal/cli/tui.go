@@ -42,6 +42,57 @@ func fromTUITrailers(t tui.TrailerSettings) config.Trailers {
 	return config.Trailers{Enabled: t.Enabled, Cost: t.Cost, CostModels: t.CostModels, Tokens: t.Tokens, Interactions: t.Interactions, Precision: t.Precision, CostName: t.CostName}
 }
 
+// buildCommits groups the ledger by commit SHA — git-independent: SHA, cost, branch,
+// and turns come straight from the store — then optionally enriches each with the
+// commit title/body and the in-git trailer via git (best-effort; a commit not in the
+// cwd repo simply stays ledger-only).
+func (a *App) buildCommits(events []event.AgentEvent, trailerName string) []tui.Commit {
+	type agg struct {
+		micros int64
+		turns  int
+		branch string
+		maxTS  time.Time
+	}
+	byCommit := map[string]*agg{}
+	var order []string
+	for _, e := range events {
+		if e.GitSHA == "" {
+			continue
+		}
+		g := byCommit[e.GitSHA]
+		if g == nil {
+			g = &agg{}
+			byCommit[e.GitSHA] = g
+			order = append(order, e.GitSHA)
+		}
+		if m := e.CostViews.APIEquivalent; m != nil {
+			g.micros += m.Micros
+		}
+		g.turns++
+		if g.branch == "" && e.GitBranch != "" {
+			g.branch = e.GitBranch
+		}
+		if e.TSStart.After(g.maxTS) {
+			g.maxTS = e.TSStart
+		}
+	}
+	sort.Slice(order, func(i, j int) bool { return byCommit[order[i]].maxTS.After(byCommit[order[j]].maxTS) })
+
+	commits := make([]tui.Commit, 0, len(order))
+	for _, sha := range order {
+		g := byCommit[sha]
+		c := tui.Commit{SHA: sha, Branch: g.branch, Micros: g.micros, Turns: g.turns}
+		if subj, body, ok := trailer.ReadCommitMessage(".", sha); ok { // optional git enrichment
+			c.Title, c.Body = subj, body
+			if tm, has := trailer.ParseCostTrailer(body, trailerName); has {
+				c.TrailerMicros, c.HasTrailer = tm, true
+			}
+		}
+		commits = append(commits, c)
+	}
+	return commits
+}
+
 func (a *App) cmdTui(args []string) int {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
@@ -163,6 +214,15 @@ func (a *App) cmdTui(args []string) int {
 				return tui.Pending{}, false
 			}
 			return tui.Pending{Branch: branch, Micros: u.Cost.Micros, Turns: u.Requests}, true
+		}).
+		WithCommits(func() []tui.Commit {
+			evs := all
+			if st2, err := a.openStore(); err == nil {
+				if fresh, e := st2.Query(store.Filter{}); e == nil {
+					evs = fresh
+				}
+			}
+			return a.buildCommits(evs, trailerName)
 		})
 	if *watch {
 		// Live mode: every few seconds re-scan + rebuild and advance the clock, so an

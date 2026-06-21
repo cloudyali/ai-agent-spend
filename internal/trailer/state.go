@@ -91,10 +91,32 @@ func ReadCommitCost(repoDir, sha, costName string) (int64, bool) {
 	if err != nil {
 		return 0, false
 	}
-	return parseCostTrailer(out, costName)
+	return ParseCostTrailer(out, costName)
 }
 
-func parseCostTrailer(msg, costName string) (int64, bool) {
+// ReadCommitMessage returns a commit's subject (first line) and body from repoDir —
+// the optional git enrichment for the commit-centric view. ok is false when the
+// commit isn't in this repo. Local git read, no network.
+func ReadCommitMessage(repoDir, sha string) (subject, body string, ok bool) {
+	if sha == "" {
+		return "", "", false
+	}
+	out, err := runGit(repoDir, "show", "-s", "--format=%s%n%b", sha)
+	if err != nil {
+		return "", "", false
+	}
+	parts := strings.SplitN(out, "\n", 2)
+	subject = strings.TrimSpace(parts[0])
+	if len(parts) > 1 {
+		body = strings.TrimSpace(parts[1])
+	}
+	return subject, body, subject != "" || body != ""
+}
+
+// ParseCostTrailer extracts the cost trailer (costName, e.g. "AI-Cost") value in
+// micros from a commit message. Exported so a caller that already has the message
+// (the commit view) doesn't re-shell to git.
+func ParseCostTrailer(msg, costName string) (int64, bool) {
 	prefix := costName + ": "
 	for _, ln := range strings.Split(msg, "\n") {
 		if strings.HasPrefix(ln, prefix) {

@@ -41,12 +41,14 @@ type mode int
 const (
 	modeList mode = iota
 	modeReceipt
-	modeFile     // a single file's receipt: the turns (evidence) that touched it
-	modeExplain  // a single turn's evidence + cost breakdown (the in-TUI `explain`)
-	modePlan     // the in-explorer plan picker (set the subscription without leaving the TUI)
-	modeChain    // the prompt-chain: the session's turns in time order with a cumulative gutter
-	modeBudget   // the in-explorer budget editor (set the monthly ceiling without leaving the TUI)
-	modeTrailers // the in-explorer [trailers] editor (toggle which trailers attach)
+	modeFile         // a single file's receipt: the turns (evidence) that touched it
+	modeExplain      // a single turn's evidence + cost breakdown (the in-TUI `explain`)
+	modePlan         // the in-explorer plan picker (set the subscription without leaving the TUI)
+	modeChain        // the prompt-chain: the session's turns in time order with a cumulative gutter
+	modeBudget       // the in-explorer budget editor (set the monthly ceiling without leaving the TUI)
+	modeTrailers     // the in-explorer [trailers] editor (toggle which trailers attach)
+	modeCommits      // the commit-centric view: per-commit ledger spend (+ optional git enrichment)
+	modeCommitDetail // one commit: full message + cost breakdown
 )
 
 // amortizedView is the period-level allocation lens (the subscription-arbitrage
@@ -100,6 +102,20 @@ type Pending struct {
 	Branch string
 	Micros int64
 	Turns  int
+}
+
+// Commit is one commit's spend for the commit-centric view. SHA/Branch/Micros/Turns
+// come from the ledger (git-independent); Title/Body/TrailerMicros/HasTrailer are
+// optional git enrichment — empty/false when git or the repo isn't available.
+type Commit struct {
+	SHA           string
+	Branch        string
+	Micros        int64
+	Turns         int
+	Title         string
+	Body          string
+	TrailerMicros int64
+	HasTrailer    bool
 }
 
 // Model is the Bubble Tea model. Update/View are pure over messages, so the whole
@@ -216,6 +232,13 @@ type Model struct {
 	trailerCur    TrailerSettings
 	trailerEdit   TrailerSettings
 	trailerCursor int
+
+	// commit-centric view (optional; WithCommits). commitsFn returns the per-commit
+	// ledger spend (+ optional git enrichment), loaded on demand into commits.
+	commitsFn    func() []Commit
+	commits      []Commit
+	commitCursor int
+	selCommit    Commit
 }
 
 // WithPlanPicker enables the in-explorer plan picker (the `p` key): providers is
@@ -257,6 +280,14 @@ func (m Model) WithBudget(fn func() (budget.Pace, bool)) Model {
 func (m Model) WithPending(fn func() (Pending, bool)) Model {
 	m.pendingFn = fn
 	m.refresh()
+	return m
+}
+
+// WithCommits enables the commit-centric view (the `c` key): fn returns the per-commit
+// ledger spend, optionally enriched with git title/body and the in-git trailer. Loaded
+// on demand (when the view opens), not per refresh. Off by default.
+func (m Model) WithCommits(fn func() []Commit) Model {
+	m.commitsFn = fn
 	return m
 }
 
@@ -675,6 +706,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case modeCommits:
+			switch msg.String() {
+			case "esc", "left", "h", "backspace":
+				m.mode = modeList
+			case "up", "k":
+				if m.commitCursor > 0 {
+					m.commitCursor--
+				}
+			case "down", "j":
+				if m.commitCursor < len(m.commits)-1 {
+					m.commitCursor++
+				}
+			case "enter":
+				if m.commitCursor >= 0 && m.commitCursor < len(m.commits) {
+					m.selCommit = m.commits[m.commitCursor]
+					m.mode = modeCommitDetail
+				}
+			}
+			return m, nil
+		case modeCommitDetail:
+			switch msg.String() {
+			case "esc", "left", "h", "backspace":
+				m.mode = modeCommits
+			}
+			return m, nil
 		default: // modeList
 			switch msg.String() {
 			case "up", "k":
@@ -719,6 +775,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.trailerCursor = 0
 					m.mode = modeTrailers
 				}
+			case "c":
+				if m.commitsFn != nil {
+					m.commits = m.commitsFn() // load on demand (not per refresh)
+					m.commitCursor = 0
+					m.mode = modeCommits
+				}
 			case "enter":
 				if len(m.rows) > 0 {
 					m.sel = m.rows[m.cursor]
@@ -759,6 +821,10 @@ func (m Model) View() string {
 		return m.budgetView()
 	case modeTrailers:
 		return m.trailersView()
+	case modeCommits:
+		return m.commitsView()
+	case modeCommitDetail:
+		return m.commitDetailView()
 	default:
 		return m.listView()
 	}
@@ -808,6 +874,61 @@ func (m Model) trailersView() string {
 	return b.String()
 }
 
+// commitsView is the commit-centric list: per-commit ledger spend, git-enriched with
+// the title + an in-git trailer badge when available.
+func (m Model) commitsView() string {
+	var b strings.Builder
+	b.WriteString(stBold.Render("commits") + stFaint.Render(" · ledger-sourced (git enriches title + the in-git trailer)") + "\n\n")
+	if len(m.commits) == 0 {
+		b.WriteString(stFaint.Render("  (no commits with ledger spend in view)") + "\n")
+		return b.String()
+	}
+	for i, c := range m.commits {
+		cursor := "  "
+		if i == m.commitCursor {
+			cursor = stBold.Render("› ")
+		}
+		row := fmt.Sprintf("%-11s %10s  %3d turns", shortSHA(c.SHA), money(c.Micros), c.Turns)
+		if c.Title != "" {
+			row += "  " + trunc(c.Title, 48)
+		}
+		if c.HasTrailer {
+			row += "  " + stOutput.Render("✓ trailer")
+		}
+		b.WriteString(cursor + row + "\n")
+	}
+	b.WriteString("\n" + stFaint.Render("  ↑/↓ move · ↵ detail · esc back · q quit") + "\n")
+	return b.String()
+}
+
+// commitDetailView is one commit: the full message (when git-enriched) and the cost
+// breakdown — ledger spend, reconciled against the in-git trailer when present.
+func (m Model) commitDetailView() string {
+	c := m.selCommit
+	var b strings.Builder
+	hdr := shortSHA(c.SHA)
+	if c.Branch != "" {
+		hdr += "  ·  " + c.Branch
+	}
+	b.WriteString(stBold.Render(hdr) + "\n\n")
+	if c.Title != "" {
+		b.WriteString(stBold.Render(c.Title) + "\n")
+		if c.Body != "" {
+			b.WriteString("\n" + c.Body + "\n")
+		}
+	} else {
+		b.WriteString(stFaint.Render("(commit message unavailable — git enrichment off / repo not present)") + "\n")
+	}
+	b.WriteString("\n  ledger   " + stBold.Render(money(c.Micros)) + stFaint.Render(fmt.Sprintf(" · %d turns", c.Turns)) + "\n")
+	if c.HasTrailer {
+		b.WriteString("  trailer  " + stBold.Render("✓ "+money(c.TrailerMicros)) + stFaint.Render(" in git"+reconLabel(c.TrailerMicros, c.Micros)) + "\n")
+	} else {
+		b.WriteString("  trailer  " + stFaint.Render("— not stamped in git") + "\n")
+	}
+	b.WriteString("\n" + stFaint.Render("  esc back · q quit") + "\n")
+	return b.String()
+}
+
 // --- list view -------------------------------------------------------------
 
 func (m Model) listView() string {
@@ -839,6 +960,9 @@ func (m Model) listView() string {
 	}
 	if m.setTrailers != nil {
 		parts = append(parts, "t trailers")
+	}
+	if m.commitsFn != nil {
+		parts = append(parts, "c commits")
 	}
 	parts = append(parts, "q quit")
 	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n")

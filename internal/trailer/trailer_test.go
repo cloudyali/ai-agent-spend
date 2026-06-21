@@ -373,6 +373,22 @@ func TestReadCommitCost(t *testing.T) {
 	}
 }
 
+func TestReadCommitMessage(t *testing.T) {
+	dir := newGitRepo(t)
+	gitIn(t, dir, "commit", "--allow-empty", "-q", "-m", "Subject line\n\nBody paragraph one.\nBody line two.")
+	sha := gitOut(t, dir, "rev-parse", "HEAD")
+	subj, body, ok := ReadCommitMessage(dir, sha)
+	if !ok || subj != "Subject line" {
+		t.Fatalf("subject = %q ok=%v, want 'Subject line'", subj, ok)
+	}
+	if !strings.Contains(body, "Body paragraph one.") || !strings.Contains(body, "Body line two.") {
+		t.Errorf("body = %q", body)
+	}
+	if _, _, ok := ReadCommitMessage(dir, "deadbeefdeadbeef"); ok {
+		t.Error("unknown sha → ok=false")
+	}
+}
+
 // --- helpers ---
 
 func newGitRepo(t *testing.T) string {

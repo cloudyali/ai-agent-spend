@@ -74,6 +74,15 @@ green (`go test ./...`), reviews passed, offline / `doctor --network` intact:
   where the `~/.claude` session logs live, so an env that commits but didn't run the AI
   has nothing to stamp (Case B in the multi-environment discussion).
 
+- **Increment 9 — commit-centric TUI view.** A `c` key in the explorer opens a commit
+  list: per-commit **ledger** spend (SHA · cost · turns · branch), sourced purely from
+  the stored events grouped by `GitSHA` — **git-independent** (works offline, even if
+  the repo is gone). Git is *optional enrichment*: when the cwd repo is present, each row
+  gains the commit title and an in-git-trailer badge, and the detail drill (↵) shows the
+  full message + a ledger-vs-trailer reconciliation. Degrades gracefully to ledger-only
+  (`trailer.ReadCommitMessage` / `ParseCostTrailer` are best-effort). `tui` stays git-free
+  — the cli injects `[]Commit` via `WithCommits`.
+
 **Build-out complete** for the local path: installer, engine (trailer/consume/watermark),
 `.aispend.toml [trailers]` config, the `today` pending preview, live-scan-at-commit-time,
 and the receipt badge — all shipped under t-wada TDD with code + security review, the
