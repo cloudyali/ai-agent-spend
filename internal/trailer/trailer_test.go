@@ -34,7 +34,7 @@ func TestFormatCost(t *testing.T) {
 func TestFormatTrailers_AllLines(t *testing.T) {
 	u := Usage{
 		Cost:     event.USD(420000),
-		Tokens:   128944,
+		Tokens:   event.Tokens{Input: 100000, Output: 20000, CacheRead: 8944},
 		Requests: 37,
 		PerModel: map[string]int64{"claude-opus-4-8": 410000, "claude-haiku-4-5": 10000},
 	}
@@ -43,11 +43,29 @@ func TestFormatTrailers_AllLines(t *testing.T) {
 	want := []string{
 		"AI-Cost: 0.42",
 		"AI-Cost-Models: claude-haiku-4-5=0.01,claude-opus-4-8=0.41", // sorted by model
-		"AI-Tokens: 128944",
+		"AI-Tokens: input=100000,output=20000,cache_read=8944",
 		"AI-Interactions: 37",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("FormatTrailers =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestFormatTrailers_TokensGranular(t *testing.T) {
+	cfg := Config{Tokens: true, Precision: 2, CostName: "AI-Cost"}
+	// All five buckets, canonical order.
+	full := FormatTrailers(Usage{Tokens: event.Tokens{Input: 12400, Output: 3100, CacheRead: 8900, CacheWrite: 500, CacheWrite1h: 50}}, cfg)
+	if len(full) != 1 || full[0] != "AI-Tokens: input=12400,output=3100,cache_read=8900,cache_write=500,cache_write_1h=50" {
+		t.Errorf("granular tokens = %v", full)
+	}
+	// Zero buckets are omitted (no cache_write=0 noise).
+	some := FormatTrailers(Usage{Tokens: event.Tokens{Input: 100, CacheRead: 50}}, cfg)
+	if len(some) != 1 || some[0] != "AI-Tokens: input=100,cache_read=50" {
+		t.Errorf("zero buckets must be omitted: %v", some)
+	}
+	// All-zero → no line at all.
+	if none := FormatTrailers(Usage{Tokens: event.Tokens{}}, cfg); len(none) != 0 {
+		t.Errorf("all-zero tokens → no line, got %v", none)
 	}
 }
 

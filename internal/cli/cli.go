@@ -815,7 +815,11 @@ func (a *App) pendingUsage(_, branch string, since time.Time) (trailer.Usage, er
 		u.Cost.Micros += m.Micros
 		u.Cost.Currency = m.Currency
 		u.PerModel[e.Model] += m.Micros
-		u.Tokens += e.Tokens.Input + e.Tokens.Output + e.Tokens.CacheRead + e.Tokens.CacheWrite + e.Tokens.CacheWrite1h
+		u.Tokens.Input += e.Tokens.Input
+		u.Tokens.Output += e.Tokens.Output
+		u.Tokens.CacheRead += e.Tokens.CacheRead
+		u.Tokens.CacheWrite += e.Tokens.CacheWrite
+		u.Tokens.CacheWrite1h += e.Tokens.CacheWrite1h
 		u.Requests++
 		if e.TSEnd.After(u.MaxTS) {
 			u.MaxTS = e.TSEnd

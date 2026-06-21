@@ -226,7 +226,7 @@ claude-budget ships a separate `.claude-budget.toml`. We already have `.aispend.
 enabled       = true     # opt-in; OFF by default (mutating commit messages is opinionated)
 cost          = true     # AI-Cost:           total USD-equivalent
 costModels    = false    # AI-Cost-Models:    per-model
-tokens        = false    # AI-Tokens:         all five buckets
+tokens        = false    # AI-Tokens:         per-bucket breakdown (input/output/cache_read/cache_write/cache_write_1h)
 interactions  = false    # AI-Interactions:   deduped request count
 precision     = 2        # decimals on cost (clamped 0–8)
 

@@ -25,7 +25,7 @@ import (
 type Config struct {
 	Cost         bool   // AI-Cost: total api-equivalent
 	CostModels   bool   // AI-Cost-Models: per-model
-	Tokens       bool   // AI-Tokens: all five buckets
+	Tokens       bool   // AI-Tokens: per-bucket breakdown (input/output/cache_read/cache_write/cache_write_1h)
 	Interactions bool   // AI-Interactions: deduped request count
 	Precision    int    // decimals on cost values
 	CostName     string // trailer key for cost (default "AI-Cost"; rename-safe)
@@ -41,7 +41,7 @@ func DefaultConfig() Config {
 // micros per model; MaxTS is how far to advance the branch watermark once consumed.
 type Usage struct {
 	Cost     event.Money
-	Tokens   int64
+	Tokens   event.Tokens
 	Requests int
 	PerModel map[string]int64
 	MaxTS    time.Time
@@ -87,6 +87,30 @@ func formatCost(micros int64, precision int) string {
 	return strconv.FormatFloat(float64(micros)/1e6, 'f', precision, 64)
 }
 
+// formatTokens renders the per-bucket token breakdown as "input=…,output=…,…",
+// omitting zero buckets (so a turn with no cache-write doesn't carry cache_write=0).
+// Canonical order matches the five token classes the engine prices. Empty when all
+// buckets are zero.
+func formatTokens(tk event.Tokens) string {
+	buckets := []struct {
+		name string
+		n    int64
+	}{
+		{"input", tk.Input},
+		{"output", tk.Output},
+		{"cache_read", tk.CacheRead},
+		{"cache_write", tk.CacheWrite},
+		{"cache_write_1h", tk.CacheWrite1h},
+	}
+	var parts []string
+	for _, b := range buckets {
+		if b.n > 0 {
+			parts = append(parts, b.name+"="+strconv.FormatInt(b.n, 10))
+		}
+	}
+	return strings.Join(parts, ",")
+}
+
 // FormatTrailers renders the configured trailer lines for u. A zero-cost / zero-
 // usage turn yields no lines — we never assert "AI-Cost: 0.00".
 func FormatTrailers(u Usage, cfg Config) []string {
@@ -106,8 +130,10 @@ func FormatTrailers(u Usage, cfg Config) []string {
 		}
 		out = append(out, "AI-Cost-Models: "+strings.Join(parts, ","))
 	}
-	if cfg.Tokens && u.Tokens > 0 {
-		out = append(out, "AI-Tokens: "+strconv.FormatInt(u.Tokens, 10))
+	if cfg.Tokens {
+		if line := formatTokens(u.Tokens); line != "" {
+			out = append(out, "AI-Tokens: "+line)
+		}
 	}
 	if cfg.Interactions && u.Requests > 0 {
 		out = append(out, "AI-Interactions: "+strconv.Itoa(u.Requests))
