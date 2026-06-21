@@ -22,11 +22,13 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
 	"github.com/agentspend/ai-agent-spend/internal/quota"
 	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/agentspend/ai-agent-spend/internal/trailer"
 )
 
 func (a *App) cmdToday(args []string) int {
 	fs := flag.NewFlagSet("today", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
+	repo := fs.String("repo", ".", "repo to preview uncommitted trailer spend for (defaults to cwd)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -52,7 +54,22 @@ func (a *App) cmdToday(args []string) int {
 	}
 	a.renderToday(events, now, a.planSet(), storeTotal, a.pricingEngine())
 	a.renderBudget(st, now)
+	a.renderPending(*repo)
 	return 0
+}
+
+// renderPending prints the read-only "pending commit" preview — the api-equivalent
+// spend the next commit on this branch would be stamped with (the trailer watermark
+// made visible). Nothing prints outside a repo, on a detached HEAD, or when nothing
+// is uncommitted, so it never adds noise. It mirrors the hook's exact computation,
+// so the preview equals what `git commit` would actually stamp.
+func (a *App) renderPending(repoDir string) {
+	u, branch, ok := trailer.Preview(repoDir, a.pendingUsage)
+	if !ok {
+		return
+	}
+	fmt.Fprintf(a.Out, "  %s %s: %s · %d turns (uncommitted)\n",
+		paint(useColor(a.Out), cBold, "pending commit"), branch, usd(u.Cost.Micros, u.Cost.Currency), u.Requests)
 }
 
 // renderBudget prints the month-to-date budget pace line when a budget is configured

@@ -15,7 +15,7 @@ two source artifacts and the code:
 > are sketched at the resolution we can honestly commit to today, and sharpened
 > as each one approaches.
 
-_Last updated: 2026-06-17 · UX/UI concept captures (07–09) added · Status: Phase 0A in progress — `scan → week → explain → doctor` working end-to-end on a real `~/.claude`, default binary provably offline. **Claude Code `(message.id, requestId)` keep-max dedup + reported-cost (`costUSD`) landed under TDD, verified against ccusage/CodeBurn** (the streaming-placeholder undercount is fixed). **Rich static surfaces shipped (hand-rolled zero-dep ANSI, t-wada TDD): `aispend today` (arbitrage-first), the `explain session:<id|max|last>` receipt, `report --by session`, and the color/sparkline/degradation layer — see 08/09.** Remaining for shippable 0A: `privacy`/`export` commands, CI workflow, signed releases + SBOM._
+_Last updated: 2026-06-20 · UX/UI concept captures (07–11) added — 11 proposes per-commit cost trailers (claude-budget-style write-back into git history, opt-in) · Status: Phase 0A nearly shippable — `scan → report → today → tui → doctor` working end-to-end on a real `~/.claude`, default binary provably offline (the `explain` command was folded into the TUI receipt drill — per-turn/session evidence now lives only in the TUI). **Claude Code `(message.id, requestId)` keep-max dedup + reported-cost (`costUSD`) landed under TDD, verified against ccusage/CodeBurn** (the streaming-placeholder undercount is fixed). **Rich zero-dep ANSI surfaces shipped (t-wada TDD): `aispend today` (arbitrage-first) plus the interactive TUI explorer — day-grouped session list, session receipt, prompt-chain view, API-equivalent budgets, and the Codex+Claude quota window (doc 10), with VCS linkage (`--by branch|commit|file`) and the color/sparkline/degradation layer — see 08/09/10.** Remaining for shippable 0A: `privacy`/`export` commands, release signing + SBOM (CI workflow + goreleaser config have landed)._
 
 ---
 
@@ -45,6 +45,9 @@ _Last updated: 2026-06-17 · UX/UI concept captures (07–09) added · Status: P
    (session-as-spine, prompt-chain travel, budgets, the plan-quota window): the surface
    design — arbitrage chart, `explain` receipt, faceted explorer, session receipt —
    captured from the 2026-06-17 and 2026-06-19 brainstorms.
+   **[11-commit-cost-trailers.md](11-commit-cost-trailers.md)** — writing per-commit
+   cost back **into** git history as trailers (the write-back complement to 09's VCS
+   linkage), proposal capture from 2026-06-20.
 8. **The phase specs**, in roadmap order (below).
 
 ## Document map
@@ -59,8 +62,9 @@ _Last updated: 2026-06-17 · UX/UI concept captures (07–09) added · Status: P
 | [06-provider-coverage-backlog.md](06-provider-coverage-backlog.md) | Prioritized which-agent-next map; per-agent data quality | Reference |
 | [07-ui-concept.md](07-ui-concept.md) | Web UI concept: arbitrage/cache chart, `explain` receipt slide-over, faceted explorer | Concept (brainstorm capture) |
 | [08-cli-tui-concept.md](08-cli-tui-concept.md) | CLI/TUI concept: ANSI `explain` receipt, composition-striped `report`, navigable TUI, reaching `explain` without an id | Concept (brainstorm capture) |
-| [09-session-view.md](09-session-view.md) | Session as a first-class unit: `report --by session` + `explain session:<id>` receipt, spike-not-streak temporal view | Concept (brainstorm capture) |
-| [10-session-explorer-budgets-quota.md](10-session-explorer-budgets-quota.md) | Session as the explorer spine (live + historical), prompt-chain travel, API-equivalent budgets, and the local plan-quota window (Codex `rate_limits` / Claude usage snapshot) | Concept (brainstorm capture) |
+| [09-session-view.md](09-session-view.md) | Session as a first-class unit: `report --by session` + the TUI session receipt, spike-not-streak temporal view, cost+churn heatmap | Implemented |
+| [10-session-explorer-budgets-quota.md](10-session-explorer-budgets-quota.md) | Session as the explorer spine (live + historical), prompt-chain travel, API-equivalent budgets, and the local plan-quota window (Codex `rate_limits` / Claude usage snapshot) | Largely implemented (A–D shipped; residue: nesting, scoped budgets, ←/→ travel, alerts) |
+| [11-commit-cost-trailers.md](11-commit-cost-trailers.md) | Per-commit cost trailers: writing api-equivalent spend back into git history via hooks (claude-budget-style); the write-back complement to 09 | Concept (proposal) |
 | [research-local-session-data.md](research-local-session-data.md) | Source note: mining agents' local session data (verified vs ccusage/CodeBurn) | Reference |
 | [phase-0A-trusted-explainable-ledger.md](phase-0A-trusted-explainable-ledger.md) | Claude Code local ledger + `explain` | **Detailed — building now** |
 | [phase-0B-provider-coverage-and-findings.md](phase-0B-provider-coverage-and-findings.md) | Codex + Cursor, fixtures, cost-driver findings, TUI | Planned |

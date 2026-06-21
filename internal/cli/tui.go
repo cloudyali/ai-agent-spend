@@ -24,6 +24,7 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
 	"github.com/agentspend/ai-agent-spend/internal/quota"
 	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/agentspend/ai-agent-spend/internal/trailer"
 	"github.com/agentspend/ai-agent-spend/internal/tui"
 )
 
@@ -104,6 +105,13 @@ func (a *App) cmdTui(args []string) int {
 		return buildPeriods()
 	}
 
+	// The receipt's trailer badge reads the configured cost-trailer name once here, so
+	// it isn't re-parsed per render; the git read itself is cached on drill-in.
+	trailerName := "AI-Cost"
+	if tc, err := config.LoadTrailers("."); err == nil && tc.CostName != "" {
+		trailerName = tc.CostName
+	}
+
 	m := tui.New(periods, startIdx, a.pricingEngine()).WithNow(now).
 		WithQuota(func() []quota.Sample {
 			return append(a.claudeQuotaSamples(a.Now()), a.codexQuotaSamples(a.Now())...)
@@ -116,7 +124,21 @@ func (a *App) cmdTui(args []string) int {
 			p, _, ok := a.budgetPace(st2, a.Now())
 			return p, ok
 		}).
-		WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan)
+		WithPlanPicker(a.planProviders(all), a.planChoices(), now, setPlan).
+		WithBudgetSetter(func(micros int64) (budget.Pace, bool) {
+			if err := config.SetBudget(a.Resolver.AppHome(), micros); err != nil {
+				fmt.Fprintf(a.Err, "aispend: %v\n", err)
+			}
+			st2, err := a.openStore()
+			if err != nil {
+				return budget.Pace{}, false
+			}
+			p, _, ok := a.budgetPace(st2, a.Now())
+			return p, ok
+		}).
+		WithCommitTrailer(func(sha string) (int64, bool) {
+			return trailer.ReadCommitCost(".", sha, trailerName)
+		})
 	if *watch {
 		// Live mode: every few seconds re-scan + rebuild and advance the clock, so an
 		// ongoing session grows and liveness decays without leaving the explorer.

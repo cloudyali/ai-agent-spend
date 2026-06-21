@@ -141,6 +141,16 @@ func LoadBudget(appHome string) (micros int64, ok bool, err error) {
 	return int64(f*1_000_000 + 0.5), true, nil
 }
 
+// SetBudget writes the monthly api-equivalent budget ceiling (in micros) to
+// ~/.aispend/config.toml as `budget_usd`, preserving every other line. The value is
+// rendered in dollars — the unit LoadBudget reads back. Callers validate the amount;
+// a non-positive micros simply writes a non-positive number, which LoadBudget then
+// treats as "unset".
+func SetBudget(appHome string, micros int64) error {
+	dollars := float64(micros) / 1_000_000
+	return setConfigKey(appHome, "budget_usd", strconv.FormatFloat(dollars, 'f', -1, 64))
+}
+
 func loadConfigMap(appHome string) (map[string]string, error) {
 	b, err := os.ReadFile(filepath.Join(appHome, "config.toml"))
 	if errors.Is(err, os.ErrNotExist) {

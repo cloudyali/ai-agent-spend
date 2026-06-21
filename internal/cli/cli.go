@@ -21,6 +21,7 @@ import (
 
 	"github.com/agentspend/ai-agent-spend/internal/config"
 	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/agentspend/ai-agent-spend/internal/githook"
 	"github.com/agentspend/ai-agent-spend/internal/normalize"
 	"github.com/agentspend/ai-agent-spend/internal/platform"
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
@@ -30,6 +31,7 @@ import (
 	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
 	"github.com/agentspend/ai-agent-spend/internal/scan"
 	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/agentspend/ai-agent-spend/internal/trailer"
 	"github.com/agentspend/ai-agent-spend/internal/vcs"
 )
 
@@ -80,6 +82,12 @@ func (a *App) dispatch(args []string) int {
 		return a.cmdPlans(rest)
 	case "pricing":
 		return a.cmdPricing(rest)
+	case "git":
+		return a.cmdGit(rest)
+	case "trailer":
+		return a.cmdTrailer(rest)
+	case "consume":
+		return a.cmdConsume(rest)
 	case "version", "--version", "-v":
 		fmt.Fprintf(a.Out, "aispend %s\n", Version)
 		return 0
@@ -154,6 +162,21 @@ func (a *App) repriceStored(eng *pricing.Engine) (int, error) {
 
 // --- scan ---
 
+// scanPair binds a provider to its normalizer. scanPairs builds the set the scanner
+// loop runs — shared by `scan` and the trailer hook's live refresh, so both ingest
+// the same providers identically.
+type scanPair struct {
+	p provider.Provider
+	n normalize.Normalizer
+}
+
+func (a *App) scanPairs(idh string, attr func(string) (string, string)) []scanPair {
+	return []scanPair{
+		{claudecode.New(a.Resolver), normalize.ClaudeCode{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr, RepoRoot: a.repoRoot, HeadAt: vcs.HeadAt, Churn: vcs.Numstat}},
+		{codex.New(a.Resolver), &normalize.Codex{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr}},
+	}
+}
+
 func (a *App) cmdScan(args []string) int {
 	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
@@ -174,13 +197,7 @@ func (a *App) cmdScan(args []string) int {
 	eng := a.pricingEngine()
 	idh := a.identityHash()
 
-	providers := []struct {
-		p provider.Provider
-		n normalize.Normalizer
-	}{
-		{claudecode.New(a.Resolver), normalize.ClaudeCode{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr, RepoRoot: a.repoRoot, HeadAt: vcs.HeadAt, Churn: vcs.Numstat}},
-		{codex.New(a.Resolver), &normalize.Codex{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr}},
-	}
+	providers := a.scanPairs(idh, attr)
 
 	var totalImported, totalSkipped, detected int
 	var allSkips []scan.Skip
@@ -655,6 +672,189 @@ func (a *App) applyPricingTable(cache string, data []byte) (models, repriced int
 	return len(rates), repriced, nil
 }
 
+// --- git (cost-trailer hooks) ---
+
+// cmdGit installs, removes, or reports the per-commit cost-trailer hooks. The heavy
+// lifting (core.hooksPath, refuse-to-clobber, manager detection) lives in
+// internal/githook; this stays a thin dispatch. The hooks themselves are fail-open
+// so a trailer problem never blocks a commit. See
+// design-documents/11-commit-cost-trailers.md.
+func (a *App) cmdGit(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(a.Err, "aispend: git <install|uninstall|status> [dir]")
+		return 2
+	}
+	sub, rest := args[0], args[1:]
+	dir := "."
+	if len(rest) > 0 {
+		dir = rest[0]
+	}
+	var (
+		rep githook.Report
+		err error
+	)
+	switch sub {
+	case "install":
+		rep, err = githook.Install(dir)
+	case "uninstall":
+		rep, err = githook.Uninstall(dir)
+	case "status":
+		rep, err = githook.Status(dir)
+	default:
+		fmt.Fprintf(a.Err, "aispend: unknown git subcommand %q (want install|uninstall|status)\n", sub)
+		return 2
+	}
+	if err != nil {
+		fmt.Fprintf(a.Err, "aispend: %v\n", err)
+		return 1
+	}
+	for _, line := range rep.Render() {
+		fmt.Fprintln(a.Out, line)
+	}
+	return rep.ExitCode()
+}
+
+// --- trailer / consume (invoked by the installed git hooks; hidden from help) ---
+
+// cmdTrailer is invoked by prepare-commit-msg as
+// `aispend trailer <msgfile> --source <s> [--repo <dir>]`. It ALWAYS exits 0 — a
+// trailer problem must never block a commit (fail-open). Args are hand-parsed so
+// the positional message file can precede the flags, as the hook passes them.
+func (a *App) cmdTrailer(args []string) int {
+	msgFile, source, repoDir := "", "", "."
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--source" && i+1 < len(args):
+			source = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--source="):
+			source = strings.TrimPrefix(args[i], "--source=")
+		case args[i] == "--repo" && i+1 < len(args):
+			repoDir = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--repo="):
+			repoDir = strings.TrimPrefix(args[i], "--repo=")
+		case strings.HasPrefix(args[i], "-"):
+			// ignore unknown flags — fail-open
+		default:
+			if msgFile == "" {
+				msgFile = args[i]
+			}
+		}
+	}
+	if msgFile == "" {
+		return 0
+	}
+	tcfg, err := config.LoadTrailers(repoDir)
+	if err != nil {
+		fmt.Fprintf(a.Err, "aispend: trailer: %v\n", err)
+		return 0 // fail-open
+	}
+	if !tcfg.Enabled {
+		return 0 // committed repo-wide off switch
+	}
+	if err := trailer.Trailer(repoDir, source, msgFile, toTrailerConfig(tcfg), a.pendingUsageLive, a.Now); err != nil {
+		fmt.Fprintf(a.Err, "aispend: trailer: %v\n", err)
+	}
+	return 0
+}
+
+// toTrailerConfig maps the parsed .aispend.toml [trailers] config to the engine's
+// Config. (Enabled is handled by the caller — it's a gate, not a render option.)
+func toTrailerConfig(t config.Trailers) trailer.Config {
+	return trailer.Config{
+		Cost:         t.Cost,
+		CostModels:   t.CostModels,
+		Tokens:       t.Tokens,
+		Interactions: t.Interactions,
+		Precision:    t.Precision,
+		CostName:     t.CostName,
+	}
+}
+
+// cmdConsume is invoked by post-commit as `aispend consume [--repo <dir>]`. Hidden;
+// always exits 0.
+func (a *App) cmdConsume(args []string) int {
+	repoDir := "."
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--repo" && i+1 < len(args):
+			repoDir = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "--repo="):
+			repoDir = strings.TrimPrefix(args[i], "--repo=")
+		}
+	}
+	if err := trailer.Consume(repoDir); err != nil {
+		fmt.Fprintf(a.Err, "aispend: consume: %v\n", err)
+	}
+	return 0
+}
+
+// pendingUsage is the real PendingFunc: it sums the api-equivalent cost of stored
+// events on `branch` newer than the watermark. (Scanning the live session logs at
+// commit time is a later refinement; for now a recent `aispend scan` is the source.)
+func (a *App) pendingUsage(_, branch string, since time.Time) (trailer.Usage, error) {
+	st, err := a.openStore()
+	if err != nil {
+		return trailer.Usage{}, err
+	}
+	events, err := st.Query(store.Filter{Since: since})
+	if err != nil {
+		return trailer.Usage{}, err
+	}
+	u := trailer.Usage{PerModel: map[string]int64{}, Cost: event.USD(0)}
+	for _, e := range events {
+		if e.GitBranch != branch || !e.TSStart.After(since) {
+			continue
+		}
+		m := e.CostViews.APIEquivalent
+		if m == nil {
+			continue
+		}
+		u.Cost.Micros += m.Micros
+		u.Cost.Currency = m.Currency
+		u.PerModel[e.Model] += m.Micros
+		u.Tokens += e.Tokens.Input + e.Tokens.Output + e.Tokens.CacheRead + e.Tokens.CacheWrite + e.Tokens.CacheWrite1h
+		u.Requests++
+		if e.TSEnd.After(u.MaxTS) {
+			u.MaxTS = e.TSEnd
+		}
+	}
+	return u, nil
+}
+
+// refreshLedger runs a silent, incremental scan so the trailer reflects turns logged
+// since the last `aispend scan` — "live at commit time." Best-effort: any error is
+// swallowed (the hook is fail-open and falls back to whatever the ledger already
+// holds). Incremental (Full:false), so only new session data is read.
+func (a *App) refreshLedger() {
+	st, err := a.openStore()
+	if err != nil {
+		return
+	}
+	attr := a.attribution()
+	plans := a.planSet()
+	eng := a.pricingEngine()
+	idh := a.identityHash()
+	for _, pr := range a.scanPairs(idh, attr) {
+		present, derr := pr.p.Detect()
+		if derr != nil || !present {
+			continue
+		}
+		sc := &scan.Scanner{Provider: pr.p, Normalizer: pr.n, Pricing: eng, Plan: toPricingPlan(plans.For(pr.p.Name())), Store: st, Sink: st, Now: a.Now, Full: false}
+		_, _ = sc.Run() // best-effort; the trailer falls back to the existing ledger on error
+	}
+}
+
+// pendingUsageLive is the trailer hook's PendingFunc: it live-scans first, then reads
+// the freshened ledger — so a commit stamps turns that were never explicitly scanned.
+// today's preview deliberately uses the non-scanning pendingUsage to stay fast.
+func (a *App) pendingUsageLive(repoDir, branch string, since time.Time) (trailer.Usage, error) {
+	a.refreshLedger()
+	return a.pendingUsage(repoDir, branch, since)
+}
+
 // --- doctor ---
 
 func (a *App) cmdDoctor(args []string) int {
@@ -947,6 +1147,7 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
   doctor [--network] [--paths]  prove the trust promise / show data locations
   plans                         list known subscription plans (seeded prices)
   pricing [refresh]             show the active rate source; 'refresh' pulls live LiteLLM rates
+  git <install|status|…>        install per-commit cost-trailer hooks (safe; honors hook managers)
   version                       print version
 
   report flags: --period P  --by G  --view V  --json

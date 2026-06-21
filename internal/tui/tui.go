@@ -45,6 +45,7 @@ const (
 	modeExplain // a single turn's evidence + cost breakdown (the in-TUI `explain`)
 	modePlan    // the in-explorer plan picker (set the subscription without leaving the TUI)
 	modeChain   // the prompt-chain: the session's turns in time order with a cumulative gutter
+	modeBudget  // the in-explorer budget editor (set the monthly ceiling without leaving the TUI)
 )
 
 // amortizedView is the period-level allocation lens (the subscription-arbitrage
@@ -142,6 +143,21 @@ type Model struct {
 	budgetFn   func() (budget.Pace, bool)
 	budgetPace budget.Pace
 	budgetSet  bool
+
+	// setBudget (optional; WithBudgetSetter) persists a new monthly ceiling and returns
+	// the recomputed pace, enabling the in-explorer budget editor (the `b` key).
+	// budgetBuf is the in-progress amount; budgetErr a transient validation message.
+	setBudget func(micros int64) (budget.Pace, bool)
+	budgetBuf string
+	budgetErr string
+
+	// commit-trailer badge (optional; WithCommitTrailer): commitTrailer reads the cost
+	// trailer written into a commit (the cli does the git read). selTrailer caches the
+	// drilled session's value, frozen on drill-in so the receipt never shells out to
+	// git per render.
+	commitTrailer func(sha string) (int64, bool)
+	selTrailer    int64
+	selTrailerOK  bool
 }
 
 // WithPlanPicker enables the in-explorer plan picker (the `p` key): providers is
@@ -174,6 +190,24 @@ func (m Model) WithQuota(fn func() []quota.Sample) Model {
 func (m Model) WithBudget(fn func() (budget.Pace, bool)) Model {
 	m.budgetFn = fn
 	m.refresh()
+	return m
+}
+
+// WithBudgetSetter enables the in-explorer budget editor (the `b` key): set persists
+// the chosen monthly ceiling (micros) and returns the recomputed pace + whether a
+// budget is now configured, so the gauge updates without leaving the TUI. Off by
+// default → the key is inert and unadvertised.
+func (m Model) WithBudgetSetter(set func(micros int64) (budget.Pace, bool)) Model {
+	m.setBudget = set
+	return m
+}
+
+// WithCommitTrailer enables the receipt's trailer badge: fn returns the cost trailer
+// value (micros) written into the commit at sha, and whether one exists. The cli
+// reads it from the current repo via git; a session whose commit isn't in cwd simply
+// shows no badge. Off by default.
+func (m Model) WithCommitTrailer(fn func(sha string) (int64, bool)) Model {
+	m.commitTrailer = fn
 	return m
 }
 
@@ -397,7 +431,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// q and ctrl+c quit from anywhere — including drill-downs — so q is never
 		// "back" (esc/←/h/backspace are). The plan picker owns its keys, so q is not
 		// intercepted while it is open.
-		if s := msg.String(); s == "ctrl+c" || (s == "q" && m.mode != modePlan) {
+		if s := msg.String(); s == "ctrl+c" || (s == "q" && m.mode != modePlan && m.mode != modeBudget) {
 			return m, tea.Quit
 		}
 		switch m.mode {
@@ -510,6 +544,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case modeBudget:
+			switch msg.String() {
+			case "esc":
+				m.mode = modeList
+				m.budgetBuf, m.budgetErr = "", ""
+			case "enter":
+				if d, err := strconv.ParseFloat(strings.TrimSpace(m.budgetBuf), 64); err != nil || d <= 0 {
+					m.budgetErr = "enter a positive dollar amount"
+				} else if m.setBudget != nil {
+					m.budgetPace, m.budgetSet = m.setBudget(int64(d*1_000_000 + 0.5))
+					m.budgetBuf, m.budgetErr = "", ""
+					m.mode = modeList
+				}
+			case "backspace":
+				if n := len(m.budgetBuf); n > 0 {
+					m.budgetBuf = m.budgetBuf[:n-1]
+				}
+			default:
+				if s := msg.String(); len(s) == 1 && (s == "." || (s[0] >= '0' && s[0] <= '9')) {
+					m.budgetBuf += s
+				}
+			}
+			return m, nil
 		default: // modeList
 			switch msg.String() {
 			case "up", "k":
@@ -543,6 +600,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.picker = newPlanPicker(m.providers, m.plans, m.today)
 					m.mode = modePlan
 				}
+			case "b":
+				if m.setBudget != nil {
+					m.mode = modeBudget
+					m.budgetBuf, m.budgetErr = "", ""
+				}
 			case "enter":
 				if len(m.rows) > 0 {
 					m.sel = m.rows[m.cursor]
@@ -552,6 +614,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.selFiles = receiptFiles(m.sel.evs) // freeze the receipt's lists
 					m.selTurns = topTurns(m.sel.evs, 5)
+					m.selTrailer, m.selTrailerOK = 0, false
+					if m.commitTrailer != nil { // freeze the commit's trailer once, not per render
+						if sha := latestSHA(m.sel.evs); sha != "" {
+							m.selTrailer, m.selTrailerOK = m.commitTrailer(sha)
+						}
+					}
 					m.recCursor = 0 // start on the priciest file (or the top turn when fileless)
 					m.mode = modeReceipt
 				}
@@ -573,9 +641,24 @@ func (m Model) View() string {
 		return m.picker.View()
 	case modeChain:
 		return m.chainView()
+	case modeBudget:
+		return m.budgetView()
 	default:
 		return m.listView()
 	}
+}
+
+// budgetView is the in-explorer budget editor: a single numeric field for the
+// monthly ceiling, persisted via setBudget on enter (esc cancels).
+func (m Model) budgetView() string {
+	var b strings.Builder
+	b.WriteString(stBold.Render("Set monthly budget") + "\n\n")
+	b.WriteString("  $" + m.budgetBuf + "▏\n\n")
+	if m.budgetErr != "" {
+		b.WriteString(stBold.Render("  "+m.budgetErr) + "\n\n")
+	}
+	b.WriteString(stFaint.Render("  a monthly api-equivalent ceiling (informational) · enter to save · esc to cancel") + "\n")
+	return b.String()
 }
 
 // --- list view -------------------------------------------------------------
@@ -603,6 +686,9 @@ func (m Model) listView() string {
 	parts = append(parts, "↑/↓ move", "↵ receipt")
 	if m.setPlan != nil {
 		parts = append(parts, "p set plan")
+	}
+	if m.setBudget != nil {
+		parts = append(parts, "b budget")
 	}
 	parts = append(parts, "q quit")
 	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n")
@@ -801,6 +887,9 @@ func (m Model) receiptView() string {
 	b.WriteString(stFaint.Render(fmt.Sprintf("%d %s over %s elapsed%s", len(s.evs), turnsWord(len(s.evs)), elapsed(s.last.Sub(s.first)), subNote)) + "\n")
 	if vcs := sessionVCSLine(s.evs); vcs != "" {
 		b.WriteString("  branch      " + stFaint.Render(vcs) + "\n")
+	}
+	if line := m.trailerBadge(s.evs); line != "" {
+		b.WriteString(line + "\n")
 	}
 	b.WriteString("\n")
 
@@ -1648,6 +1737,51 @@ func shortSHA(s string) string {
 		return string(r[:10])
 	}
 	return s
+}
+
+// trailerBadge renders the "this commit's cost is in git" line: the cost trailer
+// written into the session's latest commit (cached on drill-in), reconciled against
+// the ledger's api-equivalent for that same commit. Empty when no trailer is known
+// (no fn wired, or a session whose commit isn't in this repo).
+func (m Model) trailerBadge(evs []event.AgentEvent) string {
+	if !m.selTrailerOK {
+		return ""
+	}
+	sha := latestSHA(evs)
+	var ledger int64
+	for _, e := range evs {
+		if e.GitSHA == sha {
+			if mny := e.CostViews.APIEquivalent; mny != nil {
+				ledger += mny.Micros
+			}
+		}
+	}
+	return "  trailer     " + stBold.Render("✓ "+money(m.selTrailer)) +
+		stFaint.Render(" in git · ledger "+money(ledger)+reconLabel(m.selTrailer, ledger))
+}
+
+// latestSHA returns the full commit SHA of the session's last turn that carries one.
+func latestSHA(evs []event.AgentEvent) string {
+	for i := len(evs) - 1; i >= 0; i-- {
+		if evs[i].GitSHA != "" {
+			return evs[i].GitSHA
+		}
+	}
+	return ""
+}
+
+// reconLabel compares the git trailer against the ledger: "✓ match" when equal, else
+// the signed delta — the reconciliation's whole point.
+func reconLabel(trailerMicros, ledgerMicros int64) string {
+	d := trailerMicros - ledgerMicros
+	if d == 0 {
+		return " · ✓ match"
+	}
+	sign := "+"
+	if d < 0 {
+		sign, d = "-", -d
+	}
+	return " · Δ " + sign + money(d)
 }
 
 // fileRow is one row of the receipt's cost+churn heatmap: a real file, its
