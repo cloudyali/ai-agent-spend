@@ -65,6 +65,69 @@ func LoadTrailers(repoDir string) (Trailers, error) {
 	return t, nil
 }
 
+// SetTrailers writes the [trailers] (and [trailers.rename]) config into repoDir's
+// .aispend.toml, replacing any existing trailers sections and preserving every other
+// line. Used by the in-explorer trailers editor.
+func SetTrailers(repoDir string, t Trailers) error {
+	path := filepath.Join(repoDir, ".aispend.toml")
+	var lines []string
+	if b, err := os.ReadFile(path); err == nil {
+		if s := strings.TrimRight(string(b), "\n"); s != "" {
+			lines = strings.Split(s, "\n")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	lines = dropSections(lines, "trailers", "trailers.rename")
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	var b strings.Builder
+	if len(lines) > 0 {
+		b.WriteString(strings.Join(lines, "\n"))
+		b.WriteString("\n\n")
+	}
+	b.WriteString("[trailers]\n")
+	b.WriteString("enabled = " + strconv.FormatBool(t.Enabled) + "\n")
+	b.WriteString("cost = " + strconv.FormatBool(t.Cost) + "\n")
+	b.WriteString("cost_models = " + strconv.FormatBool(t.CostModels) + "\n")
+	b.WriteString("tokens = " + strconv.FormatBool(t.Tokens) + "\n")
+	b.WriteString("interactions = " + strconv.FormatBool(t.Interactions) + "\n")
+	b.WriteString("precision = " + strconv.Itoa(t.Precision) + "\n")
+	if t.CostName != "" && t.CostName != "AI-Cost" {
+		b.WriteString("\n[trailers.rename]\ncost = " + strconv.Quote(t.CostName) + "\n")
+	}
+	if err := os.MkdirAll(repoDir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// dropSections returns lines with the named [section] blocks removed (the header
+// through the line before the next [section] or EOF), preserving all other content.
+func dropSections(lines []string, names ...string) []string {
+	drop := map[string]bool{}
+	for _, n := range names {
+		drop[n] = true
+	}
+	var out []string
+	skipping := false
+	for _, ln := range lines {
+		s := strings.TrimSpace(ln)
+		if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+			skipping = drop[strings.TrimSpace(s[1:len(s)-1])]
+			if skipping {
+				continue
+			}
+		} else if skipping {
+			continue
+		}
+		out = append(out, ln)
+	}
+	return out
+}
+
 func setBool(m map[string]string, key string, dst *bool) {
 	switch strings.ToLower(strings.TrimSpace(m[key])) {
 	case "true":

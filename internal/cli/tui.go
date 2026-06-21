@@ -32,6 +32,16 @@ import (
 // no-arg default (cmdDefault) may open it. The offline build sets it false.
 const tuiBuilt = true
 
+// toTUITrailers / fromTUITrailers bridge config.Trailers and the tui's editor struct,
+// keeping the tui package free of a config dependency.
+func toTUITrailers(t config.Trailers) tui.TrailerSettings {
+	return tui.TrailerSettings{Enabled: t.Enabled, Cost: t.Cost, CostModels: t.CostModels, Tokens: t.Tokens, Interactions: t.Interactions, Precision: t.Precision, CostName: t.CostName}
+}
+
+func fromTUITrailers(t tui.TrailerSettings) config.Trailers {
+	return config.Trailers{Enabled: t.Enabled, Cost: t.Cost, CostModels: t.CostModels, Tokens: t.Tokens, Interactions: t.Interactions, Precision: t.Precision, CostName: t.CostName}
+}
+
 func (a *App) cmdTui(args []string) int {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
@@ -105,11 +115,16 @@ func (a *App) cmdTui(args []string) int {
 		return buildPeriods()
 	}
 
-	// The receipt's trailer badge reads the configured cost-trailer name once here, so
-	// it isn't re-parsed per render; the git read itself is cached on drill-in.
-	trailerName := "AI-Cost"
-	if tc, err := config.LoadTrailers("."); err == nil && tc.CostName != "" {
-		trailerName = tc.CostName
+	// Load the repo's [trailers] config once: the receipt badge uses the cost name, the
+	// in-explorer editor seeds + writes the whole block. (The git read is cached on
+	// drill-in, so it isn't re-parsed per render.)
+	trailerCfg := config.DefaultTrailers()
+	if tc, err := config.LoadTrailers("."); err == nil {
+		trailerCfg = tc
+	}
+	trailerName := trailerCfg.CostName
+	if trailerName == "" {
+		trailerName = "AI-Cost"
 	}
 
 	m := tui.New(periods, startIdx, a.pricingEngine()).WithNow(now).
@@ -138,6 +153,9 @@ func (a *App) cmdTui(args []string) int {
 		}).
 		WithCommitTrailer(func(sha string) (int64, bool) {
 			return trailer.ReadCommitCost(".", sha, trailerName)
+		}).
+		WithTrailerSettings(toTUITrailers(trailerCfg), func(ts tui.TrailerSettings) error {
+			return config.SetTrailers(".", fromTUITrailers(ts))
 		})
 	if *watch {
 		// Live mode: every few seconds re-scan + rebuild and advance the clock, so an

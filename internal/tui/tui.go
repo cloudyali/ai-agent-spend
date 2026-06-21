@@ -41,11 +41,12 @@ type mode int
 const (
 	modeList mode = iota
 	modeReceipt
-	modeFile    // a single file's receipt: the turns (evidence) that touched it
-	modeExplain // a single turn's evidence + cost breakdown (the in-TUI `explain`)
-	modePlan    // the in-explorer plan picker (set the subscription without leaving the TUI)
-	modeChain   // the prompt-chain: the session's turns in time order with a cumulative gutter
-	modeBudget  // the in-explorer budget editor (set the monthly ceiling without leaving the TUI)
+	modeFile     // a single file's receipt: the turns (evidence) that touched it
+	modeExplain  // a single turn's evidence + cost breakdown (the in-TUI `explain`)
+	modePlan     // the in-explorer plan picker (set the subscription without leaving the TUI)
+	modeChain    // the prompt-chain: the session's turns in time order with a cumulative gutter
+	modeBudget   // the in-explorer budget editor (set the monthly ceiling without leaving the TUI)
+	modeTrailers // the in-explorer [trailers] editor (toggle which trailers attach)
 )
 
 // amortizedView is the period-level allocation lens (the subscription-arbitrage
@@ -57,6 +58,41 @@ const amortizedView = "amortized"
 // estimated mirrors api-equivalent in 0A so it is omitted; only views actually
 // present in the data are offered, so `v` never lands on an all-$0 screen.
 var cycleViews = []string{"api_equivalent", "reported", "billed", "marginal"}
+
+// TrailerSettings is the editable subset of a repo's [trailers] config, surfaced by
+// the in-explorer trailers editor (the `t` key). The cli maps it to/from
+// config.Trailers, so this package needs no config dependency.
+type TrailerSettings struct {
+	Enabled      bool
+	Cost         bool
+	CostModels   bool
+	Tokens       bool
+	Interactions bool
+	Precision    int
+	CostName     string
+}
+
+func (t *TrailerSettings) toggle(i int) {
+	switch i {
+	case 0:
+		t.Enabled = !t.Enabled
+	case 1:
+		t.Cost = !t.Cost
+	case 2:
+		t.CostModels = !t.CostModels
+	case 3:
+		t.Tokens = !t.Tokens
+	case 4:
+		t.Interactions = !t.Interactions
+	}
+}
+
+func (t TrailerSettings) costLabel() string {
+	if t.CostName == "" {
+		return "AI-Cost"
+	}
+	return t.CostName
+}
 
 // Model is the Bubble Tea model. Update/View are pure over messages, so the whole
 // interaction is testable by feeding tea.KeyMsg values — no terminal required.
@@ -158,6 +194,14 @@ type Model struct {
 	commitTrailer func(sha string) (int64, bool)
 	selTrailer    int64
 	selTrailerOK  bool
+
+	// in-explorer [trailers] editor (optional; WithTrailerSettings). setTrailers
+	// persists the edited config to the repo's .aispend.toml; trailerEdit is the
+	// working copy, trailerCur the last-loaded state seeded on open.
+	setTrailers   func(TrailerSettings) error
+	trailerCur    TrailerSettings
+	trailerEdit   TrailerSettings
+	trailerCursor int
 }
 
 // WithPlanPicker enables the in-explorer plan picker (the `p` key): providers is
@@ -208,6 +252,15 @@ func (m Model) WithBudgetSetter(set func(micros int64) (budget.Pace, bool)) Mode
 // shows no badge. Off by default.
 func (m Model) WithCommitTrailer(fn func(sha string) (int64, bool)) Model {
 	m.commitTrailer = fn
+	return m
+}
+
+// WithTrailerSettings enables the in-explorer trailers editor (the `t` key): cur is
+// the repo's current [trailers] config, save persists the edited copy to .aispend.toml.
+// Off by default → the key is inert and unadvertised.
+func (m Model) WithTrailerSettings(cur TrailerSettings, save func(TrailerSettings) error) Model {
+	m.trailerCur = cur
+	m.setTrailers = save
 	return m
 }
 
@@ -431,7 +484,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// q and ctrl+c quit from anywhere — including drill-downs — so q is never
 		// "back" (esc/←/h/backspace are). The plan picker owns its keys, so q is not
 		// intercepted while it is open.
-		if s := msg.String(); s == "ctrl+c" || (s == "q" && m.mode != modePlan && m.mode != modeBudget) {
+		if s := msg.String(); s == "ctrl+c" || (s == "q" && m.mode != modePlan && m.mode != modeBudget && m.mode != modeTrailers) {
 			return m, tea.Quit
 		}
 		switch m.mode {
@@ -567,6 +620,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case modeTrailers:
+			switch msg.String() {
+			case "esc":
+				m.mode = modeList // cancel (discard edits)
+			case "s":
+				if m.setTrailers != nil {
+					_ = m.setTrailers(m.trailerEdit) // best-effort persist to .aispend.toml
+				}
+				m.mode = modeList
+			case "up", "k":
+				if m.trailerCursor > 0 {
+					m.trailerCursor--
+				}
+			case "down", "j":
+				if m.trailerCursor < 5 {
+					m.trailerCursor++
+				}
+			case " ", "x", "enter":
+				m.trailerEdit.toggle(m.trailerCursor)
+			case "left", "h", "-":
+				if m.trailerCursor == 5 && m.trailerEdit.Precision > 0 {
+					m.trailerEdit.Precision--
+				}
+			case "right", "l", "+", "=":
+				if m.trailerCursor == 5 && m.trailerEdit.Precision < 8 {
+					m.trailerEdit.Precision++
+				}
+			}
+			return m, nil
 		default: // modeList
 			switch msg.String() {
 			case "up", "k":
@@ -604,6 +686,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.setBudget != nil {
 					m.mode = modeBudget
 					m.budgetBuf, m.budgetErr = "", ""
+				}
+			case "t":
+				if m.setTrailers != nil {
+					m.trailerEdit = m.trailerCur // edit a working copy of the current config
+					m.trailerCursor = 0
+					m.mode = modeTrailers
 				}
 			case "enter":
 				if len(m.rows) > 0 {
@@ -643,6 +731,8 @@ func (m Model) View() string {
 		return m.chainView()
 	case modeBudget:
 		return m.budgetView()
+	case modeTrailers:
+		return m.trailersView()
 	default:
 		return m.listView()
 	}
@@ -658,6 +748,37 @@ func (m Model) budgetView() string {
 		b.WriteString(stBold.Render("  "+m.budgetErr) + "\n\n")
 	}
 	b.WriteString(stFaint.Render("  a monthly api-equivalent ceiling (informational) · enter to save · esc to cancel") + "\n")
+	return b.String()
+}
+
+// trailersView is the in-explorer [trailers] editor: a toggle list of which trailers
+// attach, plus precision, persisted to the repo's .aispend.toml on save.
+func (m Model) trailersView() string {
+	e := m.trailerEdit
+	chk := func(on bool) string {
+		if on {
+			return "[x]"
+		}
+		return "[ ]"
+	}
+	rows := [][2]string{
+		{"enabled", chk(e.Enabled)},
+		{e.costLabel() + " (total)", chk(e.Cost)},
+		{"per-model", chk(e.CostModels)},
+		{"tokens", chk(e.Tokens)},
+		{"interactions", chk(e.Interactions)},
+		{"precision", strconv.Itoa(e.Precision)},
+	}
+	var b strings.Builder
+	b.WriteString(stBold.Render("Trailer settings") + stFaint.Render("  ·  saved to ./.aispend.toml") + "\n\n")
+	for i, r := range rows {
+		cursor := "  "
+		if i == m.trailerCursor {
+			cursor = stBold.Render("› ")
+		}
+		b.WriteString(cursor + fmt.Sprintf("%-20s %s", r[0], r[1]) + "\n")
+	}
+	b.WriteString("\n" + stFaint.Render("  ↑/↓ move · space toggle · ←/→ precision · s save · esc cancel") + "\n")
 	return b.String()
 }
 
@@ -689,6 +810,9 @@ func (m Model) listView() string {
 	}
 	if m.setBudget != nil {
 		parts = append(parts, "b budget")
+	}
+	if m.setTrailers != nil {
+		parts = append(parts, "t trailers")
 	}
 	parts = append(parts, "q quit")
 	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n")

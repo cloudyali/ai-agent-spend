@@ -58,6 +58,12 @@ green (`go test ./...`), reviews passed, offline / `doctor --network` intact:
   hashes repo paths, this resolves only for commits in the current repo (cwd); a session
   from another repo simply shows no badge — honest, not a guess.
 
+- **Increment 7 — TUI trailers editor.** The `t` key in the explorer opens a toggle form
+  for the `[trailers]` config (enabled / cost / per-model / tokens / interactions, plus
+  precision), persisted to the repo's `.aispend.toml` via `config.SetTrailers` (a
+  section writer that preserves all other content). So the install hint "tune them in
+  .aispend.toml" no longer means hand-editing TOML.
+
 **Build-out complete** for the local path: installer, engine (trailer/consume/watermark),
 `.aispend.toml [trailers]` config, the `today` pending preview, live-scan-at-commit-time,
 and the receipt badge — all shipped under t-wada TDD with code + security review, the
