@@ -64,6 +64,16 @@ green (`go test ./...`), reviews passed, offline / `doctor --network` intact:
   section writer that preserves all other content). So the install hint "tune them in
   .aispend.toml" no longer means hand-editing TOML.
 
+- **Increment 8 — hook binary resolution (multi-environment).** The installed shim no
+  longer calls bare `aispend` (which silently no-ops when it isn't on PATH). It resolves,
+  in order: `$AISPEND_BIN` → the install-time absolute path (`os.Executable()`, embedded
+  at `git install`) → PATH → repo-local `./aispend`, then fail-open. This lets one shared
+  `.git/hooks` work across environments (a stale install-time path falls through), and is
+  exactly what's needed when a sandbox/CI clone commits: set `AISPEND_BIN` or drop a built
+  `./aispend` in the repo. Note the orthogonal limit — a trailer can only be *computed*
+  where the `~/.claude` session logs live, so an env that commits but didn't run the AI
+  has nothing to stamp (Case B in the multi-environment discussion).
+
 **Build-out complete** for the local path: installer, engine (trailer/consume/watermark),
 `.aispend.toml [trailers]` config, the `today` pending preview, live-scan-at-commit-time,
 and the receipt badge — all shipped under t-wada TDD with code + security review, the

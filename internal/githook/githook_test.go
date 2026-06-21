@@ -10,12 +10,16 @@ import (
 
 // --- pure unit tests (no git binary needed) ---
 
-func TestHookScript_AbsPathFailOpenAndMarker(t *testing.T) {
+func TestHookScript_ResolvesBinFailOpenAndMarker(t *testing.T) {
 	bin := "/opt/aispend/aispend"
 	pre := hookScript("prepare-commit-msg", bin)
-	// Embeds the install-time absolute path (so it fires without aispend on PATH),
-	// keeps a PATH fallback, and stays fail-open.
-	for _, want := range []string{"#!/bin/sh", markerLine, bin, "trailer", `"$1"`, "command -v aispend", "exit 0"} {
+	// Resolution order baked into the shim: $AISPEND_BIN → install-time path → PATH →
+	// repo-local ./aispend; fail-open throughout. Multiple environments can share one
+	// .git/hooks (a stale install-time path simply falls through to PATH / ./aispend).
+	for _, want := range []string{
+		"#!/bin/sh", markerLine, "AISPEND_BIN", bin, "command -v aispend", "show-toplevel",
+		"trailer", `"$1"`, "exit 0",
+	} {
 		if !strings.Contains(pre, want) {
 			t.Errorf("prepare-commit-msg script missing %q:\n%s", want, pre)
 		}
@@ -24,8 +28,10 @@ func TestHookScript_AbsPathFailOpenAndMarker(t *testing.T) {
 		t.Errorf("prepare-commit-msg must be fail-open (|| true):\n%s", pre)
 	}
 	post := hookScript("post-commit", bin)
-	if !strings.Contains(post, "consume") || !strings.Contains(post, bin) || !strings.Contains(post, markerLine) {
-		t.Errorf("post-commit script wrong:\n%s", post)
+	for _, want := range []string{"consume", "AISPEND_BIN", bin, markerLine} {
+		if !strings.Contains(post, want) {
+			t.Errorf("post-commit script missing %q:\n%s", want, post)
+		}
 	}
 }
 
