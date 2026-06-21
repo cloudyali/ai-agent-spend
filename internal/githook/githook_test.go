@@ -10,25 +10,27 @@ import (
 
 // --- pure unit tests (no git binary needed) ---
 
-func TestHookScript_FailOpenAndMarker(t *testing.T) {
-	pre := hookScript("prepare-commit-msg")
-	for _, want := range []string{"#!/bin/sh", markerLine, "aispend trailer", `"$1"`, "exit 0"} {
+func TestHookScript_AbsPathFailOpenAndMarker(t *testing.T) {
+	bin := "/opt/aispend/aispend"
+	pre := hookScript("prepare-commit-msg", bin)
+	// Embeds the install-time absolute path (so it fires without aispend on PATH),
+	// keeps a PATH fallback, and stays fail-open.
+	for _, want := range []string{"#!/bin/sh", markerLine, bin, "trailer", `"$1"`, "command -v aispend", "exit 0"} {
 		if !strings.Contains(pre, want) {
 			t.Errorf("prepare-commit-msg script missing %q:\n%s", want, pre)
 		}
 	}
-	// Fail-open: the shim must never let a failing aispend abort the commit.
 	if !strings.Contains(pre, "|| true") {
 		t.Errorf("prepare-commit-msg must be fail-open (|| true):\n%s", pre)
 	}
-	post := hookScript("post-commit")
-	if !strings.Contains(post, "aispend consume") || !strings.Contains(post, markerLine) {
+	post := hookScript("post-commit", bin)
+	if !strings.Contains(post, "consume") || !strings.Contains(post, bin) || !strings.Contains(post, markerLine) {
 		t.Errorf("post-commit script wrong:\n%s", post)
 	}
 }
 
 func TestIsOurHook(t *testing.T) {
-	if !isOurHook(hookScript("post-commit")) {
+	if !isOurHook(hookScript("post-commit", "/x/aispend")) {
 		t.Error("our own script must be recognized as ours")
 	}
 	foreign := "#!/bin/sh\nnpx husky run\n"

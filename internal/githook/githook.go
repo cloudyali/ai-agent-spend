@@ -142,9 +142,10 @@ func Install(repoDir string) (Report, error) {
 	if err := os.MkdirAll(lay.HooksDir, 0o755); err != nil {
 		return Report{}, err
 	}
+	bin := aispendBinary()
 	for _, name := range hookNames {
 		p := filepath.Join(lay.HooksDir, name)
-		if err := os.WriteFile(p, []byte(hookScript(name)), 0o755); err != nil {
+		if err := os.WriteFile(p, []byte(hookScript(name, bin)), 0o755); err != nil {
 			return Report{}, err
 		}
 		// Re-assert the exec bit: WriteFile's mode is masked by umask, and a hook
@@ -305,23 +306,46 @@ func wiringDetectedIn(paths []string) bool {
 // hookScript is the shim written for a hook. It is fail-open by construction: it
 // only calls aispend when present, swallows any error (|| true), and exits 0 so a
 // trailer problem can never abort the user's commit.
-func hookScript(name string) string {
-	var invocation string
+func hookScript(name, bin string) string {
+	var verb string
 	switch name {
 	case "prepare-commit-msg":
-		invocation = `aispend trailer "$1" --source "${2:-}"`
+		verb = `trailer "$1" --source "${2:-}"`
 	case "post-commit":
-		invocation = `aispend consume`
+		verb = `consume`
 	}
 	return strings.Join([]string{
 		"#!/bin/sh",
 		markerLine,
 		"# " + name + ": records the API-equivalent cost of Claude Code / Codex activity as a git trailer.",
 		"# Fail-open by design — a missing or failing aispend never blocks your commit.",
-		`command -v aispend >/dev/null 2>&1 && ` + invocation + ` || true`,
+		"# Prefer the aispend that ran 'git install'; fall back to PATH.",
+		"bin=" + shellQuote(bin),
+		`[ -x "$bin" ] || bin="$(command -v aispend 2>/dev/null)"`,
+		`[ -n "$bin" ] && "$bin" ` + verb + ` || true`,
 		"exit 0",
 		"",
 	}, "\n")
+}
+
+// shellQuote single-quotes s for safe embedding in a /bin/sh script (a path can
+// contain spaces; a stray quote is escaped).
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// aispendBinary is the absolute path of the running binary, embedded into the hook so
+// it fires even when `aispend` isn't on PATH. Falls back to the bare name (PATH
+// lookup) if the path can't be resolved.
+func aispendBinary() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "aispend"
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		return resolved
+	}
+	return exe
 }
 
 func isOurHook(content string) bool { return strings.Contains(content, markerSentinel) }
