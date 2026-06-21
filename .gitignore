@@ -28,3 +28,7 @@ coverage.html
 
 # vendored deps - kept local, not committed (use go mod download)
 /vendor/
+
+# stray editor/bridge temp copies (e.g. foo.go.1543530090915827819)
+*.go.[0-9]*
+*-go-tmp-*
