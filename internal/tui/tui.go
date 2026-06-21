@@ -878,27 +878,60 @@ func (m Model) trailersView() string {
 // the title + an in-git trailer badge when available.
 func (m Model) commitsView() string {
 	var b strings.Builder
-	b.WriteString(stBold.Render("commits") + stFaint.Render(" · ledger-sourced (git enriches title + the in-git trailer)") + "\n\n")
+	// Fixed header (title + legend) — always visible; the list scrolls under it.
+	b.WriteString(stBold.Render("commits") + stFaint.Render(fmt.Sprintf(" · %d · ledger-sourced (git enriches the title + in-git trailer)", len(m.commits))) + "\n")
+	b.WriteString(stFaint.Render("  ↑/↓ move · ↵ detail · esc back · q quit") + "\n\n")
 	if len(m.commits) == 0 {
-		b.WriteString(stFaint.Render("  (no commits with ledger spend in view)") + "\n")
+		b.WriteString(stFaint.Render("  (no commits with ledger spend)") + "\n")
 		return b.String()
 	}
-	for i, c := range m.commits {
+	start, end := m.commitWindow(len(m.commits))
+	if start > 0 {
+		b.WriteString(stFaint.Render(fmt.Sprintf("     ↑ %d more", start)) + "\n")
+	}
+	for i := start; i < end; i++ {
+		c := m.commits[i]
 		cursor := "  "
 		if i == m.commitCursor {
 			cursor = stBold.Render("› ")
 		}
 		row := fmt.Sprintf("%-11s %10s  %3d turns", shortSHA(c.SHA), money(c.Micros), c.Turns)
 		if c.Title != "" {
-			row += "  " + trunc(c.Title, 48)
+			row += "  " + trunc(c.Title, 46)
 		}
 		if c.HasTrailer {
 			row += "  " + stOutput.Render("✓ trailer")
 		}
 		b.WriteString(cursor + row + "\n")
 	}
-	b.WriteString("\n" + stFaint.Render("  ↑/↓ move · ↵ detail · esc back · q quit") + "\n")
+	if end < len(m.commits) {
+		b.WriteString(stFaint.Render(fmt.Sprintf("     ↓ %d more", len(m.commits)-end)) + "\n")
+	}
 	return b.String()
+}
+
+// commitWindow returns the [start,end) slice of the commit list that fits the terminal
+// height, keeping the cursor visible — the list scrolls under the fixed header.
+func (m Model) commitWindow(n int) (int, int) {
+	visible := m.h - 5 // header (2) + blank (1) + the two "N more" indicator lines
+	if m.h <= 0 || visible >= n {
+		return 0, n
+	}
+	if visible < 1 {
+		visible = 1
+	}
+	start := 0
+	if m.commitCursor >= visible {
+		start = m.commitCursor - visible + 1
+	}
+	end := start + visible
+	if end > n {
+		end = n
+		if start = end - visible; start < 0 {
+			start = 0
+		}
+	}
+	return start, end
 }
 
 // commitDetailView is one commit: the full message (when git-enriched) and the cost

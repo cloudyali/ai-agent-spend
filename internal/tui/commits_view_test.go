@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -8,6 +9,37 @@ import (
 
 	"github.com/agentspend/ai-agent-spend/internal/pricing"
 )
+
+func TestModel_CommitsWindowing(t *testing.T) {
+	commits := make([]Commit, 30)
+	for i := range commits {
+		commits[i] = Commit{SHA: fmt.Sprintf("%02d00000000aaaa", i), Micros: int64(i+1) * 1000, Turns: i}
+	}
+	m := New([]Period{{Label: "today"}}, 0, pricing.NewEngine()).WithCommits(func() []Commit { return commits })
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 12}) // short terminal
+	m = nm.(Model)
+	nm, _ = m.Update(runeKey('c'))
+	m = nm.(Model)
+
+	v := m.View()
+	if !strings.Contains(v, "commits") {
+		t.Errorf("header must stay visible:\n%s", v)
+	}
+	if !strings.Contains(v, "more") {
+		t.Errorf("a long list in a short terminal must show a 'more' indicator:\n%s", v)
+	}
+	if strings.Contains(v, shortSHA(commits[29].SHA)) {
+		t.Errorf("the last commit should be windowed out at the top:\n%s", v)
+	}
+	// Scroll to the bottom: the last commit comes into view (cursor stays on screen).
+	for i := 0; i < 29; i++ {
+		nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = nm.(Model)
+	}
+	if v := m.View(); !strings.Contains(v, shortSHA(commits[29].SHA)) {
+		t.Errorf("the last commit must be visible after scrolling down:\n%s", v)
+	}
+}
 
 func TestModel_CommitsView(t *testing.T) {
 	eng := pricing.NewEngine()
