@@ -112,6 +112,7 @@ type Commit struct {
 	Branch        string
 	Micros        int64
 	Turns         int
+	When          time.Time // ledger work-time (maxTS) for this commit — git-independent
 	Title         string
 	Body          string
 	TrailerMicros int64
@@ -895,9 +896,13 @@ func (m Model) commitsView() string {
 		if i == m.commitCursor {
 			cursor = stBold.Render("› ")
 		}
-		row := fmt.Sprintf("%-11s %10s  %3d turns", shortSHA(c.SHA), money(c.Micros), c.Turns)
+		when := ""
+		if !c.When.IsZero() {
+			when = c.When.In(time.Local).Format("Jan 2 15:04")
+		}
+		row := fmt.Sprintf("%-11s %10s  %3d turns  %-12s", shortSHA(c.SHA), money(c.Micros), c.Turns, when)
 		if c.Title != "" {
-			row += "  " + trunc(c.Title, 46)
+			row += "  " + trunc(c.Title, 40)
 		}
 		if c.HasTrailer {
 			row += "  " + stOutput.Render("✓ trailer")
@@ -942,6 +947,9 @@ func (m Model) commitDetailView() string {
 	hdr := shortSHA(c.SHA)
 	if c.Branch != "" {
 		hdr += "  ·  " + c.Branch
+	}
+	if !c.When.IsZero() {
+		hdr += "  ·  " + c.When.In(time.Local).Format("Mon Jan 2 15:04")
 	}
 	b.WriteString(stBold.Render(hdr) + "\n\n")
 	if c.Title != "" {

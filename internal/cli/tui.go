@@ -81,7 +81,7 @@ func (a *App) buildCommits(events []event.AgentEvent, trailerName string) []tui.
 	commits := make([]tui.Commit, 0, len(order))
 	for _, sha := range order {
 		g := byCommit[sha]
-		c := tui.Commit{SHA: sha, Branch: g.branch, Micros: g.micros, Turns: g.turns}
+		c := tui.Commit{SHA: sha, Branch: g.branch, Micros: g.micros, Turns: g.turns, When: g.maxTS}
 		if subj, body, ok := trailer.ReadCommitMessage(".", sha); ok { // optional git enrichment
 			c.Title, c.Body = subj, body
 			if tm, has := trailer.ParseCostTrailer(body, trailerName); has {

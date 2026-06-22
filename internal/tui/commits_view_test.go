@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -42,9 +43,11 @@ func TestModel_CommitsWindowing(t *testing.T) {
 }
 
 func TestModel_CommitsView(t *testing.T) {
+	defer func(l *time.Location) { time.Local = l }(time.Local)
+	time.Local = time.UTC // pin so the rendered timestamp is deterministic
 	eng := pricing.NewEngine()
 	commits := []Commit{
-		{SHA: "abcdef1234567890", Branch: "main", Micros: 1234000, Turns: 34, Title: "feat: add the thing", Body: "details here", TrailerMicros: 1234000, HasTrailer: true},
+		{SHA: "abcdef1234567890", Branch: "main", Micros: 1234000, Turns: 34, When: time.Date(2026, 6, 21, 19, 13, 0, 0, time.UTC), Title: "feat: add the thing", Body: "details here", TrailerMicros: 1234000, HasTrailer: true},
 		{SHA: "0011223344556677", Branch: "main", Micros: 500000, Turns: 5}, // git-independent: no title/trailer
 	}
 	m := New([]Period{{Label: "today"}}, 0, eng).WithCommits(func() []Commit { return commits })
@@ -60,7 +63,7 @@ func TestModel_CommitsView(t *testing.T) {
 		t.Fatalf("c should open the commit view, mode=%v", m.mode)
 	}
 	list := m.View()
-	for _, want := range []string{"commits", "abcdef1234", "$1.23", "34 turns", "feat: add the thing", "✓ trailer", "0011223344", "$0.50"} {
+	for _, want := range []string{"commits", "abcdef1234", "$1.23", "34 turns", "Jun 21 19:13", "feat: add the thing", "✓ trailer", "0011223344", "$0.50"} {
 		if !strings.Contains(list, want) {
 			t.Errorf("commits list missing %q:\n%s", want, list)
 		}
@@ -72,7 +75,7 @@ func TestModel_CommitsView(t *testing.T) {
 		t.Fatalf("enter should open the commit detail, mode=%v", m.mode)
 	}
 	detail := m.View()
-	for _, want := range []string{"abcdef1234", "feat: add the thing", "details here", "ledger", "$1.23", "trailer", "match"} {
+	for _, want := range []string{"abcdef1234", "feat: add the thing", "details here", "Jun 21 19:13", "ledger", "$1.23", "trailer", "match"} {
 		if !strings.Contains(detail, want) {
 			t.Errorf("commit detail missing %q:\n%s", want, detail)
 		}
