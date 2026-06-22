@@ -81,7 +81,32 @@ green (`go test ./...`), reviews passed, offline / `doctor --network` intact:
   gains the commit title and an in-git-trailer badge, and the detail drill (↵) shows the
   full message + a ledger-vs-trailer reconciliation. Degrades gracefully to ledger-only
   (`trailer.ReadCommitMessage` / `ParseCostTrailer` are best-effort). `tui` stays git-free
-  — the cli injects `[]Commit` via `WithCommits`.
+  — the cli injects `[]Commit` via `WithCommits`. (A later pass added a per-commit
+  **timestamp** to the list row + detail header, sourced from the ledger `maxTS` so it
+  stays git-independent and renders in local tz.)
+
+- **Increment 10 — placeholder-branch attribution (the "no trailer on Cowork commits"
+  bug).** Symptom: `today` showed a day's spend (e.g. `$12.15`) but commits stamped
+  nothing and the per-branch watermark stayed frozen. Root cause: the pending query
+  filtered turns with strict `e.GitBranch == branch`, while **Cowork** sessions log
+  `gitBranch:"HEAD"` (the symbolic ref recorded verbatim, never resolved to `main`) where
+  the Claude Code CLI logs a real branch. So every Cowork turn was `"HEAD" != "main"` and
+  silently dropped from the trailer — even though `today` (no branch filter) counted it.
+  Confirmed live via `report --period today --by branch` showing the spend under a `HEAD`
+  bucket. Fix (`internal/cli` `branchMatches`): a turn belongs to the committed branch when
+  it names that branch **or** carries a non-committal placeholder git never resolved —
+  `""` (field omitted) or `"HEAD"` (detached / Cowork) — so placeholders fold into whatever
+  branch you commit on, matching what `today` already sums; a turn naming a *different real*
+  branch is still excluded, so per-branch attribution holds. RED→GREEN under t-wada (a
+  `"HEAD"` turn must stamp onto `main`, a `feature/x` turn must not; plus an all-arms
+  `branchMatches` table test); `branchMatches` 100% / `pendingUsage` 88% covered; full suite
+  + `vet` + `gofmt` green. **Known limitation:** because watermarks are per-branch, a
+  placeholder turn matches every branch and could be re-stamped on a second branch's first
+  commit (cross-branch double-count) — harmless on a single-branch (`main`) workflow, but
+  the durable fix is to resolve `"HEAD"→` the real branch at **enrich** time (`EnrichVCS`,
+  reading `.git/HEAD`) so each turn has one home branch and `--by branch` stops showing a
+  `HEAD` bucket. Deferred as a follow-up (needs a `scan --full` to retrofit existing
+  ledger rows; the filter fix works on the existing ledger with no rescan).
 
 **Build-out complete** for the local path: installer, engine (trailer/consume/watermark),
 `.aispend.toml [trailers]` config, the `today` pending preview, live-scan-at-commit-time,

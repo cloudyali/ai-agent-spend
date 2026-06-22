@@ -65,6 +65,77 @@ func TestCmdTrailer_StampsThenConsumeAdvances(t *testing.T) {
 	}
 }
 
+// Cowork logs gitBranch:"HEAD" — an unresolved symbolic ref, not a real branch — so
+// its priced turns never matched the committed branch ("main") and could never reach
+// a commit, even though `today` counted them. A "HEAD" (or empty) placeholder must
+// fold into whatever branch you commit on; a turn naming a *different real* branch
+// must still be excluded.
+func TestCmdTrailer_StampsPlaceholderBranchTurns(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("AISPEND_HOME", "")
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+
+	st, err := store.OpenFileStore(filepath.Join(home, ".aispend", "events.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	headCost := event.USD(420000)  // a Cowork turn tagged "HEAD" → must stamp onto main
+	otherCost := event.USD(990000) // a turn on a different real branch → must NOT stamp onto main
+	if err := st.Upsert([]event.AgentEvent{
+		{
+			EventID: "head", SessionID: "s", Provider: "claude_code", GitBranch: "HEAD",
+			Model: "claude-opus-4-8", Tokens: event.Tokens{Input: 1000},
+			CostViews: event.CostViews{APIEquivalent: &headCost},
+			TSStart:   time.Unix(1000, 0).UTC(), TSEnd: time.Unix(1005, 0).UTC(),
+		},
+		{
+			EventID: "other", SessionID: "s2", Provider: "claude_code", GitBranch: "feature/x",
+			Model: "claude-opus-4-8", Tokens: event.Tokens{Input: 1000},
+			CostViews: event.CostViews{APIEquivalent: &otherCost},
+			TSStart:   time.Unix(1001, 0).UTC(), TSEnd: time.Unix(1006, 0).UTC(),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	repo := initMainRepo(t)
+	msg := filepath.Join(t.TempDir(), "MSG")
+	mustWrite(t, msg, "Add\n")
+	if _, errs, code := run(t, "trailer", msg, "--source", "", "--repo", repo); code != 0 {
+		t.Fatalf("trailer exit %d err=%s", code, errs)
+	}
+	body, _ := os.ReadFile(msg)
+	if !strings.Contains(string(body), "AI-Cost: 0.42") {
+		t.Errorf(`a "HEAD"-tagged (Cowork) turn must stamp onto the committed branch:\n%s`, body)
+	}
+	if strings.Contains(string(body), "1.41") { // 0.42 + 0.99 → the other branch leaked in
+		t.Errorf("a turn on a different real branch must not be folded into main:\n%s", body)
+	}
+}
+
+func TestBranchMatches(t *testing.T) {
+	cases := []struct {
+		ev, target string
+		want       bool
+	}{
+		{"main", "main", true},       // same real branch
+		{"HEAD", "main", true},       // Cowork / detached placeholder folds in
+		{"", "main", true},           // missing branch folds in
+		{"feature/x", "main", false}, // a different real branch is excluded
+		{"main", "develop", false},   // wrong real branch
+		{"HEAD", "feature/x", true},  // placeholder folds into any target
+	}
+	for _, c := range cases {
+		if got := branchMatches(c.ev, c.target); got != c.want {
+			t.Errorf("branchMatches(%q, %q) = %v, want %v", c.ev, c.target, got, c.want)
+		}
+	}
+}
+
 // A merge-source commit must never be stamped (and must still exit 0).
 func TestCmdTrailer_MergeSourceIsNoOp(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {

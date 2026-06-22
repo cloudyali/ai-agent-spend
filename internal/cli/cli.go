@@ -805,7 +805,7 @@ func (a *App) pendingUsage(_, branch string, since time.Time) (trailer.Usage, er
 	}
 	u := trailer.Usage{PerModel: map[string]int64{}, Cost: event.USD(0)}
 	for _, e := range events {
-		if e.GitBranch != branch || !e.TSStart.After(since) {
+		if !branchMatches(e.GitBranch, branch) || !e.TSStart.After(since) {
 			continue
 		}
 		m := e.CostViews.APIEquivalent
@@ -826,6 +826,23 @@ func (a *App) pendingUsage(_, branch string, since time.Time) (trailer.Usage, er
 		}
 	}
 	return u, nil
+}
+
+// branchMatches reports whether a turn tagged evBranch belongs to the branch being
+// committed. A turn counts when it names the target branch, or carries a
+// non-committal placeholder git never resolved to a real branch: "" (the log omitted
+// the field) or "HEAD" (a detached checkout or a Cowork session that recorded the
+// symbolic ref verbatim instead of "main"). Placeholders fold into whatever branch
+// you commit on, so their cost still reaches a commit — matching what `today`
+// already counts. A turn naming a *different* real branch is excluded, so per-branch
+// attribution still holds.
+func branchMatches(evBranch, target string) bool {
+	switch evBranch {
+	case target, "", "HEAD":
+		return true
+	default:
+		return false
+	}
 }
 
 // refreshLedger runs a silent, incremental scan so the trailer reflects turns logged
