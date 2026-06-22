@@ -477,6 +477,54 @@ func TestEnrichVCS_BestEffortNoOps(t *testing.T) {
 	})
 }
 
+// Cowork logs gitBranch:"HEAD" (the symbolic ref, never resolved to a real branch).
+// EnrichVCS must resolve it to the repo's current branch via the injected
+// CurrentBranch seam, so per-branch facets and the trailer see "main", not "HEAD".
+// A turn already naming a real branch is left untouched.
+func TestEnrichVCS_ResolvesHEADToRealBranch(t *testing.T) {
+	headAt := func(root string, _ time.Time) (string, bool) { return "sha", root == "/repo/payments" }
+	curBranch := func(root string) (string, bool) {
+		if root == "/repo/payments" {
+			return "main", true
+		}
+		return "", false
+	}
+	n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/payments"), HeadAt: headAt, CurrentBranch: curBranch}
+
+	mk := func(id, branch string) (event.AgentEvent, provider.RawRecord) {
+		raw := `{"type":"assistant","sessionId":"S","timestamp":"2026-06-14T10:00:00Z","cwd":"/repo/payments","gitBranch":"` + branch + `","message":{"id":"` + id + `","role":"assistant","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/payments/x.go"}}],"usage":{"input_tokens":1}}}`
+		r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: id}, Raw: []byte(raw)}
+		ev, err := n.Normalize(r)
+		if err != nil {
+			t.Fatalf("normalize: %v", err)
+		}
+		return ev, r
+	}
+	evHead, rHead := mk("head", "HEAD")
+	evReal, rReal := mk("real", "feature/keep")
+
+	out := n.EnrichVCS([]event.AgentEvent{evHead, evReal}, []provider.RawRecord{rHead, rReal})
+	if out[0].GitBranch != "main" {
+		t.Errorf(`"HEAD" must resolve to the real branch, got %q`, out[0].GitBranch)
+	}
+	if out[1].GitBranch != "feature/keep" {
+		t.Errorf("a real branch must be left untouched, got %q", out[1].GitBranch)
+	}
+}
+
+// Without a CurrentBranch hook, "HEAD" is left as-is — best-effort, like the SHA path.
+func TestEnrichVCS_HEADStaysWithoutSeam(t *testing.T) {
+	n := ClaudeCode{GOOS: "linux", RepoRoot: underRoots("/repo/payments"),
+		HeadAt: func(string, time.Time) (string, bool) { return "sha", true }}
+	raw := `{"type":"assistant","sessionId":"S","timestamp":"2026-06-14T10:00:00Z","cwd":"/repo/payments","gitBranch":"HEAD","message":{"id":"m","role":"assistant","model":"claude-opus-4","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/payments/x.go"}}],"usage":{"input_tokens":1}}}`
+	r := provider.RawRecord{Provider: "claude_code", Source: provider.Source{PathHash: "h"}, Raw: []byte(raw)}
+	ev, _ := n.Normalize(r)
+	out := n.EnrichVCS([]event.AgentEvent{ev}, []provider.RawRecord{r})
+	if out[0].GitBranch != "HEAD" {
+		t.Errorf(`without a CurrentBranch hook, "HEAD" must be left untouched, got %q`, out[0].GitBranch)
+	}
+}
+
 // Churn is captured once per session, over the commit range the session spanned
 // (first turn's SHA → last turn's SHA), and stamped on the representative (earliest)
 // event so a per-file rollup never double-counts it.

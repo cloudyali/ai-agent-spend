@@ -51,6 +51,30 @@ func HeadAt(repoRoot string, t time.Time) (string, bool) {
 	return best, found
 }
 
+// CurrentBranch returns the branch HEAD points to in repoRoot, read from .git/HEAD
+// ("ref: refs/heads/<branch>"). ok is false best-effort when repoRoot is empty, no
+// git dir/HEAD exists, or HEAD is detached (a raw SHA, not a symbolic ref) — there is
+// no branch to name. Pure file I/O, no git binary, no network. EnrichVCS uses it to
+// rewrite the literal "HEAD" that detached or Cowork sessions log into a real branch.
+func CurrentBranch(repoRoot string) (string, bool) {
+	if repoRoot == "" {
+		return "", false
+	}
+	gitDir, ok := resolveGitDir(repoRoot)
+	if !ok {
+		return "", false
+	}
+	data, err := os.ReadFile(filepath.Join(gitDir, "HEAD"))
+	if err != nil {
+		return "", false
+	}
+	branch, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "ref: refs/heads/")
+	if !ok || branch == "" {
+		return "", false // detached HEAD (raw SHA) — no branch to name
+	}
+	return branch, true
+}
+
 // resolveGitDir returns the git directory for repoRoot. Normally that is
 // repoRoot/.git (a directory); for a linked worktree or submodule it is a FILE
 // containing "gitdir: <path>", which we follow (the path may be relative to

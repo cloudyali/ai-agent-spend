@@ -172,7 +172,7 @@ type scanPair struct {
 
 func (a *App) scanPairs(idh string, attr func(string) (string, string)) []scanPair {
 	return []scanPair{
-		{claudecode.New(a.Resolver), normalize.ClaudeCode{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr, RepoRoot: a.repoRoot, HeadAt: vcs.HeadAt, Churn: vcs.Numstat}},
+		{claudecode.New(a.Resolver), normalize.ClaudeCode{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr, RepoRoot: a.repoRoot, HeadAt: vcs.HeadAt, Churn: vcs.Numstat, CurrentBranch: vcs.CurrentBranch}},
 		{codex.New(a.Resolver), &normalize.Codex{GOOS: a.Resolver.GOOS, IdentityHash: idh, Attribute: attr}},
 	}
 }

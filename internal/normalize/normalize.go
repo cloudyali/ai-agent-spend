@@ -51,6 +51,11 @@ type ClaudeCode struct {
 	// git-binary dependency. nil disables churn capture; EnrichVCS then leaves
 	// SessionChurn empty and the heatmap degrades to cost-only.
 	Churn func(repoRoot, fromSHA, toSHA string, files []string) []event.FileChurn
+	// CurrentBranch (optional) resolves a repo root to the branch HEAD points to now,
+	// reading .git/HEAD. EnrichVCS uses it to rewrite the literal "HEAD" that detached
+	// or Cowork sessions log (the symbolic ref, never resolved) into a real branch name,
+	// so per-branch facets and the commit trailer don't see "HEAD". nil leaves it as-is.
+	CurrentBranch func(repoRoot string) (string, bool)
 }
 
 const (
@@ -522,7 +527,10 @@ type VCSEnricher interface {
 // time), best-effort and per turn — two turns in one session can land on different
 // commits. It is a no-op without a HeadAt hook; a turn whose repo can't be resolved,
 // or whose commit predates the reflog, keeps GitSHA empty (never a guessed SHA).
-// GitBranch is set in Normalize and left untouched here.
+// GitBranch is set in Normalize; here a literal "HEAD" (logged by detached or Cowork
+// sessions) is resolved to the repo's real current branch via CurrentBranch, so
+// per-branch facets and the trailer never see an unresolved ref. A real branch name
+// is left untouched.
 func (n ClaudeCode) EnrichVCS(events []event.AgentEvent, recs []provider.RawRecord) []event.AgentEvent {
 	if n.HeadAt == nil {
 		return events
@@ -531,6 +539,7 @@ func (n ClaudeCode) EnrichVCS(events []event.AgentEvent, recs []provider.RawReco
 	if len(roots) == 0 {
 		return events
 	}
+	branchOf := map[string]string{} // resolved current branch per root; "" = unresolved
 	for i := range events {
 		root := roots[events[i].Evidence.SourcePathHash]
 		if root == "" {
@@ -538,6 +547,18 @@ func (n ClaudeCode) EnrichVCS(events []event.AgentEvent, recs []provider.RawReco
 		}
 		if sha, ok := n.HeadAt(root, events[i].TSStart); ok {
 			events[i].GitSHA = sha
+		}
+		if n.CurrentBranch != nil && events[i].GitBranch == "HEAD" {
+			br, cached := branchOf[root]
+			if !cached {
+				if b, ok := n.CurrentBranch(root); ok {
+					br = b
+				}
+				branchOf[root] = br
+			}
+			if br != "" {
+				events[i].GitBranch = br
+			}
 		}
 	}
 	if n.Churn != nil {

@@ -174,3 +174,57 @@ func TestHeadAt_GitFileWithoutGitdirPointer(t *testing.T) {
 		t.Errorf("malformed .git pointer must be best-effort empty, got (%q, %v)", got, ok)
 	}
 }
+
+// writeHEAD creates a repoRoot with a real .git dir whose HEAD file holds content.
+func writeHEAD(t *testing.T, content string) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git", "HEAD"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func TestCurrentBranch(t *testing.T) {
+	t.Run("symbolic ref → branch name", func(t *testing.T) {
+		if got, ok := CurrentBranch(writeHEAD(t, "ref: refs/heads/main\n")); !ok || got != "main" {
+			t.Errorf("CurrentBranch = (%q, %v), want (main, true)", got, ok)
+		}
+	})
+	t.Run("slashed branch name preserved", func(t *testing.T) {
+		if got, ok := CurrentBranch(writeHEAD(t, "ref: refs/heads/feature/x\n")); !ok || got != "feature/x" {
+			t.Errorf("CurrentBranch = (%q, %v), want (feature/x, true)", got, ok)
+		}
+	})
+	t.Run("detached HEAD (raw sha) → not a branch", func(t *testing.T) {
+		if got, ok := CurrentBranch(writeHEAD(t, shaA+"\n")); ok || got != "" {
+			t.Errorf(`detached HEAD must yield ("", false), got (%q, %v)`, got, ok)
+		}
+	})
+	t.Run("no repo → best-effort empty", func(t *testing.T) {
+		if got, ok := CurrentBranch(t.TempDir()); ok || got != "" {
+			t.Errorf(`no .git must yield ("", false), got (%q, %v)`, got, ok)
+		}
+	})
+	t.Run("empty root → no-op", func(t *testing.T) {
+		if got, ok := CurrentBranch(""); ok || got != "" {
+			t.Errorf(`empty root must yield ("", false), got (%q, %v)`, got, ok)
+		}
+	})
+	t.Run("worktree .git-file indirection", func(t *testing.T) {
+		realGitDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(realGitDir, "HEAD"), []byte("ref: refs/heads/wt\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, ".git"), []byte("gitdir: "+realGitDir+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := CurrentBranch(root); !ok || got != "wt" {
+			t.Errorf("worktree CurrentBranch = (%q, %v), want (wt, true)", got, ok)
+		}
+	})
+}

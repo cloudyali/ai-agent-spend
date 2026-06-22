@@ -105,8 +105,25 @@ green (`go test ./...`), reviews passed, offline / `doctor --network` intact:
   commit (cross-branch double-count) — harmless on a single-branch (`main`) workflow, but
   the durable fix is to resolve `"HEAD"→` the real branch at **enrich** time (`EnrichVCS`,
   reading `.git/HEAD`) so each turn has one home branch and `--by branch` stops showing a
-  `HEAD` bucket. Deferred as a follow-up (needs a `scan --full` to retrofit existing
-  ledger rows; the filter fix works on the existing ledger with no rescan).
+  `HEAD` bucket — shipped next as **increment 11** (the filter fix above still works on the
+  existing ledger with no rescan; the enrich fix cleans new rows + a `scan --full`).
+
+- **Increment 11 — resolve `HEAD`→ real branch at scan time (the durable fix).** New
+  `vcs.CurrentBranch(repoRoot)` reads `.git/HEAD` (`ref: refs/heads/<branch>`) — pure file
+  I/O, no git binary, no network, reusing `resolveGitDir` so worktree/submodule `.git`-file
+  indirection works; a detached HEAD (raw SHA) returns `("", false)`. A new optional
+  `CurrentBranch` seam on the `ClaudeCode` normalizer lets `EnrichVCS` rewrite a turn whose
+  logged `GitBranch == "HEAD"` to the repo's real current branch (memoized per repo root;
+  real branch names and `""` are left untouched; nil seam = no-op, like the `HeadAt` path).
+  Wired in `scanPairs` as `CurrentBranch: vcs.CurrentBranch`. Net effect: Cowork turns land
+  in the ledger as `main` (not `HEAD`), so `report --by branch`/`--by commit` and the trailer
+  all agree without leaning on the placeholder-wildcard. RED→GREEN under t-wada (vcs:
+  symbolic ref, slashed name, detached, no-repo, worktree indirection; normalize:
+  `HEAD`→branch resolution, real-branch-untouched, no-seam no-op). Coverage: `vcs` 93.2%,
+  `normalize` 88.8%; gofmt/vet/full suite green; offline build + `doctor --network` intact
+  (no new imports). The increment-10 filter stays as the back-compat net for un-rescanned
+  `HEAD` rows; `scan --full` retrofits the rest, shrinking the cross-branch double-count
+  window to zero.
 
 **Build-out complete** for the local path: installer, engine (trailer/consume/watermark),
 `.aispend.toml [trailers]` config, the `today` pending preview, live-scan-at-commit-time,
