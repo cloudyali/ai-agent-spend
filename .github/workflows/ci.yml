@@ -28,6 +28,17 @@ jobs:
       - name: test (with coverage)
         run: go test ./... -coverprofile=coverage.out
 
+      # Re-run the suite under non-UTC zones so timezone-dependent tests (e.g. the
+      # period-window label) can't pass merely because the runner is UTC. The build
+      # cache from the step above keeps this fast.
+      - name: test under non-UTC timezones
+        run: |
+          for tz in Asia/Kolkata America/Los_Angeles; do
+            echo "::group::TZ=$tz"
+            TZ="$tz" go test ./...
+            echo "::endgroup::"
+          done
+
       # t-wada RED guard for the const→var fix: -ldflags -X is silently ignored on a
       # const, so on the old code this step fails. It proves version stamping works.
       - name: version stamping is wired
