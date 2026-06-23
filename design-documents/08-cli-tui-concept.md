@@ -2,7 +2,7 @@
 
 Status: concept / brainstorm capture · 2026-06-17 · owner: Nishant · companion to `07-ui-concept.md`
 
-agentspend is CLI-first and "zero-dependency, provably offline." That ethos should shape the TUI — not get steamrolled by it.
+aispend is CLI-first and "zero-dependency, provably offline." That ethos should shape the TUI — not get steamrolled by it.
 
 ## Two surfaces, very different risk
 
@@ -20,7 +20,7 @@ agentspend is CLI-first and "zero-dependency, provably offline." That ethos shou
 The opaque `e7c41a9b` is a *reproducibility primitive, not the primary UX*. A human gets to a receipt three ways:
 
 - **TUI drill** — arrow to any row, press ↵; the id is resolved for you. The main path, and the real reason to go interactive.
-- **Selectors & flags** — `aispend explain --top` (priciest in the window), `--last` (most recent), or human selectors: `explain today:max`, `explain opus:biggest`, `explain session:3f9c`. You name the turn; agentspend resolves the hash.
+- **Selectors & flags** — `aispend explain --top` (priciest in the window), `--last` (most recent), or human selectors: `explain today:max`, `explain opus:biggest`, `explain session:3f9c`. You name the turn; aispend resolves the hash.
 - **Surfaced in output** — `report` and a new `aispend top` print ids beside notable turns, rendered as OSC-8 hyperlinks in modern terminals (click to explain). Copy-paste or click.
 
 The raw hash then earns its own keep as *provenance*: it's stable (derived from `message.id + requestId`), so `explain e7c41a9b` is reproducible and shareable — paste it to a teammate and they see the same itemized turn. Discovery is the job of `top`/the TUI; the id is for re-running and sharing.
@@ -29,7 +29,7 @@ The raw hash then earns its own keep as *provenance*: it's stable (derived from 
 
 ## Interactive TUI (`tui` / `watch`)
 
-Navigable, not just pretty — the only reason to go interactive is drill (↵ → receipt). Plus: `p` cycles the pivot (model → family → provider → token → project); `m/t/c` toggle facets live; `◂ ▸` scrub the period; `watch` tails logs as you code with a live arbitrage gauge; a `compare` pane (agentspend vs CodeBurn/ccusage, window-aligned, deltas lit) productizes the reconciliation.
+Navigable, not just pretty — the only reason to go interactive is drill (↵ → receipt). Plus: `p` cycles the pivot (model → family → provider → token → project); `m/t/c` toggle facets live; `◂ ▸` scrub the period; `watch` tails logs as you code with a live arbitrage gauge; a `compare` pane (aispend vs CodeBurn/ccusage, window-aligned, deltas lit) productizes the reconciliation.
 
 ## Craft
 

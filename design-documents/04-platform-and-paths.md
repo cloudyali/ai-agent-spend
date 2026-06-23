@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-14 · Stable. Cross-cutting: every provider depends on this._
 
-AgentSpend sources most of its data from **local files**, and those files live in
+aispend sources most of its data from **local files**, and those files live in
 different places on macOS, Linux, and Windows. A single static cross-platform Go
 binary has to find them correctly on each OS. So OS-awareness is not an
 afterthought sprinkled through providers — it is **centralized in one package,

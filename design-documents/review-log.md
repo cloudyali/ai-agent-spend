@@ -79,7 +79,7 @@ offline, still hashed-paths-only, still zero third-party runtime deps.
 ## 2026-06-14 · Design decision — pricing refresh evolves the egress stance
 
 **Decision (product owner):** the LLM pricing module will *ship embedded **and**
-refresh daily* from an AgentSpend S3 endpoint, curated server-side — the
+refresh daily* from an aispend S3 endpoint, curated server-side — the
 ccusage/CodeBurn pattern, improved by self-hosting (see
 [05-llm-pricing.md](05-llm-pricing.md) §4). This introduces the **first outbound
 network call** in the default build, from Phase 0B.
@@ -182,7 +182,7 @@ offline-build mechanism; it contains only the pinned, `go.sum`-verified driver t
 (captured in the phase-0A doc). All green; 87.3% total; `cmd` net-free.
 
 - **Zero-dep config parser (decision).** Rather than vendor a TOML library, the
-  loader parses the small flat subset AgentSpend defines (`key = value`, quotes,
+  loader parses the small flat subset aispend defines (`key = value`, quotes,
   `#` comments, `[section]` skipped). Consistent with FileStore/stdlib-flag; keeps
   the binary dependency-free. **Limitation:** it is not a full TOML parser (no
   nested tables, arrays, multiline) — documented; swap to a vendored lib behind the

@@ -4,7 +4,7 @@ Status: concept / brainstorm capture · 2026-06-17 · owner: Nishant
 
 ## The bet
 
-ccusage hands you the credit-card total. CodeBurn draws it as a pretty dashboard. agentspend should hand you the **itemized receipt** — and answer the one question neither tool touches: *is my subscription actually worth it?*
+ccusage hands you the credit-card total. CodeBurn draws it as a pretty dashboard. aispend should hand you the **itemized receipt** — and answer the one question neither tool touches: *is my subscription actually worth it?*
 
 So we do **not** try to out-dashboard CodeBurn. The wedge is two things only we can do, because only we keep an evidence ledger:
 
@@ -21,7 +21,7 @@ Lead with the one chart and the one drill-down nobody else has. Everything else 
 
 ## CLI / TUI — don't abandon home turf
 
-agentspend is CLI-first; out-explain, don't out-pretty. Arbitrage sparkline inside `report`; `explain` rendered as an ANSI cost-waterfall; an `aispend cache` savings view; faceted `--by` / `--where` / `--pivot`; **`aispend compare`** (window-aligned reconciliation vs ccusage / CodeBurn / the invoice); and an `aispend watch` live TUI with the arbitrage chart pinned.
+aispend is CLI-first; out-explain, don't out-pretty. Arbitrage sparkline inside `report`; `explain` rendered as an ANSI cost-waterfall; an `aispend cache` savings view; faceted `--by` / `--where` / `--pivot`; **`aispend compare`** (window-aligned reconciliation vs ccusage / CodeBurn / the invoice); and an `aispend watch` live TUI with the arbitrage chart pinned.
 
 ## Why it wins (and the proof)
 

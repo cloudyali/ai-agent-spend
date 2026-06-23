@@ -3,7 +3,7 @@
 _Last updated: 2026-06-14 · Stable design, phased build. The engine behind every
 cost view — so its fidelity is the product's fidelity._
 
-Pricing is not a helper in AgentSpend; it is the machine that turns raw tokens
+Pricing is not a helper in aispend; it is the machine that turns raw tokens
 into a defensible number. Every `cost_view` and every confidence score is its
 output, and "the tool whose numbers you can trust" lives or dies here. This doc
 designs the module as a first-class subsystem. The Phase 0A code (`internal/pricing`)
@@ -124,15 +124,15 @@ Prices change often, and the trackers show the two failure modes to avoid:
 *embed-only* goes stale (ccusage repeatedly ships fixes for missing new model
 snapshots, e.g. `claude-opus-4-6`/`-4-7`), while *fetch-only-from-a-third-party*
 is fragile (the LiteLLM "invalid cost map on main" incident broke everyone's
-costs at once). So AgentSpend does **both**, in a strict precedence that **always
+costs at once). So aispend does **both**, in a strict precedence that **always
 degrades to an embedded floor** and never blocks on the network:
 
 **[implemented 2026-06-16 — bootstrap; endpoint moved to our host 2026-06-17]**
 Steps 1 and 3 are wired: pricing is offline-first via `internal/pricing/refresh`
 (`ReadFreshCache`/`WriteCache`, `pricing.ParseLiteLLM`, `pricing.NewEngineWithRates`
 overlay) and the CLI command `aispend pricing [refresh]`. `refresh` targets the
-**AgentSpend-hosted price mirror** at `refresh.LiteLLMURL` —
-`https://agentspend.cloudyali.io/pricing/litellm.json`, a host we control and
+**aispend-hosted price mirror** at `refresh.LiteLLMURL` —
+`https://aispendllm.cloudyali.io/litellm.json`, a host we control and
 **host-pin** (the client refuses any cross-host redirect), serving a copy of the
 upstream LiteLLM JSON schema. This already satisfies the "the laptop only ever talks
 to a host we control" posture; what remains versus the full step-2 vision below is
@@ -142,12 +142,27 @@ discloses the one inbound fetch; the `offline` build compiles out all `net/*`.
 LiteLLM omissions (e.g. a model's cache rates) map to 0 rather than a fabricated
 heuristic.
 
+**[implemented 2026-06-22 — daily mirror pipeline + host move]** The "server-side
+process" described below is now the `pricing-sync` GitHub Action
+(`.github/workflows/pricing-sync.yml`), run daily + on demand. It fetches upstream
+LiteLLM, then `internal/pricesync` + `cmd/pricing-sync` **curate and validate** it
+through the real `pricing.ParseLiteLLM` canonicalizer behind a circuit breaker: a floor
+on priced-model count, a max-drop guard against the "invalid cost map" cliff, required
+anchor models, and a per-model price-swing/collapse-to-0 guard. Only a table that passes
+is published to **GitHub Pages at `aispendllm.cloudyali.io`** as `litellm.json` +
+`index.json` (generated_at, model count, sha256) — the checksummed index this section
+anticipated. On any violation it
+**publishes nothing and keeps serving the last-good file** (stale-but-correct) and opens
+an alert issue. The client fetches it directly: `refresh.LiteLLMURL` is hardcoded to
+`https://aispendllm.cloudyali.io/litellm.json` (host-pinned, no env override) — the offline
+build and `doctor --network` guarantees are unchanged.
+
 **Resolution order (freshest valid wins):**
 1. **Local cache** — `~/.aispend/pricing/litellm.json` (one table today; a
    per-provider `<provider>.json` layout later), used if fresh (≤ 24h).
    (CodeBurn caches the same way at `~/.cache/codeburn/`.)
-2. **Remote refresh** — at most daily, from the **AgentSpend pricing endpoint** on
-   our own subdomain: `https://agentspend.cloudyali.io/pricing/litellm.json` today,
+2. **Remote refresh** — at most daily, from the **aispend pricing endpoint** on
+   our own subdomain: `https://aispendllm.cloudyali.io/litellm.json`,
    growing to per-provider tables plus a signed `index.json` (versions + checksums).
    Curated and kept current by our **server-side process**, which tracks vendor pages
    / LiteLLM / models.dev, validates against the schema, versions + signs, and

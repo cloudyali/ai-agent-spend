@@ -65,7 +65,7 @@ clean (or have logged, accepted exceptions):
 | **Code review** | Go error handling, concurrency, interface design, table-test quality, SQL/N+1, coverage gaps | the `technical-code-reviewing` skill (Go/React/SQL/Docker aware) |
 | **Security review** | Egress paths, secret handling, path/PII leakage, dependency risk, injection | the **Security Guidance** plugin / `security-review` |
 
-For AgentSpend specifically, the security review has a standing checklist beyond
+For aispend specifically, the security review has a standing checklist beyond
 the generic pass, because the product's entire promise is trust:
 
 - The default build's import graph contains **no `net/*` transport** (asserted in

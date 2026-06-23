@@ -1,6 +1,6 @@
-# AgentSpend — Design Documents
+# aispend — Design Documents
 
-This folder is the **living design record** for AgentSpend. It sits between the
+This folder is the **living design record** for aispend. It sits between the
 two source artifacts and the code:
 
 - **`aispend-prd.md` (PRD v1.3)** — *why* we build and *what* the product is.

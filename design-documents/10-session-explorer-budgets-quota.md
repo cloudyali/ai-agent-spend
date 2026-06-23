@@ -1,7 +1,11 @@
 # 10 — Session explorer, budgets, and the quota window
 
-Status: **Concept (brainstorm capture, 2026-06-19)** · owner: Nishant · companion to
-`07-ui-concept.md`, `08-cli-tui-concept.md`, `09-session-view.md`
+Status: **Largely implemented (as of 2026-06-20)** — sections A–D shipped under t-wada
+TDD (session spine, prompt-chain view, API-equivalent budgets, the Codex+Claude quota
+window). Residue tracked in *Acceptance criteria* / *Phased build* below: subagent
+nesting, scoped budgets, cross-session `←/→` travel, budget alerts, and the deliberately
+held online `quota refresh` (D.1). · owner: Nishant · companion to `07-ui-concept.md`,
+`08-cli-tui-concept.md`, `09-session-view.md`
 
 > The session receipt (09) answered *what did this sitting cost?* This doc takes the
 > next three steps the founder asked for: make the **session** the navigational spine
@@ -95,12 +99,16 @@ Keep it on the scan result / store as `latest map[providerWindow]Sample` (keep-m
 > headers match the wall clock, while event timestamps, period windows, dedupe, and
 > pricing remain UTC. **Shipped (2026-06-19):** the discrete timestamps localize —
 > list-row clocks + spans, day-group headers/grouping, the receipt/file/explain
-> windows, and the period-span label (now tagged with the local zone, e.g. `IST`),
-> via `fmtTimeIn`/`clockTime(loc)`/`dayKey/dayLabel(loc)`; `fmtTime` defaults to
-> `time.Local`. **Bucketed axes done (2026-06-19):** the spend-over-time duration bar
+> windows — via `fmtTimeIn`/`clockTime(loc)`/`dayKey/dayLabel(loc)`; `fmtTime`
+> defaults to `time.Local`. **Correction (2026-06-23): the period-span label is the
+> exception — it renders in UTC, not local.** Periods are UTC calendar windows whose
+> inclusive end is `23:59:59 UTC`; localizing that boundary crossed midnight east of
+> UTC (an IST user saw the Jun 15–21 week as `Jun 15–Jun 22`), so `periodDates` /
+> `periodSpanLabel` format the span + zone tag in UTC. **Bucketed axes done (2026-06-19):** the spend-over-time duration bar
 > now truncates, indexes, and labels in the display zone (`bucketSpend`/`truncateTo`/
 > `bucketIndex` take a `*time.Location`), and `today`'s hourly spike already bucketed in
-> `now.Location()`. So every visual time — discrete *and* bucketed — is local; the
+> `now.Location()`. So every visual time — discrete *and* bucketed — is local (the
+> period-span *window* label excepted — UTC, per the 2026-06-23 correction above); the
 > backend (instants, windows, dedupe, pricing) stays UTC.
 
 Promote "session" from a `--by` facet (shipped in 09) to the **default backbone** of
@@ -402,32 +410,41 @@ purpose:
 
 ## Acceptance criteria
 
-- [ ] Codex `rate_limits.{primary,secondary}` retained through normalize into a
-      `quota.Sample`; absent/`null`/exec-mode → no sample (never `0%`).
-- [ ] Quota gauge renders `used_percent` + reset countdown with source + as-of; expires a
-      sample older than its reset; degrades to "unknown" off-sample and to ASCII off-TTY.
-- [ ] Session list groups by calendar day; live sessions detected by recency + mtime and
-      pinned; cross-midnight sessions listed once under start day with span.
+- [x] Codex `rate_limits.{primary,secondary}` retained into a `quota.Sample`;
+      absent/`null`/exec-mode → no sample (never `0%`) (2026-06-19). Validated against a
+      real `~/.codex`: window classified by `window_minutes`, absolute `resets_at` epoch.
+- [x] Quota gauge renders `used_percent` + reset countdown with source + as-of; expires a
+      sample older than its reset; degrades to "unknown" off-sample and to ASCII off-TTY
+      (2026-06-19).
+- [x] Session list groups by calendar day; live sessions pinned with span (2026-06-19).
+      As-built deviations from the wording above: grouped under **last-active** day (not
+      start day) so a live session surfaces under Today; liveness is **recency-only** for
+      now — AND-ing in file mtime is still pending.
 - [x] Subagent transcripts roll up under the parent session exactly once (2026-06-19)
       — reconciles to the by-model total; indented *drillable* children is a later refinement.
 - [x] Chain view orders turns by time, groups by `PromptID`, shows a cumulative-cost
       gutter, reuses the `↑/↓` + `tab` + `↵` model (2026-06-19); cross-session `←/→`
       travel is deferred.
-- [ ] Budgets measure `CostViews.APIEquivalent` only, default off, calendar-aligned,
-      scoped by existing group keys; show pace not just level; never claim enforcement;
-      exclude + disclose `nil`-cost providers.
-- [ ] Money stays integer micros; `nil` reads as "not computable," never `$0`.
-- [ ] New code ≥ 85% coverage; code-review + Security-Guidance gates pass; offline build
-      still compiles out `net/*` and `doctor --network` is unchanged.
+- [x] Budgets measure `CostViews.APIEquivalent` only, default off, calendar-aligned;
+      show pace not just level; never claim enforcement; exclude + disclose `nil`-cost
+      providers (2026-06-19). **Global scope only** — per-repo/provider/cost_tag scoping
+      still pending.
+- [x] Money stays integer micros; `nil` reads as "not computable," never `$0`.
+- [~] New code clears the ≥ 85% coverage floor (quota 93%, chain 100%, budget 93%,
+      tui 90%) and the offline build still compiles out `net/*` with `doctor --network`
+      unchanged (verified 2026-06-20). **Still to run for these features: the code-review
+      + Security-Guidance gates.**
 
 ## Phased build
 
-- **Now** — `quota.Sample` + Codex `rate_limits` retention + the weekly gauge on `today`
-  and the TUI header (cheapest end-to-end proof; we already ingest the line).
-- **Next** — the day-grouped live session list + identity header + the chain view
-  (reuses 09's cursor grammar); budgets (config + pace gauge).
-- **Later** — Claude `usage-exact.json` snapshot reader; subagent nesting; the live
-  `watch` loop; budget alerts via scheduled tasks.
+- **Now — done (2026-06-19).** `quota.Sample` + Codex `rate_limits` retention + the weekly
+  gauge on `today` and the TUI header.
+- **Next — done (2026-06-19).** The day-grouped live session list + identity header + the
+  chain view (reuses 09's cursor grammar); budgets (config + pace gauge).
+- **Later — partially done.** ✅ Claude `usage-exact.json` snapshot reader (2026-06-19);
+  ✅ the live `watch` loop (2026-06-19). ⏳ Remaining: subagent nesting (drillable
+  children), scoped budgets, cross-session `←/→` travel, and budget alerts via scheduled
+  tasks.
 
 ## Open questions
 

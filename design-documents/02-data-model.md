@@ -211,7 +211,7 @@ charged, and a plan whose start falls after the report window is flagged (not
 silently shown as `$0`). Without `plan_start` the legacy flat `fee × days / 30`
 proration is used, so existing configs are unaffected. Both files are
 parsed by a small **zero-dependency** loader (`internal/config`) that supports the
-flat subset AgentSpend uses — `key = value`, quotes, `#` comments, `[section]`
+flat subset aispend uses — `key = value`, quotes, `#` comments, `[section]`
 skipped — keeping the binary dependency-free (swap in a full TOML library behind
 the loader if richer files are ever needed).
 

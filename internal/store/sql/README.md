@@ -2,7 +2,7 @@
 
 The Go in [`../sqlcgen/`](../sqlcgen) is **generated** from `schema.sql` +
 `query.sql` by [sqlc](https://sqlc.dev) and **committed**. So you do *not* need
-sqlc installed to build or use AgentSpend — only if you change the SQL.
+sqlc installed to build or use aispend — only if you change the SQL.
 
 ## Regenerate (after editing `schema.sql` / `query.sql`)
 
