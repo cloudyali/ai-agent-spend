@@ -1,0 +1,7 @@
+[trailers]
+enabled = true
+cost = true
+cost_models = true
+tokens = true
+interactions = false
+precision = 3

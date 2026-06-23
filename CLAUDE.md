@@ -65,6 +65,18 @@ files visible (or all, when fewer) so it never collapses on a short terminal. Th
 receipt carries the VCS linkage (branch · SHA + per-file cost+churn heatmap).
 Offline/non-TTY builds (no TUI) therefore have no receipt surface.
 
+**Scan-on-launch.** The read commands (`today`, `report`, `top`, `tui`, and the bare
+default) run a **watermark-gated incremental scan before reading the ledger**, so
+`aispend` works without a remembered `aispend scan` (install → run → value). It's quiet:
+a one-line `scanned N new turn(s)` on **stderr** only when something was imported (so
+stdout / `--json` stays pipe-clean), and silent on a fresh ledger. Opt out per-command
+with `--no-scan`, globally with `AISPEND_NO_SCAN=1` (explicit truthy only — `1/true/yes/on`),
+or persistently with `scan_on_launch = false` in `~/.aispend/config.toml`. `aispend scan`
+remains the explicit import. Shared seam: `App.scanOnLaunch` → `App.incrementalScan` (also
+the trailer hook's live refresh); offline-safe (local files only, no `net/*`). The opt-in
+session-end **hook** (the "milestone" trigger) is still pending — see
+`design-documents/12-surfaces-ingestion-roadmap.md` Item 7.
+
 Rich static surfaces are **hand-rolled, zero-dependency ANSI** (no Bubble Tea /
 lipgloss / x/term — keeps the offline-build + `doctor --network` promise). They
 degrade to plain ASCII off a TTY, under `NO_COLOR`, or with `TERM=dumb`, and never

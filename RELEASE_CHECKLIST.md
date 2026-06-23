@@ -41,12 +41,59 @@ bottom; items already done in this OSS-prep pass are marked ✅.
 
 ## 5. Homebrew tap (macOS)
 
-- [ ] `cloudyali/homebrew-tap` repository exists and is writable by the token above.
-- [ ] After a release, `brew install cloudyali/tap/aispend` works on a clean machine.
-- [ ] **Known gap:** binaries are **unsigned/un-notarized**, so Gatekeeper quarantines
-      browser-downloaded copies. The cask strips the quarantine bit as a stopgap
-      (see `.goreleaser.yaml`); wire up Apple notarization when a Developer account is
-      available, then remove the stopgap.
+How it works: on a `v*` tag, GoReleaser builds the archives + `checksums.txt`, cuts
+the GitHub Release in this repo, then generates `Casks/aispend.rb` and commits it to a
+**separate** tap repo. Users then `brew install cloudyali/tap/aispend` (the `homebrew-`
+prefix is dropped). The `homebrew_casks` block and `release.yml` token wiring are
+already done — these two manual steps are what's left:
+
+- [ ] **Create the tap repo.** Make `cloudyali/homebrew-tap` on GitHub — **public**, may
+      be empty (a bare README is fine). GoReleaser creates `Casks/` and `aispend.rb`
+      itself, but it will **not** create the repo. (Repo name must keep the `homebrew-`
+      prefix; `homebrew-tap` → users install `cloudyali/tap/aispend`.)
+- [ ] **Provision `HOMEBREW_TAP_TOKEN`.** The default `GITHUB_TOKEN` cannot push to a
+      second repo ("resource not accessible by integration"), so a fine-grained PAT is
+      required. Steps:
+    1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained
+       tokens → Generate new token**.
+    2. **Token name:** `HOMEBREW_TAP_TOKEN`. **Expiration:** set a date and calendar the
+       renewal (an expired PAT silently breaks the next release's tap push).
+    3. **Resource owner:** the owner of `homebrew-tap` — the `cloudyali` **org** if it's
+       org-owned, *not* your personal account. The org must have fine-grained PATs
+       enabled; if it requires approval, an org owner approves it (auto if you're one).
+    4. **Repository access:** Only select repositories → **`homebrew-tap`** (the
+       destination, not `ai-agent-spend`).
+    5. **Permissions → Repository → Contents: Read and write** (Metadata: Read is added
+       automatically; nothing else is needed).
+    6. Generate, copy the token, then add it under **`cloudyali/ai-agent-spend` → Settings
+       → Secrets and variables → Actions → New repository secret**, named exactly
+       `HOMEBREW_TAP_TOKEN`.
+    - Prefill shortcut (still pick the repo + expiration in the UI):
+      `https://github.com/settings/personal-access-tokens/new?name=HOMEBREW_TAP_TOKEN&target_name=cloudyali&contents=write`
+    - Fallback: a classic PAT with the `repo` scope also works.
+- [x] ✅ `release.yml` already passes `GITHUB_TOKEN` (this repo's Release) **and**
+      `HOMEBREW_TAP_TOKEN` (cross-repo tap push) to GoReleaser.
+- [ ] Dry-run the cask locally before trusting CI: `goreleaser release --snapshot --clean`,
+      then `brew install --cask ./dist/.../aispend.rb` (or inspect the generated `.rb`).
+- [ ] After a real release, `brew install cloudyali/tap/aispend` works on a clean machine.
+- [ ] **Known gap (unsigned):** binaries are **unsigned/un-notarized**, so Gatekeeper
+      quarantines browser-downloaded copies. The cask strips the quarantine bit as a
+      stopgap (see `.goreleaser.yaml`); wire up Apple notarization (§5b) when a Developer
+      account is available, then remove the `xattr` hook.
+
+## 5b. Code signing (when ready — optional for preview)
+
+- [ ] **macOS notarization** — biggest UX win, runs from the current Linux CI via
+      GoReleaser's cross-platform `quill` path. Needs an Apple Developer account
+      ($99/yr), a **Developer ID Application** cert (`.p12`), and an App Store Connect
+      API key (`.p8`). Add a `notarize.macos` block + the base64 secrets, then drop the
+      `xattr` cask hook. Docs: <https://goreleaser.com/customization/sign/notarize/>.
+- [ ] **Checksums signing** — free supply-chain signal; add a `signs`/cosign block to
+      sign `checksums.txt`.
+- [ ] **Windows signing** — optional; an unsigned `.exe` only shows a SmartScreen prompt.
+      Skip EV certs (they no longer bypass SmartScreen since 2024). Cheapest modern path
+      is Azure Trusted Signing (~$9.99/mo, signable from CI via `jsign`) — but check
+      eligibility (US/Canada individuals, or US/Canada/EU/UK orgs) before relying on it.
 
 ## 6. Screenshots (currently placeholders)
 
