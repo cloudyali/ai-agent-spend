@@ -6,13 +6,14 @@ import (
 	"time"
 )
 
-// LiteLLMURL is the AgentSpend-hosted mirror of the community LiteLLM price table
-// (github.com/BerriAI/litellm) — served from our own subdomain, not a third party,
-// so the laptop only ever talks to a host we control and can pin (see fetchBytes'
-// same-host redirect guard). Fetching it is a single inbound GET for a public file:
-// no spend, no identity, no telemetry. The endpoint must serve the table directly
-// (HTTP 200, no cross-host redirect); it mirrors the upstream LiteLLM JSON schema.
-const LiteLLMURL = "https://agentspend.cloudyali.io/pricing/litellm.json"
+// LiteLLMURL is the aispend-hosted mirror of the community LiteLLM price table
+// (github.com/BerriAI/litellm), served from aispendllm.cloudyali.io — a host we control,
+// not a third party — so the laptop only ever talks to a host we can pin (see
+// fetchBytes' same-host redirect guard). Fetching it is a single inbound GET for a
+// public file: no spend, no identity, no telemetry. The endpoint serves the table
+// directly (HTTP 200, no cross-host redirect) in the upstream LiteLLM JSON schema,
+// published daily by the pricing-sync pipeline (.github/workflows/pricing-sync.yml).
+const LiteLLMURL = "https://aispendllm.cloudyali.io/litellm.json"
 
 // CachePath is the on-disk location of the last refreshed price table, under the
 // app home so it travels with the rest of aispend's local state.
