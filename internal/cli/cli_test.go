@@ -87,6 +87,21 @@ func TestRun_EndToEnd(t *testing.T) {
 	if out, _, _ = run(t, "version"); !strings.Contains(out, "aispend "+Version) {
 		t.Errorf("version: %s", out)
 	}
+	if out, _, _ = run(t, "version"); !strings.Contains(out, "Home page: "+Website) {
+		t.Errorf("version banner should show home page %q: %s", Website, out)
+	}
+	if out, _, _ = run(t, "version"); !strings.Contains(out, "Report bugs to: "+Issues) {
+		t.Errorf("version banner should report bugs to %q: %s", Issues, out)
+	}
+	if out, _, _ = run(t, "help"); !strings.Contains(out, Website) {
+		t.Errorf("help banner should show the website %q: %s", Website, out)
+	}
+	if out, _, _ = run(t, "help"); !strings.Contains(out, "Report bugs to: "+Issues) {
+		t.Errorf("help footer should report bugs to %q: %s", Issues, out)
+	}
+	if out, _, _ = run(t, "help"); !strings.Contains(out, "Home page: "+Website) {
+		t.Errorf("help footer should show home page %q: %s", Website, out)
+	}
 	if _, _, code = run(t, "bogus"); code != 2 {
 		t.Errorf("unknown command exit = %d, want 2", code)
 	}

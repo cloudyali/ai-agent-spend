@@ -41,6 +41,14 @@ import (
 // report the dev value. See .goreleaser.yaml (ldflags) and .github/workflows/release.yml.
 var Version = "0.1.0-dev"
 
+// Website is the project's home page; Issues is the bug tracker. Both appear in
+// the version and help banners. Purely informational text — printing them makes
+// no network call.
+const (
+	Website = "https://ai-spend.cloudyali.io/"
+	Issues  = "https://github.com/agentspend/ai-agent-spend/issues"
+)
+
 // App holds resolved dependencies; constructed from the environment, overridable
 // in tests (which set HOME / AISPEND_HOME to temp dirs).
 type App struct {
@@ -89,7 +97,7 @@ func (a *App) dispatch(args []string) int {
 	case "consume":
 		return a.cmdConsume(rest)
 	case "version", "--version", "-v":
-		fmt.Fprintf(a.Out, "aispend %s\n", Version)
+		fmt.Fprintf(a.Out, "aispend %s\n\nReport bugs to: %s\nHome page: %s\n", Version, Issues, Website)
 		return 0
 	case "help", "-h", "--help":
 		a.usage()
@@ -1167,5 +1175,8 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
     aispend report --period "last month" --by cost_tag
     aispend report --period "90 days" --view effective_allocated
     aispend report --period 2026-01-01..2026-03-31 --by repo --json
-`, Version)
+
+Report bugs to: %s
+Home page: %s
+`, Version, Issues, Website)
 }
