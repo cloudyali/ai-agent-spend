@@ -7,7 +7,7 @@
 // Posture (locked): the shipped default ships embedded tables AND refresh ON
 // (opt-out). Resolution precedence is cache → endpoint → embedded; pricing never
 // blocks on the network. The one outbound is a single GET of the public,
-// AgentSpend-hosted price table — host-pinned and size-capped, sending no identity,
+// aispend-hosted price table — host-pinned and size-capped, sending no identity,
 // its result only overlaying the embedded floor. See design-documents/05-llm-pricing.md §4.
 package refresh
 

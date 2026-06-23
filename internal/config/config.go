@@ -1,6 +1,6 @@
 // Package config loads .aispend.toml (repo-level attribution: project, cost_tag,
 // env) and ~/.aispend/config.toml (plan configuration). To keep the binary
-// dependency-free, it parses the small, flat config subset AgentSpend defines
+// dependency-free, it parses the small, flat config subset aispend defines
 // itself rather than pulling a full TOML library. Credentials are never read or
 // written here and never logged.
 //
@@ -331,7 +331,7 @@ func Plans() []SeededPlan {
 	return out
 }
 
-// parseTOML parses the flat config subset AgentSpend uses: blank lines and
+// parseTOML parses the flat config subset aispend uses: blank lines and
 // # comments are ignored, [section] headers are skipped (our files are flat), and
 // each `key = value` yields a string (quotes stripped; inline # comments removed
 // on unquoted values).

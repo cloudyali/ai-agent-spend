@@ -1,4 +1,4 @@
-// Package platform centralizes OS-aware path discovery. Most of AgentSpend's data
+// Package platform centralizes OS-aware path discovery. Most of aispend's data
 // is sourced from local files whose locations differ across macOS, Linux, and
 // Windows, so every provider asks this layer where an agent's files live on the
 // current machine rather than hardcoding a path. The Resolver's inputs (GOOS,
@@ -38,7 +38,7 @@ func (r Resolver) env(k string) string {
 	return r.Env(k)
 }
 
-// AppHome is AgentSpend's own data/config directory. A single visible ~/.aispend
+// AppHome is aispend's own data/config directory. A single visible ~/.aispend
 // (overridable via AISPEND_HOME) keeps the README promise legible; the Windows
 // equivalent resolves under the user profile via the same join.
 func (r Resolver) AppHome() string {

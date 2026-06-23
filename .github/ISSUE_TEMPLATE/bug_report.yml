@@ -1,0 +1,78 @@
+name: Bug report
+description: Something computed the wrong number, crashed, or behaved unexpectedly.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. `aispend` reads only local files and hashes source
+        paths — but please still **avoid pasting prompt text, code, or anything
+        sensitive**. Output of `aispend report --json` or a `doctor` dump is plenty.
+  - type: input
+    id: version
+    attributes:
+      label: aispend version
+      description: Output of `aispend version`.
+      placeholder: "aispend 0.1.0-dev"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      description: Windows is experimental — reports from Windows users are especially welcome.
+      options:
+        - Linux
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: Build
+      options:
+        - default
+        - offline (-tags offline)
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: "aispend report --period \"last week\" --by file"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste the output. For wrong-number bugs, `--json` output is ideal.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Agent (Claude Code / Codex), rough session size, `aispend doctor --paths` output, etc.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This is not a security or privacy issue (those go through SECURITY.md, privately).
+          required: true

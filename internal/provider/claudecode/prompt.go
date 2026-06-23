@@ -1,5 +1,5 @@
 // Prompt re-read: resolve the human prompt behind a turn by reading the original
-// session .jsonl on demand. AgentSpend stores no prompt text and hashes source
+// session .jsonl on demand. aispend stores no prompt text and hashes source
 // paths, so the explain view recovers the prompt live from the user's own log —
 // nothing new is persisted. This is a local, read-only file access (no network),
 // so the offline build and `doctor --network` promise are untouched.

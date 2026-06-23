@@ -1,5 +1,5 @@
 // Prompt re-read for Codex: resolve the human prompt behind a turn by reading the
-// original rollout .jsonl on demand. As with Claude Code, AgentSpend stores no
+// original rollout .jsonl on demand. As with Claude Code, aispend stores no
 // prompt text and hashes source paths, so the explain view recovers the prompt live
 // from the user's own log — nothing new is persisted. Local, read-only file access
 // (no network), so the offline build is untouched.

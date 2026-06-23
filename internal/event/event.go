@@ -1,6 +1,6 @@
 // Package event defines the core contract every surface reads: AgentEvent, the
 // versioned schema, and Money (integer micro-units, never a float). Nothing in
-// AgentSpend reads a raw file directly — it reads AgentEvent.
+// aispend reads a raw file directly — it reads AgentEvent.
 //
 // See design-documents/02-data-model.md. A change here is a versioned-contract
 // change: bump SchemaVersion and update the golden fixtures in the same change-set.

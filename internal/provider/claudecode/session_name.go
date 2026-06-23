@@ -1,6 +1,6 @@
 // Session naming: recover a human label for a session by reading its original
 // .jsonl on demand — Claude Code's auto-generated summary title when present, else
-// the first human prompt. Like the prompt re-read, AgentSpend stores no title and
+// the first human prompt. Like the prompt re-read, aispend stores no title and
 // hashes paths, so the name is recovered live from the user's own log; nothing new is
 // persisted. Local, read-only (no network) — the offline promise is untouched.
 package claudecode

@@ -32,8 +32,10 @@ touches the network, and it can _prove_ it.
 
 - [Why this exists](#why-this-exists)
 - [What you get](#what-you-get)
+- [Use cases](#use-cases)
 - [Quickstart](#quickstart)
 - [Install](#install)
+- [Supported OS](#supported-os)
 - [Prove it's offline](#prove-its-offline)
 - [Commands & usage](#commands--usage)
 - [How it works](#how-it-works)
@@ -90,6 +92,33 @@ have cost `$11.71` in API-equivalent metering _today alone_, you have your answe
   entirely.
 - **One binary, zero runtime.** Pure Go, vendored, no codegen. Drop it on your PATH
   and go.
+
+---
+
+## Use cases
+
+Different people open `aispend` for different reasons. A few of the common ones:
+
+- **"Am I getting my money's worth?"** You're on a `$20`–`$200/mo` plan and the
+  meter is hidden. `aispend today` puts api-equivalent spend next to your plan's
+  daily cost, so the ROI line settles it — are you under-using the seat, or
+  squeezing 3× the value out of it?
+- **"What on earth happened at 2 a.m.?"** An agent got into a loop overnight and you
+  can feel it but can't see it. The hourly spike bar in `today` points at the hour;
+  `aispend top` names the exact turns and the session that ran away.
+- **"Which feature did the spend go to?"** Group by `branch`, `commit`, or `file` to
+  tie cost to shipped work — for a client invoice, a cost-per-feature readout, or
+  just answering your own _"was that refactor worth it?"_ Commit trailers can bake
+  the number straight into your git history.
+- **"Opus or Codex for this kind of task?"** `report --by model` / `--by provider`
+  shows what each agent actually costs you on real work, so you reach for the right
+  one instead of the expensive one out of habit.
+- **"I can't send my code to a SaaS dashboard."** Under an NDA, in a regulated shop,
+  or just privacy-minded? `aispend` reads only local files and has no
+  network-capable code path to begin with — and `doctor --network` proves it.
+- **"Did caching actually save me anything?"** Cache-aware pricing shows what prompt
+  caching shaved off the day, so you can tell whether your prompt structure is
+  pulling its weight.
 
 ---
 
@@ -170,7 +199,8 @@ go install github.com/cloudyali/ai-agent-spend/cmd/aispend@latest
 
 ### From a prebuilt binary
 
-Every release ships binaries for macOS and Linux (amd64 + arm64) and Windows, plus a
+Every release ships binaries for macOS, Linux, and Windows (amd64 + arm64) — see
+[Supported OS](#supported-os) for the per-platform status — plus a
 `checksums.txt`. Grab them from the
 [Releases page](https://github.com/cloudyali/ai-agent-spend/releases), verify, and
 drop on your PATH:
@@ -209,6 +239,40 @@ It's also noticeably smaller, because all the network and TUI code is simply gon
 10 MB   aispend            (default build)
 4.5 MB  aispend-offline    (net/* + TUI compiled out)
 ```
+
+---
+
+## Supported OS
+
+`aispend` is one static, dependency-free Go binary, so it runs anywhere Go cross-
+compiles. Every release ships both the standard and the [offline](#the-offline-build)
+SKU for all three desktop OSes, in `amd64` and `arm64`. What differs is how thoroughly
+each is exercised — and `aispend` would rather tell you that than imply a uniform
+guarantee it can't back up.
+
+| OS | Status | Arch | Install | Data lives in |
+|---|---|---|---|---|
+| **Linux** | ✅ Supported · runs in CI on every push | amd64 · arm64 | [install script](#install) or `go install` | `~/.aispend` |
+| **macOS** | ✅ Supported · primary dev platform | Apple Silicon (arm64) · Intel (amd64) | [Homebrew](#install) or install script | `~/.aispend` |
+| **Windows** | 🧪 Experimental · build-verified, not yet CI-tested | amd64 · arm64 | prebuilt `.zip` or `go install` | `%USERPROFILE%\.aispend` |
+
+**Linux** is where CI runs the full suite (including non-UTC timezones) on every
+push, so it's the most exercised target. **macOS** is the primary development
+platform — it's what the screenshots above come from — and is fully supported; it
+just isn't in the automated matrix yet. A binary you download through a browser may
+get Gatekeeper-quarantined ("app is damaged"); the Homebrew cask clears that for you,
+or run `xattr -dr com.apple.quarantine ./aispend` once by hand.
+
+**Windows** is honestly experimental. The binaries build and ship, the path layer
+already resolves Windows locations (`%USERPROFILE%`, `%APPDATA%`), and the per-OS
+logic is unit-tested — but it isn't covered by CI yet and isn't a daily-driven
+platform, so treat the numbers as community-tested until that lands. The shell
+installer and Homebrew don't target Windows; grab the `.zip` from the
+[Releases page](https://github.com/cloudyali/ai-agent-spend/releases) or use
+`go install`. Bug reports from Windows users are especially welcome.
+
+> Broadening CI to macOS and Windows runners is tracked on the
+> [pre-release checklist](RELEASE_CHECKLIST.md).
 
 ---
 

@@ -55,7 +55,7 @@ func Run(args []string, out, err io.Writer) int {
 	return app.dispatch(args)
 }
 
-// nowUTC is the app clock. AgentSpend is UTC end-to-end — event timestamps and
+// nowUTC is the app clock. aispend is UTC end-to-end — event timestamps and
 // billing data are UTC — so period boundaries (today/week/month/…), scan cutoffs,
 // and the plan-start default are all computed in UTC for clean reconciliation,
 // regardless of the machine's local zone.

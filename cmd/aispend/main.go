@@ -1,4 +1,4 @@
-// Command aispend is the AgentSpend CLI: a trusted, explainable, local-by-default
+// Command aispend is the aispend CLI: a trusted, explainable, local-by-default
 // ledger for AI-coding spend. The command tree lives in internal/cli; this
 // entrypoint intentionally pulls in no network imports — see
 // design-documents/phase-0A-trusted-explainable-ledger.md (Trust requirements).
