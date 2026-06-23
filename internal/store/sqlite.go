@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/store/sqlcgen"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/store/sqlcgen"
 
 	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
 )

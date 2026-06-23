@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/normalize"
-	"github.com/agentspend/ai-agent-spend/internal/platform"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/normalize"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
 )
 
 var update = flag.Bool("update", false, "update golden files")

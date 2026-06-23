@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
 )
 
 // promptResolver snapshots the user's Claude Code and Codex logs and, for a turn,

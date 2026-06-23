@@ -13,8 +13,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 )
 
 // --- color gating (stdlib-only; no golang.org/x/term) ---

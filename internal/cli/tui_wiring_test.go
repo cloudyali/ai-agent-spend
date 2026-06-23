@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/config"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/config"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
 )
 
 // Off a TTY (the test writer is a buffer), `tui` refuses and points at the static

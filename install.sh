@@ -4,7 +4,7 @@
 # aispend installer — downloads the right prebuilt binary from GitHub Releases,
 # verifies its SHA-256 against the signed checksums.txt, and drops it on your PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/agentspend/ai-agent-spend/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/cloudyali/ai-agent-spend/main/install.sh | sh
 #
 # It makes exactly one kind of network call: GETs to github.com / api.github.com to
 # fetch the release. No telemetry, nothing else. Prefer to trust nothing? Read this
@@ -14,7 +14,7 @@
 # Env overrides:
 #   AISPEND_VERSION   pin a version (e.g. v0.2.0); default: latest release
 #   AISPEND_BIN_DIR   install target; default: first writable of /usr/local/bin, ~/.local/bin
-#   AISPEND_REPO      owner/repo; default: agentspend/ai-agent-spend
+#   AISPEND_REPO      owner/repo; default: cloudyali/ai-agent-spend
 
 set -u
 
@@ -136,7 +136,7 @@ install_dir() {
 
 main() {
 	set -e
-	repo="${AISPEND_REPO:-agentspend/ai-agent-spend}"
+	repo="${AISPEND_REPO:-cloudyali/ai-agent-spend}"
 	bin="aispend"
 
 	os="$(detect_os)"

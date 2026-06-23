@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 func TestParseNumstat(t *testing.T) {

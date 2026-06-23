@@ -14,7 +14,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/pricesync"
+	"github.com/cloudyali/ai-agent-spend/internal/pricesync"
 )
 
 func main() {

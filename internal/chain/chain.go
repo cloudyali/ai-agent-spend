@@ -16,7 +16,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // Turn is one billable turn in the chain, carrying its own cost and the running

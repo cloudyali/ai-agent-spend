@@ -141,6 +141,30 @@ func LoadBudget(appHome string) (micros int64, ok bool, err error) {
 	return int64(f*1_000_000 + 0.5), true, nil
 }
 
+// LoadScanOnLaunch reads the optional `scan_on_launch` switch from
+// ~/.aispend/config.toml. It defaults to TRUE — a read command (today/report/top/tui)
+// brings the ledger current with an incremental scan before rendering, so there is no
+// manual `aispend scan` step to remember. Set `scan_on_launch = false` to require an
+// explicit scan. Accepts true/false, 1/0, yes/no, on/off (case-insensitive); a blank
+// value is the default (on). A malformed value returns (true, err) so the caller keeps
+// the safe default (freshness) and may choose to surface the error.
+func LoadScanOnLaunch(appHome string) (bool, error) {
+	m, err := loadConfigMap(appHome)
+	if err != nil {
+		return true, err
+	}
+	switch strings.ToLower(strings.TrimSpace(m["scan_on_launch"])) {
+	case "":
+		return true, nil
+	case "true", "1", "yes", "on":
+		return true, nil
+	case "false", "0", "no", "off":
+		return false, nil
+	default:
+		return true, fmt.Errorf("config: scan_on_launch %q (want true/false)", m["scan_on_launch"])
+	}
+}
+
 // SetBudget writes the monthly api-equivalent budget ceiling (in micros) to
 // ~/.aispend/config.toml as `budget_usd`, preserving every other line. The value is
 // rendered in dollars — the unit LoadBudget reads back. Callers validate the amount;

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // Filter selects and groups events for a query.

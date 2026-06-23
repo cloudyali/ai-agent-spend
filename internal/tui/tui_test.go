@@ -8,10 +8,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/agentspend/ai-agent-spend/internal/budget"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
-	"github.com/agentspend/ai-agent-spend/internal/quota"
+	"github.com/cloudyali/ai-agent-spend/internal/budget"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
 )
 
 func priced(t *testing.T, eng *pricing.Engine, id, sess, repo, model string, ts time.Time, tk event.Tokens) event.AgentEvent {

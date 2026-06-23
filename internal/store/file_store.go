@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 var (

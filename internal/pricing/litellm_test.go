@@ -3,7 +3,7 @@ package pricing
 import (
 	"testing"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // A trimmed LiteLLM model_prices_and_context_window.json: a placeholder entry to

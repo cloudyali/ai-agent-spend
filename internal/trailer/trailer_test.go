@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // --- pure formatting ---

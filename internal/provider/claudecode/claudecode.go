@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/platform"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
 )
 
 // Compile-time proof we satisfy the Provider seam.

@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // Config selects which trailers attach and how they render. It mirrors the

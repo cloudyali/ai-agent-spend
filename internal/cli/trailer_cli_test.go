@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/store"
 )
 
 // End-to-end through the CLI: a seeded ledger event is stamped onto a commit
@@ -302,8 +302,10 @@ func TestCmdTrailer_LiveScansAtCommitTime(t *testing.T) {
 	}
 }
 
-// today's pending preview reads the ledger only — it must NOT trigger a live scan
-// (that keeps `today` fast). A live, never-scanned turn yields no pending line.
+// today's pending preview reads the ledger only — renderPending must NOT trigger its
+// own live scan (that keeps the preview fast). We pass --no-scan so the new
+// scan-on-launch front door doesn't import the live turn first, isolating the preview
+// path: a live, never-scanned turn must still yield no pending line.
 func TestCmdToday_PreviewStaysStoreOnly(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -315,7 +317,7 @@ func TestCmdToday_PreviewStaysStoreOnly(t *testing.T) {
 	writeLiveClaudeTurn(t, home)
 
 	repo := initMainRepo(t)
-	out, _, code := run(t, "today", "--repo", repo)
+	out, _, code := run(t, "today", "--repo", repo, "--no-scan")
 	if code != 0 {
 		t.Fatalf("today exit %d", code)
 	}

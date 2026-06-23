@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // Numstat returns per-file line churn between commits fromSHA..toSHA in repoRoot,

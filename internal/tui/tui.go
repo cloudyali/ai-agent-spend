@@ -17,11 +17,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/agentspend/ai-agent-spend/internal/budget"
-	"github.com/agentspend/ai-agent-spend/internal/chain"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
-	"github.com/agentspend/ai-agent-spend/internal/quota"
+	"github.com/cloudyali/ai-agent-spend/internal/budget"
+	"github.com/cloudyali/ai-agent-spend/internal/chain"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
 )
 
 // Period is one selectable window: a label, the events that fall in it, and the
@@ -428,27 +428,30 @@ func (m Model) events() []event.AgentEvent { return m.period().Events }
 
 func (m Model) label() string { return m.period().Label }
 
-// periodDates renders the active window's date span in the LOCAL display zone — a
-// single date ("Jun 19") or a range ("Jun 15–Jun 21"). The bounds are UTC instants;
-// this only chooses the display zone. Callers guard the unbounded "all" window, so
-// both bounds are non-zero here.
+// periodDates renders the active window's date span — a single date ("Jun 19") or a
+// range ("Jun 15–Jun 21"). Periods are UTC calendar windows (the CLI builds them in
+// UTC, end-to-end) and the bounds are UTC instants — including an inclusive end of
+// 23:59:59 — so the span is formatted in UTC. Localizing it would shift a boundary
+// across midnight (e.g. 23:59:59 UTC → the next day in IST), mislabeling the window.
+// Callers guard the unbounded "all" window, so both bounds are non-zero here.
 func periodDates(since, until time.Time) string {
-	s, u := since.In(time.Local), until.In(time.Local)
+	s, u := since.In(time.UTC), until.In(time.UTC)
 	if s.Format("20060102") == u.Format("20060102") {
 		return s.Format("Jan 2")
 	}
 	return s.Format("Jan 2") + "–" + u.Format("Jan 2")
 }
 
-// periodSpanLabel is the active window's date span tagged with the local zone
-// abbreviation (e.g. "Jun 15–Jun 21 IST"), or "" when the window is unbounded
-// ("all"), where the label alone conveys the span.
+// periodSpanLabel is the active window's date span tagged with its zone (e.g.
+// "Jun 15–Jun 21 UTC"), or "" when the window is unbounded ("all"), where the label
+// alone conveys the span. Periods are UTC calendar windows, so the span and tag are
+// UTC — see periodDates. (Discrete event clocks still render in the local zone.)
 func (m Model) periodSpanLabel() string {
 	p := m.period()
 	if p.Since.IsZero() && p.Until.IsZero() {
 		return ""
 	}
-	return periodDates(p.Since, p.Until) + " " + p.Since.In(time.Local).Format("MST")
+	return periodDates(p.Since, p.Until) + " " + p.Since.In(time.UTC).Format("MST")
 }
 
 func (m Model) view() string { return m.curView }

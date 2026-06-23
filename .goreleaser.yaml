@@ -22,7 +22,7 @@ builds:
       - -trimpath # strip local paths → reproducible, no $HOME leakage
     ldflags:
       # Stamp the version into internal/cli.Version (must be a `var`, see cli.go).
-      - -s -w -X github.com/agentspend/ai-agent-spend/internal/cli.Version={{ .Version }}
+      - -s -w -X github.com/cloudyali/ai-agent-spend/internal/cli.Version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}" # reproducible: archive mtimes = commit time
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
@@ -39,7 +39,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X github.com/agentspend/ai-agent-spend/internal/cli.Version={{ .Version }}
+      - -s -w -X github.com/cloudyali/ai-agent-spend/internal/cli.Version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
@@ -78,7 +78,7 @@ checksum:
 homebrew_casks:
   - name: aispend
     ids: [archives] # never the offline archive
-    homepage: "https://github.com/agentspend/ai-agent-spend"
+    homepage: "https://github.com/cloudyali/ai-agent-spend"
     description: "Local, explainable AI-coding spend — prices each turn against a pinned table, offline."
     binaries:
       - aispend
@@ -94,18 +94,18 @@ homebrew_casks:
     # Don't push prereleases (e.g. v1.0.0-rc1) to the tap.
     skip_upload: auto
     repository:
-      owner: agentspend
-      name: homebrew-tap # → users run: brew install agentspend/tap/aispend
+      owner: cloudyali
+      name: homebrew-tap # → users run: brew install cloudyali/tap/aispend
       branch: main
       # Cross-repo push needs a PAT with contents:write on the tap repo.
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     commit_author:
       name: goreleaserbot
-      email: bot@agentspend.dev
+      email: bot@cloudyali.io
 
 release:
   github:
-    owner: agentspend
+    owner: cloudyali
     name: ai-agent-spend
   prerelease: auto # tags like v1.2.3-rc1 are marked prerelease automatically
   draft: false

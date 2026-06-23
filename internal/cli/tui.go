@@ -16,16 +16,16 @@ import (
 	"sort"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/budget"
-	"github.com/agentspend/ai-agent-spend/internal/config"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
-	"github.com/agentspend/ai-agent-spend/internal/provider/claudecode"
-	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
-	"github.com/agentspend/ai-agent-spend/internal/quota"
-	"github.com/agentspend/ai-agent-spend/internal/store"
-	"github.com/agentspend/ai-agent-spend/internal/trailer"
-	"github.com/agentspend/ai-agent-spend/internal/tui"
+	"github.com/cloudyali/ai-agent-spend/internal/budget"
+	"github.com/cloudyali/ai-agent-spend/internal/config"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/provider/claudecode"
+	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
+	"github.com/cloudyali/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/trailer"
+	"github.com/cloudyali/ai-agent-spend/internal/tui"
 )
 
 // tuiBuilt reports that the interactive TUI is linked into this build, so the
@@ -98,6 +98,7 @@ func (a *App) cmdTui(args []string) int {
 	fs.SetOutput(a.Err)
 	periodSpec := fs.String("period", "week", "initial calendar window (same grammar as `report`)")
 	watch := fs.Bool("watch", false, "live mode: periodically re-scan logs and refresh the view in place")
+	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -105,6 +106,7 @@ func (a *App) cmdTui(args []string) int {
 		fmt.Fprintln(a.Err, "aispend tui needs an interactive terminal; try `aispend top` or `aispend report`")
 		return 1
 	}
+	a.scanOnLaunch(*noScan)
 
 	st, err := a.openStore()
 	if err != nil {

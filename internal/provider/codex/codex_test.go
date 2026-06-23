@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
 )
 
 func noEnv(string) string { return "" }

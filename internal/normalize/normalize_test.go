@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
 )
 
 const opusLine = `{"type":"assistant","uuid":"a1","sessionId":"sess_1","timestamp":"2026-06-14T10:00:05Z","cwd":"/Users/dev/payments","message":{"id":"msg_1","role":"assistant","model":"claude-opus-4-20250514","content":[{"type":"text","text":"hi"},{"type":"tool_use","id":"t1","name":"Edit"},{"type":"tool_use","id":"t2","name":"mcp__github__create_issue"}],"usage":{"input_tokens":12400,"output_tokens":3100,"cache_read_input_tokens":8900,"cache_creation_input_tokens":0}}}`

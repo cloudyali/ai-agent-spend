@@ -148,7 +148,7 @@ be lowered toward the PRD's stated `1.22+` once the CI matrix is set up. The
 choice is recorded in `go.mod` and noted in
 [03-engineering-process.md](03-engineering-process.md).
 
-> **Module path:** `github.com/agentspend/ai-agent-spend` (matches the repo
+> **Module path:** `github.com/cloudyali/ai-agent-spend` (matches the repo
 > folder). There is no git remote yet; if the published path differs, it is a
 > one-line `go mod edit -module ...` change and a find/replace of imports — do it
 > *before* the first external contributor, not after.

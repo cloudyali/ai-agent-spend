@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/config"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/platform"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/config"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 )
 
 func writeUsage(t *testing.T, home, raw string) {

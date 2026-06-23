@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/store"
 )
 
 func (a *App) cmdTop(args []string) int {
@@ -19,6 +19,7 @@ func (a *App) cmdTop(args []string) int {
 	periodSpec := fs.String("period", "week", "calendar window (same grammar as `report`)")
 	limit := fs.Int("limit", 10, "how many rows to list")
 	bySessions := fs.Bool("sessions", false, "rank whole sessions instead of individual turns")
+	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -30,6 +31,7 @@ func (a *App) cmdTop(args []string) int {
 	if *limit < 1 {
 		*limit = 10
 	}
+	a.scanOnLaunch(*noScan)
 	st, err := a.openStore()
 	if err != nil {
 		fmt.Fprintf(a.Err, "aispend: %v\n", err)

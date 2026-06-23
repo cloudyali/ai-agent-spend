@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // June 2026: the 19th is a Friday (per env), so 18th=Thursday, 15th=Monday.

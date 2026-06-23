@@ -19,20 +19,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/config"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/githook"
-	"github.com/agentspend/ai-agent-spend/internal/normalize"
-	"github.com/agentspend/ai-agent-spend/internal/platform"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
-	"github.com/agentspend/ai-agent-spend/internal/pricing/refresh"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
-	"github.com/agentspend/ai-agent-spend/internal/provider/claudecode"
-	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
-	"github.com/agentspend/ai-agent-spend/internal/scan"
-	"github.com/agentspend/ai-agent-spend/internal/store"
-	"github.com/agentspend/ai-agent-spend/internal/trailer"
-	"github.com/agentspend/ai-agent-spend/internal/vcs"
+	"github.com/cloudyali/ai-agent-spend/internal/config"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/githook"
+	"github.com/cloudyali/ai-agent-spend/internal/normalize"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing/refresh"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/provider/claudecode"
+	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
+	"github.com/cloudyali/ai-agent-spend/internal/scan"
+	"github.com/cloudyali/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/trailer"
+	"github.com/cloudyali/ai-agent-spend/internal/vcs"
 )
 
 // Version is overwritten at release time via -ldflags (-X). It must stay a `var`,
@@ -265,6 +265,7 @@ func (a *App) cmdReport(args []string) int {
 	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|billed|effective_allocated|marginal")
 	periodSpec := fs.String("period", "week", `calendar window: today|yesterday|week|month|"last week"|"last month"|quarter|"this year"|"N days"|"since YYYY-MM-DD"|YYYY-MM-DD..YYYY-MM-DD|all`)
 	jsonOut := fs.Bool("json", false, "emit the report as JSON instead of a table (metered views only)")
+	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -278,6 +279,8 @@ func (a *App) cmdReport(args []string) int {
 		fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view effective_allocated yet (use a metered view: api_equivalent, reported, estimated, billed, marginal)")
 		return 2
 	}
+
+	a.scanOnLaunch(*noScan)
 
 	st, err := a.openStore()
 	if err != nil {
@@ -644,7 +647,7 @@ func (a *App) cmdPricingRefresh(cache string) int {
 		fmt.Fprintf(a.Err, "aispend: pricing refresh: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(a.Out, "Refreshed %d model prices from LiteLLM → cached at %s\n", models, cache)
+	fmt.Fprintf(a.Out, "Refreshed %d model prices from LiteLLM (%s) → cached at %s\n", models, refresh.LiteLLMURL, cache)
 	if repriced > 0 {
 		fmt.Fprintf(a.Out, "Re-priced %d stored events — report reflects these rates now.\n", repriced)
 	} else {
@@ -845,34 +848,80 @@ func branchMatches(evBranch, target string) bool {
 	}
 }
 
-// refreshLedger runs a silent, incremental scan so the trailer reflects turns logged
-// since the last `aispend scan` — "live at commit time." Best-effort: any error is
-// swallowed (the hook is fail-open and falls back to whatever the ledger already
-// holds). Incremental (Full:false), so only new session data is read.
-func (a *App) refreshLedger() {
+// incrementalScan runs a silent, incremental (watermark-bounded) scan across every
+// detected provider and returns the total number of events imported. Best-effort: a
+// provider that fails to detect/read/price is skipped, never fatal, so callers fall
+// back to whatever the ledger already holds. Incremental (Full:false) — only session
+// data newer than the last scan is read — and offline-safe (local files only, no net).
+// Shared by the trailer hook's live refresh and the scan-on-launch path.
+func (a *App) incrementalScan() int {
 	st, err := a.openStore()
 	if err != nil {
-		return
+		return 0
 	}
 	attr := a.attribution()
 	plans := a.planSet()
 	eng := a.pricingEngine()
 	idh := a.identityHash()
+	total := 0
 	for _, pr := range a.scanPairs(idh, attr) {
 		present, derr := pr.p.Detect()
 		if derr != nil || !present {
 			continue
 		}
 		sc := &scan.Scanner{Provider: pr.p, Normalizer: pr.n, Pricing: eng, Plan: toPricingPlan(plans.For(pr.p.Name())), Store: st, Sink: st, Now: a.Now, Full: false}
-		_, _ = sc.Run() // best-effort; the trailer falls back to the existing ledger on error
+		sum, runErr := sc.Run()
+		if runErr != nil {
+			continue // best-effort; a provider error falls back to the existing ledger
+		}
+		total += sum.Imported
 	}
+	return total
+}
+
+// scanOnLaunch brings the ledger current before a read command (today/report/top/tui)
+// renders, so `aispend` "just works" without a remembered `aispend scan`. It is:
+//   - opt-out: the per-command --no-scan flag (passed as skip), AISPEND_NO_SCAN in the
+//     environment, or scan_on_launch=false in config.toml each disable it;
+//   - quiet: a one-line notice on STDERR only when something new was imported, so
+//     stdout (report --json, pipes) stays clean and an already-fresh ledger says nothing;
+//   - best-effort + offline-safe: incrementalScan swallows provider errors and reads
+//     only local files (no network), so a flaky provider never blocks the render.
+func (a *App) scanOnLaunch(skip bool) {
+	if skip || !a.scanOnLaunchEnabled() {
+		return
+	}
+	n := a.incrementalScan()
+	if n <= 0 {
+		return
+	}
+	noun := "turns"
+	if n == 1 {
+		noun = "turn"
+	}
+	fmt.Fprintf(a.Err, "scanned %d new %s\n", n, noun)
+}
+
+// scanOnLaunchEnabled reports whether the launch scan should run: off when
+// AISPEND_NO_SCAN is explicitly truthy (1/true/yes/on), or when scan_on_launch=false in
+// config.toml; on by default. The env vocabulary is explicit (not presence-based) so a
+// stray AISPEND_NO_SCAN=false/0 reads as "don't disable" rather than silently turning
+// scanning off. A malformed config value keeps the safe default (on, freshness) rather
+// than silently disabling scanning.
+func (a *App) scanOnLaunchEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AISPEND_NO_SCAN"))) {
+	case "1", "true", "yes", "on":
+		return false // explicitly disabled via the environment
+	}
+	on, _ := config.LoadScanOnLaunch(a.Resolver.AppHome())
+	return on
 }
 
 // pendingUsageLive is the trailer hook's PendingFunc: it live-scans first, then reads
 // the freshened ledger — so a commit stamps turns that were never explicitly scanned.
 // today's preview deliberately uses the non-scanning pendingUsage to stay fast.
 func (a *App) pendingUsageLive(repoDir, branch string, since time.Time) (trailer.Usage, error) {
-	a.refreshLedger()
+	_ = a.incrementalScan()
 	return a.pendingUsage(repoDir, branch, since)
 }
 
@@ -1170,6 +1219,9 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
   pricing [refresh]             show the active rate source; 'refresh' pulls live LiteLLM rates
   git <install|status|…>        install per-commit cost-trailer hooks (safe; honors hook managers)
   version                       print version
+
+  today/report/top/tui scan new sessions on launch first; --no-scan reads the ledger as-is
+  (or set scan_on_launch = false in ~/.aispend/config.toml, or AISPEND_NO_SCAN=1)
 
   report flags: --period P  --by G  --view V  --json
   P (period): today | yesterday | week | month | "last week" | "last month" |

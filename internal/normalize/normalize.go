@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/platform"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
 )
 
 // ErrNotBillable signals a well-formed record that is not a billable assistant

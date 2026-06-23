@@ -14,24 +14,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/budget"
-	"github.com/agentspend/ai-agent-spend/internal/config"
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
-	"github.com/agentspend/ai-agent-spend/internal/provider/codex"
-	"github.com/agentspend/ai-agent-spend/internal/quota"
-	"github.com/agentspend/ai-agent-spend/internal/store"
-	"github.com/agentspend/ai-agent-spend/internal/trailer"
+	"github.com/cloudyali/ai-agent-spend/internal/budget"
+	"github.com/cloudyali/ai-agent-spend/internal/config"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
+	"github.com/cloudyali/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/trailer"
 )
 
 func (a *App) cmdToday(args []string) int {
 	fs := flag.NewFlagSet("today", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
 	repo := fs.String("repo", ".", "repo to preview uncommitted trailer spend for (defaults to cwd)")
+	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	a.scanOnLaunch(*noScan)
 	now := a.Now()
 	st, err := a.openStore()
 	if err != nil {

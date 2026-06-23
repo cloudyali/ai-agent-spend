@@ -30,6 +30,6 @@ jobs:
         env:
           # Default token: creates the Release in THIS repo.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Separate PAT (contents:write on agentspend/homebrew-tap) — the default
+          # Separate PAT (contents:write on cloudyali/homebrew-tap) — the default
           # token cannot push to another repo. Create it, save as this secret.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

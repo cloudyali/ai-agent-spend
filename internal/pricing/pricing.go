@@ -15,7 +15,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 //go:embed tables/pricing-2026-06.json

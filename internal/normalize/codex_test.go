@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/agentspend/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
 )
 
 func cxRec(raw string, line int, pathHash string) provider.RawRecord {

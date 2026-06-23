@@ -16,7 +16,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 )
 
 // IndexSchemaVersion is the version stamp on index.json.

@@ -32,7 +32,7 @@ jobs:
       # const, so on the old code this step fails. It proves version stamping works.
       - name: version stamping is wired
         run: |
-          go build -ldflags "-X github.com/agentspend/ai-agent-spend/internal/cli.Version=ci-smoke-9.9.9" -o /tmp/aispend ./cmd/aispend
+          go build -ldflags "-X github.com/cloudyali/ai-agent-spend/internal/cli.Version=ci-smoke-9.9.9" -o /tmp/aispend ./cmd/aispend
           out="$(/tmp/aispend version)"
           echo "$out"
           echo "$out" | grep -q "ci-smoke-9.9.9" || {

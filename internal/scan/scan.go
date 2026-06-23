@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
-	"github.com/agentspend/ai-agent-spend/internal/normalize"
-	"github.com/agentspend/ai-agent-spend/internal/pricing"
-	"github.com/agentspend/ai-agent-spend/internal/provider"
-	"github.com/agentspend/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/normalize"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/provider"
+	"github.com/cloudyali/ai-agent-spend/internal/store"
 )
 
 // maxSkipSamples bounds how many skipped-record details we retain for `--verbose`.

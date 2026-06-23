@@ -1,4 +1,4 @@
-module github.com/agentspend/ai-agent-spend
+module github.com/cloudyali/ai-agent-spend
 
 go 1.25.0
 

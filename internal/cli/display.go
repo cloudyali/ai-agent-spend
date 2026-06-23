@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentspend/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
 // Shared turn/session display helpers used across the CLI surfaces (top, today,

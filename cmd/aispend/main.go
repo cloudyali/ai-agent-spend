@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/agentspend/ai-agent-spend/internal/cli"
+	"github.com/cloudyali/ai-agent-spend/internal/cli"
 )
 
 func main() {
