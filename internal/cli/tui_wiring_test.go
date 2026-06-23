@@ -4,6 +4,7 @@ package cli
 
 import (
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +12,36 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/config"
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing/refresh"
 )
+
+// pricingStatus feeds the TUI header: the LiteLLM cache (with its mtime as the sync
+// date) when fresh, else the embedded floor — mirroring pricingEngine's resolution.
+func TestPricingStatus_SourceAndDate(t *testing.T) {
+	home := t.TempDir()
+	now := time.Date(2026, 6, 23, 12, 0, 0, 0, time.UTC)
+	a := appWithHome(home, &strings.Builder{}, now)
+
+	if ps := a.pricingStatus(); ps.Source != "embedded" || !ps.SyncedAt.IsZero() {
+		t.Errorf("no cache → embedded with no date, got %+v", ps)
+	}
+
+	cache := refresh.CachePath(a.Resolver.AppHome())
+	if err := refresh.WriteCache(cache, []byte(`{"x":{"input_cost_per_token":0.000001}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if ps := a.pricingStatus(); ps.Source != "LiteLLM" || ps.SyncedAt.IsZero() {
+		t.Errorf("fresh cache → LiteLLM with a sync date, got %+v", ps)
+	}
+
+	old := now.Add(-48 * time.Hour) // age the cache past 24h
+	if err := os.Chtimes(cache, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if ps := a.pricingStatus(); ps.Source != "embedded" {
+		t.Errorf("stale cache → embedded fallback, got %+v", ps)
+	}
+}
 
 // Off a TTY (the test writer is a buffer), `tui` refuses and points at the static
 // commands rather than opening an unusable interactive screen; a bad flag exits 2.

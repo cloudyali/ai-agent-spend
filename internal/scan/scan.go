@@ -153,8 +153,11 @@ func (s *Scanner) Run() (Summary, error) {
 }
 
 // sampleOf returns the first ~80 printable chars of a raw line, for diagnosing a
-// skip. Control characters become spaces. Content stays local — shown only to the
-// user via `scan --verbose`, never stored or exported.
+// skip. Every control character — C0 (<0x20), DEL, and the C1 range (0x7f–0x9f,
+// which includes the 8-bit CSI/OSC introducers) — becomes a space, so a crafted
+// log line can't inject a terminal escape into `scan --verbose` (CWE-150). Content
+// stays local — shown only to the user via `scan --verbose`, never stored or
+// exported. (The richer report/TUI surfaces use internal/termtext instead.)
 func sampleOf(b []byte) string {
 	const n = 80
 	s := string(b)
@@ -162,7 +165,7 @@ func sampleOf(b []byte) string {
 		s = s[:n] + "…"
 	}
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 {
+		if r < 0x20 || (r >= 0x7f && r <= 0x9f) {
 			return ' '
 		}
 		return r

@@ -45,6 +45,13 @@ func setupHome(t *testing.T) string {
 
 func run(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()
+	// Hermetic by default: the launch auto-refresh must never reach the real network
+	// from a test. Tests that exercise the refresh path do so via injected fetchers
+	// (see refresh_on_launch_test.go), not through run(). A test may set the env
+	// explicitly to override this default.
+	if os.Getenv("AISPEND_NO_REFRESH") == "" {
+		t.Setenv("AISPEND_NO_REFRESH", "1")
+	}
 	var out, errb bytes.Buffer
 	code := Run(args, &out, &errb)
 	return out.String(), errb.String(), code

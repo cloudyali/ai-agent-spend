@@ -3,6 +3,7 @@
 package refresh
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,10 +14,11 @@ import (
 // endpoint. `aispend doctor --network` reads this to disclose the one outbound.
 const NetworkEnabled = true
 
-// fetchBytes performs the inbound GET. It attaches no cookies, no body, and no
-// identifying headers — only a plain request for a public price file — and caps
-// the response so a misbehaving endpoint can't exhaust memory.
-func fetchBytes(url string) ([]byte, error) {
+// fetchBytes performs the inbound GET under ctx. It attaches no cookies, no body, and
+// no identifying headers — only a plain request for a public price file — and caps the
+// response so a misbehaving endpoint can't exhaust memory. The 10s client timeout is
+// the ceiling; a shorter ctx deadline (e.g. a launch top-up) bounds it tighter.
+func fetchBytes(ctx context.Context, url string) ([]byte, error) {
 	c := &http.Client{
 		Timeout: 10 * time.Second,
 		// Pin redirects to the origin host: the price fetch talks only to the host it
@@ -28,7 +30,11 @@ func fetchBytes(url string) ([]byte, error) {
 			return nil
 		},
 	}
-	resp, err := c.Get(url) //nolint:gosec // intended: GET a public, non-identifying price file
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("refresh: request %s: %w", url, err)
+	}
+	resp, err := c.Do(req) //nolint:gosec // intended: GET a public, non-identifying price file
 	if err != nil {
 		return nil, fmt.Errorf("refresh: get %s: %w", url, err)
 	}

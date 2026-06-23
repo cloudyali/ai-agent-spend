@@ -165,6 +165,32 @@ func LoadScanOnLaunch(appHome string) (bool, error) {
 	}
 }
 
+// LoadRefreshOnLaunch reads the optional `refresh_on_launch` switch from
+// ~/.aispend/config.toml. It defaults to TRUE — a read command tops up the LiteLLM
+// price cache with a single inbound fetch when it is missing or older than 24h, so
+// rates stay current without a manual `aispend pricing refresh`. Set
+// `refresh_on_launch = false` to keep launches fully offline (the explicit refresh
+// then remains the only fetch). Accepts true/false, 1/0, yes/no, on/off
+// (case-insensitive); a blank value is the default (on). A malformed value returns
+// (true, err) so the caller keeps the default and may surface the error. The offline
+// build never fetches regardless (refresh.NetworkEnabled is false there).
+func LoadRefreshOnLaunch(appHome string) (bool, error) {
+	m, err := loadConfigMap(appHome)
+	if err != nil {
+		return true, err
+	}
+	switch strings.ToLower(strings.TrimSpace(m["refresh_on_launch"])) {
+	case "":
+		return true, nil
+	case "true", "1", "yes", "on":
+		return true, nil
+	case "false", "0", "no", "off":
+		return false, nil
+	default:
+		return true, fmt.Errorf("config: refresh_on_launch %q (want true/false)", m["refresh_on_launch"])
+	}
+}
+
 // SetBudget writes the monthly api-equivalent budget ceiling (in micros) to
 // ~/.aispend/config.toml as `budget_usd`, preserving every other line. The value is
 // rendered in dollars — the unit LoadBudget reads back. Callers validate the amount;

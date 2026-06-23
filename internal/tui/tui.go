@@ -22,6 +22,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 	"github.com/cloudyali/ai-agent-spend/internal/quota"
+	"github.com/cloudyali/ai-agent-spend/internal/termtext"
 )
 
 // Period is one selectable window: a label, the events that fall in it, and the
@@ -205,6 +206,12 @@ type Model struct {
 	budgetPace budget.Pace
 	budgetSet  bool
 
+	// pricing (optional; WithPricingStatus): the compact rate-source provenance shown in
+	// the header (source + sync age). pricingFn is re-read on each refresh so a watch tick
+	// reflects a mid-session refresh; off by default → no rates segment.
+	pricingFn func() PricingStatus
+	pricing   PricingStatus
+
 	// pending (optional; WithPending): the read-only "pending commit" preview — the
 	// uncommitted trailer spend on the current branch. Re-read on each refresh.
 	pendingFn func() (Pending, bool)
@@ -271,6 +278,24 @@ func (m Model) WithQuota(fn func() []quota.Sample) Model {
 // default → nothing renders.
 func (m Model) WithBudget(fn func() (budget.Pace, bool)) Model {
 	m.budgetFn = fn
+	m.refresh()
+	return m
+}
+
+// PricingStatus is the rate-source provenance the header shows compactly: the active
+// source ("LiteLLM" or "embedded") and, for the LiteLLM cache, when it was last synced.
+// SyncedAt is zero for the embedded table (no sync date).
+type PricingStatus struct {
+	Source   string
+	SyncedAt time.Time
+}
+
+// WithPricingStatus enables the compact "rates: …" provenance segment in the header: fn
+// returns the active rate source and its sync time (the cli reads the price cache).
+// Re-read on each refresh so a watch tick reflects a mid-session refresh; off by
+// default → no rates segment renders.
+func (m Model) WithPricingStatus(fn func() PricingStatus) Model {
+	m.pricingFn = fn
 	m.refresh()
 	return m
 }
@@ -412,6 +437,9 @@ func (m *Model) refresh() {
 	if m.budgetFn != nil {
 		m.budgetPace, m.budgetSet = m.budgetFn() // re-pace on each refresh / watch tick
 	}
+	if m.pricingFn != nil {
+		m.pricing = m.pricingFn() // re-read the rate source so a watch tick reflects a refresh
+	}
 	if m.pendingFn != nil {
 		m.pending, m.pendingOK = m.pendingFn() // re-read the pending-commit preview
 	}
@@ -502,23 +530,41 @@ func (m Model) tickCmd() tea.Cmd {
 	return tea.Tick(m.watchInt, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
-// applyReload advances the clock and pulls fresh periods (keeping the selected window
-// by label), then rebuilds rows. Total by design: an empty reload keeps the current
-// data, and the cursor is clamped so a shrunk list can never be indexed past its end.
-func (m *Model) applyReload() {
+// reloadDoneMsg carries the periods produced by a background reload (reloadCmd) back to
+// the main update loop, where they're applied on the model's own goroutine.
+type reloadDoneMsg struct{ periods []Period }
+
+// reloadCmd runs reload OFF the update loop (Bubble Tea executes Cmds in goroutines), so
+// the potentially slow work behind it — an incremental log re-scan and a price-cache
+// top-up over the network, wired in the cli — never blocks the UI. It is the only place
+// reload is invoked, and the loop re-arms the tick only after reloadDoneMsg, so at most
+// one reload is ever in flight (no overlapping store writers). nil when no reload is
+// wired, so a plain model schedules nothing.
+func (m Model) reloadCmd() tea.Cmd {
+	if m.reload == nil {
+		return nil
+	}
+	reload := m.reload
+	return func() tea.Msg { return reloadDoneMsg{periods: reload()} }
+}
+
+// applyReloadResult folds a completed reload into the model: advance the clock, swap in
+// the fresh periods (keeping the selected window by label), rebuild rows, and re-read the
+// header gauges (incl. the pricing status, so a background price top-up shows up). Total
+// by design: an empty reload keeps the current data, and the cursor is clamped so a
+// shrunk list can never be indexed past its end.
+func (m *Model) applyReloadResult(ps []Period) {
 	if m.nowFn != nil {
 		m.now = m.nowFn()
 	}
-	if m.reload != nil {
-		if ps := m.reload(); len(ps) > 0 {
-			label := m.period().Label
-			m.periods = ps
-			m.pIdx = 0
-			for i, p := range ps {
-				if p.Label == label {
-					m.pIdx = i
-					break
-				}
+	if len(ps) > 0 {
+		label := m.period().Label
+		m.periods = ps
+		m.pIdx = 0
+		for i, p := range ps {
+			if p.Label == label {
+				m.pIdx = i
+				break
 			}
 		}
 	}
@@ -531,7 +577,10 @@ func (m *Model) applyReload() {
 	}
 }
 
-func (m Model) Init() tea.Cmd { return m.tickCmd() }
+// Init kicks the first background reload (async launch sync) when one is wired; the
+// reload→tick cycle then keeps a watch session live. With no reload wired it schedules
+// nothing (a static snapshot).
+func (m Model) Init() tea.Cmd { return m.reloadCmd() }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -539,7 +588,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.w, m.h = msg.Width, msg.Height
 		m.buildPromptViewport() // re-fit the prompt box to the new size
 	case tickMsg:
-		m.applyReload() // watch heartbeat: refresh in place, then re-arm
+		return m, m.reloadCmd() // heartbeat: kick a background reload; re-arm after it lands
+	case reloadDoneMsg:
+		m.applyReloadResult(msg.periods) // apply the off-thread reload, then arm the next tick
 		return m, m.tickCmd()
 	case tea.KeyMsg:
 		// q and ctrl+c quit from anywhere — including drill-downs — so q is never
@@ -772,6 +823,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.setBudget != nil {
 					m.mode = modeBudget
 					m.budgetBuf, m.budgetErr = "", ""
+					if m.budgetSet && m.budgetPace.Limit > 0 {
+						// Seed the field with the current ceiling so an already-set
+						// budget is visible and editable, not a blank prompt.
+						m.budgetBuf = strconv.FormatFloat(float64(m.budgetPace.Limit)/1e6, 'f', -1, 64)
+					}
 				}
 			case "t":
 				if m.setTrailers != nil {
@@ -988,6 +1044,9 @@ func (m Model) listView() string {
 		hdr += " · " + d
 	}
 	hdr += fmt.Sprintf("   ·   %d sessions", len(m.rows))
+	if t := m.pricingStatusText(); t != "" {
+		hdr += "   ·   " + t
+	}
 	b.WriteString(stBold.Render("aispend") + stFaint.Render(hdr) + "\n")
 	b.WriteString(m.headerLine(view) + "\n")
 
@@ -1194,7 +1253,7 @@ func (m Model) receiptView() string {
 	var b strings.Builder
 	b.WriteString(m.breadcrumb() + "\n\n")
 	if m.selNameOK { // the session's human title leads the receipt when we can recover it
-		b.WriteString(stBold.Render(trunc(m.selName, 64)) + "\n")
+		b.WriteString(stBold.Render(trunc(termtext.SanitizeLabel(m.selName), 64)) + "\n") // title = first prompt — neutralize escapes (CWE-150)
 	}
 	b.WriteString(fmt.Sprintf("%s · %s · %s → %s UTC\n",
 		stBold.Render(orDash(s.repo)), providerLabel(s.provider), fmtTime(s.first), fmtTime(s.last)))
@@ -1308,7 +1367,7 @@ func (m Model) fileView() string {
 	turns := m.selFileTurns
 	var b strings.Builder
 	b.WriteString(m.breadcrumb() + "\n\n")
-	b.WriteString(stBold.Render(fr.path) + "\n")
+	b.WriteString(stBold.Render(termtext.SanitizeLabel(fr.path)) + "\n") // log-derived path — neutralize escapes (CWE-150)
 	b.WriteString(stFaint.Render(fmt.Sprintf("in %s · %d %s", orDash(m.sel.repo), len(turns), turnsWord(len(turns)))) + "\n\n")
 	line := "  total       " + stBold.Render(money(fr.cost)) + stFaint.Render(" api-equivalent")
 	if fr.hasChurn {
@@ -1673,7 +1732,7 @@ func (m *Model) buildPromptViewport() {
 	if w < 20 {
 		w = 120 // unknown/tiny width (e.g. off a TTY in tests): a sane default
 	}
-	wrapped := wrapText(m.promptText, w)
+	wrapped := wrapText(termtext.SanitizeMultiline(m.promptText), w) // raw human prompt — neutralize escapes, keep line breaks (CWE-150)
 	m.promptLines = len(wrapped)
 	h := m.promptBoxHeight()
 	if h > len(wrapped) {
@@ -1780,6 +1839,7 @@ func (m Model) breadcrumb() string {
 	}
 	var b strings.Builder
 	for i, s := range segs {
+		s = termtext.SanitizeLabel(s) // segs include log-derived repo + file path — neutralize escapes (CWE-150)
 		if i > 0 {
 			b.WriteString(stFaint.Render(" › "))
 		}
@@ -2028,7 +2088,7 @@ func sessionVCSLine(evs []event.AgentEvent) string {
 	branch := ""
 	for _, e := range evs {
 		if e.GitBranch != "" {
-			branch = e.GitBranch
+			branch = termtext.SanitizeLabel(e.GitBranch) // verbatim from the log — neutralize escapes (CWE-150)
 			break
 		}
 	}
@@ -2223,14 +2283,15 @@ func fileWindow(n, cursor, budget int) (start, end int) {
 // select style, ▶ marker), mirroring the session list's cursor row.
 func fileRowLine(fr fileRow, max int64, selected bool) string {
 	bar := spendBar(fr.cost, max, 10)
+	path := termtext.SanitizeLabel(fr.path) // path is log-derived — neutralize escapes (CWE-150)
 	churn := ""
 	if fr.hasChurn {
 		churn = fmt.Sprintf("  +%d/-%d", fr.churn.Added, fr.churn.Removed)
 	}
 	if selected {
-		return "  " + stSel.Render(fmt.Sprintf("▶ %s  %9s  %s%s", bar, money(fr.cost), fr.path, churn))
+		return "  " + stSel.Render(fmt.Sprintf("▶ %s  %9s  %s%s", bar, money(fr.cost), path, churn))
 	}
-	row := fmt.Sprintf("    %s  %9s  %s", styleBar(bar), money(fr.cost), fr.path)
+	row := fmt.Sprintf("    %s  %9s  %s", styleBar(bar), money(fr.cost), path)
 	if churn != "" {
 		row += stFaint.Render(churn)
 	}
@@ -2341,6 +2402,36 @@ func wrapText(s string, width int) []string {
 	return out
 }
 
+// pricingStatusText is the compact rate-source provenance for the header — e.g.
+// "rates: LiteLLM (2h ago)" for a synced cache, or "rates: embedded" for the floor.
+// Empty when no pricing status is wired (WithPricingStatus off), so the header is
+// unchanged for callers that don't supply it.
+func (m Model) pricingStatusText() string {
+	ps := m.pricing
+	if ps.Source == "" {
+		return ""
+	}
+	if ps.SyncedAt.IsZero() {
+		return "rates: " + ps.Source
+	}
+	return "rates: " + ps.Source + " (" + relAge(m.now.Sub(ps.SyncedAt)) + ")"
+}
+
+// relAge renders a duration as a compact relative age: "just now" under a minute (also
+// for a slightly-future time from clock skew), then "Nm ago" / "Nh ago" / "Nd ago".
+func relAge(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
+
 func money(micros int64) string {
 	v := float64(micros) / 1e6
 	neg := ""
@@ -2376,7 +2467,9 @@ func humanModel(m string) string {
 	if m == "<synthetic>" {
 		return "other"
 	}
-	return strings.TrimPrefix(m, "claude-")
+	// The id is lifted verbatim from the session log; sanitize at this render
+	// boundary against terminal escape-sequence injection (CWE-150).
+	return termtext.SanitizeLabel(strings.TrimPrefix(m, "claude-"))
 }
 
 func providerLabel(p string) string {
@@ -2515,11 +2608,14 @@ func trunc(s string, n int) string {
 	return string(r[:n-1]) + "…"
 }
 
+// orDash renders an empty value as an em dash, else the (session-derived) value
+// sanitized at this render boundary — repo names reach the TUI verbatim from the
+// log, so they must not carry terminal escape sequences (CWE-150).
 func orDash(s string) string {
 	if s == "" {
 		return "—"
 	}
-	return s
+	return termtext.SanitizeLabel(s)
 }
 
 func comma(n int64) string {

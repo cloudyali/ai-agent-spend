@@ -9,6 +9,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
 	"github.com/cloudyali/ai-agent-spend/internal/scan"
 	"github.com/cloudyali/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/termtext"
 	"github.com/cloudyali/ai-agent-spend/internal/trailer"
 	"github.com/cloudyali/ai-agent-spend/internal/vcs"
 )
@@ -47,6 +49,11 @@ type App struct {
 	Resolver platform.Resolver
 	Now      func() time.Time
 	Out, Err io.Writer
+	// fetchPrices fetches the LiteLLM price-table bytes for the launch auto-refresh,
+	// honoring the context's deadline so a latency-sensitive caller can bound the wait.
+	// nil in production → refresh.FetchContext (the single disclosed inbound GET);
+	// injected in tests so they never touch the network.
+	fetchPrices func(context.Context, string) ([]byte, error)
 }
 
 // Run is the entry point: dispatch args, write to out/err, return an exit code.
@@ -266,6 +273,7 @@ func (a *App) cmdReport(args []string) int {
 	periodSpec := fs.String("period", "week", `calendar window: today|yesterday|week|month|"last week"|"last month"|quarter|"this year"|"N days"|"since YYYY-MM-DD"|YYYY-MM-DD..YYYY-MM-DD|all`)
 	jsonOut := fs.Bool("json", false, "emit the report as JSON instead of a table (metered views only)")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
+	noRefresh := fs.Bool("no-refresh", false, "skip the automatic price refresh-on-launch; use cached/embedded rates as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -280,6 +288,7 @@ func (a *App) cmdReport(args []string) int {
 		return 2
 	}
 
+	a.refreshOnLaunch(*noRefresh)
 	a.scanOnLaunch(*noScan)
 
 	st, err := a.openStore()
@@ -453,7 +462,7 @@ func topUnpriced(m map[string]int, limit int) string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		fmt.Fprintf(&b, "%s (%d)", x.k, x.n)
+		fmt.Fprintf(&b, "%s (%d)", termtext.SanitizeLabel(x.k), x.n)
 	}
 	return b.String()
 }
@@ -917,6 +926,82 @@ func (a *App) scanOnLaunchEnabled() bool {
 	return on
 }
 
+// launchRefreshBudget bounds the one-shot launch top-up so a slow network never hangs a
+// short-lived command (report/today/top). The TUI's background worker passes a plain
+// context and uses the full client timeout instead, since it never blocks the UI.
+const launchRefreshBudget = 2500 * time.Millisecond
+
+// priceFetcher returns the function used to pull the LiteLLM table. Tests inject
+// a.fetchPrices to stay hermetic; production falls back to refresh.FetchContext (the one
+// disclosed inbound GET — a no-op in the offline build, which never reaches here
+// because refreshIfStale gates on refresh.NetworkEnabled first).
+func (a *App) priceFetcher() func(context.Context, string) ([]byte, error) {
+	if a.fetchPrices != nil {
+		return a.fetchPrices
+	}
+	return refresh.FetchContext
+}
+
+// refreshIfStale tops up the LiteLLM price cache when it is missing or older than 24h:
+// one inbound fetch (under ctx), then cache + reprice in place (applyPricingTable), so
+// reports use rates no more than a day old. It is the shared seam for the launch refresh
+// and the TUI's background top-up. Best-effort and silent — it returns (0,false),
+// leaving the existing cache or the embedded floor in place, when:
+//   - disabled (skip, AISPEND_NO_REFRESH, or refresh_on_launch=false),
+//   - the network is compiled out (offline build: refresh.NetworkEnabled=false),
+//   - the cache is already fresh (≤24h), or
+//   - the fetch/parse fails or ctx expires (offline, timeout, bad payload).
+//
+// The offline build can never fetch — preserving the provably-offline promise
+// (doctor --network discloses it).
+func (a *App) refreshIfStale(ctx context.Context, skip bool) (models int, did bool) {
+	if skip || !refresh.NetworkEnabled || !a.refreshOnLaunchEnabled() {
+		return 0, false
+	}
+	cache := refresh.CachePath(a.Resolver.AppHome())
+	if _, ok := refresh.ReadFreshCache(cache, 24*time.Hour); ok {
+		return 0, false // already fresh — no fetch
+	}
+	data, err := a.priceFetcher()(ctx, refresh.LiteLLMURL)
+	if err != nil {
+		return 0, false // best-effort: keep the stale cache / embedded floor
+	}
+	n, _, err := a.applyPricingTable(cache, data)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// refreshOnLaunch is the one-shot read-command hook (today/report/top): it keeps prices
+// fresh before anything is priced, mirroring scanOnLaunch. The fetch is bounded by
+// launchRefreshBudget so a slow network never hangs the command — on timeout it proceeds
+// with the cached/embedded rates and the cache simply updates on a later run. Quiet: a
+// one-line notice on STDERR only when a refresh actually happened (so stdout / --json
+// stays pipe-clean). Opt out with --no-refresh, AISPEND_NO_REFRESH, or
+// refresh_on_launch=false. (The TUI refreshes asynchronously instead — see cmdTui.)
+func (a *App) refreshOnLaunch(skip bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), launchRefreshBudget)
+	defer cancel()
+	if n, did := a.refreshIfStale(ctx, skip); did {
+		fmt.Fprintf(a.Err, "refreshed %d model prices (cache was stale)\n", n)
+	}
+}
+
+// refreshOnLaunchEnabled reports whether the launch refresh should run: off when
+// AISPEND_NO_REFRESH is explicitly truthy (1/true/yes/on), or when
+// refresh_on_launch=false in config.toml; on by default. The env vocabulary is explicit
+// (not presence-based) so a stray AISPEND_NO_REFRESH=false/0 reads as "don't disable".
+// A malformed config value keeps the safe default (on, freshness).
+func (a *App) refreshOnLaunchEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AISPEND_NO_REFRESH"))) {
+	case "1", "true", "yes", "on":
+		return false // explicitly disabled via the environment
+	}
+	on, _ := config.LoadRefreshOnLaunch(a.Resolver.AppHome())
+	return on
+}
+
 // pendingUsageLive is the trailer hook's PendingFunc: it live-scans first, then reads
 // the freshened ledger — so a commit stamps turns that were never explicitly scanned.
 // today's preview deliberately uses the non-scanning pendingUsage to stay fast.
@@ -958,10 +1043,15 @@ func (a *App) cmdDoctor(args []string) int {
 	}
 	if *network {
 		fmt.Fprintln(a.Out, "default build: no network-capable sink in import graph  ✓")
-		// Honest disclosure: the one outbound is an opt-in INBOUND price fetch
-		// (a public file; no spend, identity, or telemetry leaves the machine).
+		// Honest disclosure: the only outbound is an INBOUND price fetch (a public
+		// file; no spend, identity, or telemetry leaves the machine). It fires on the
+		// explicit `pricing refresh` AND automatically on launch when the cache is
+		// >24h old — the latter is on by default but opt-out.
 		if refresh.NetworkEnabled {
-			fmt.Fprintf(a.Out, "inbound only: `aispend pricing refresh` may GET %s (no data sent)\n", refresh.LiteLLMURL)
+			fmt.Fprintf(a.Out, "inbound only: GET %s (a public price file; no data sent)\n", refresh.LiteLLMURL)
+			fmt.Fprintln(a.Out, "  · on `aispend pricing refresh`, and automatically when the cache is >24h old")
+			fmt.Fprintln(a.Out, "  · auto top-up runs in the background in the TUI, and bounded (≤2.5s) on other commands")
+			fmt.Fprintln(a.Out, "  · disable the auto top-up: --no-refresh, AISPEND_NO_REFRESH=1, or refresh_on_launch=false")
 		} else {
 			fmt.Fprintln(a.Out, "offline build: price refresh disabled (no net/* compiled in)")
 		}
@@ -1035,14 +1125,19 @@ func groupKey(e event.AgentEvent, by string) string {
 // ids, which are long UUIDs. The full id is preserved everywhere it matters
 // (grouping, JSON, `explain session:<id>` prefix-matching); other dimensions pass
 // through unchanged.
+//
+// Keys are lifted verbatim from session logs (branch, repo, model, file, cost_tag)
+// or are id prefixes, so each is sanitized at this render boundary — a poisoned
+// value must not inject terminal escape sequences (CWE-150). Only the displayed
+// copy is scrubbed; the stored key that drives grouping is untouched.
 func displayKey(by, key string) string {
 	switch by {
 	case "session":
-		return shortSession(key)
+		return termtext.SanitizeLabel(shortSession(key))
 	case "commit":
-		return shortSHA(key)
+		return termtext.SanitizeLabel(shortSHA(key))
 	}
-	return key
+	return termtext.SanitizeLabel(key)
 }
 
 // shortSHA renders a commit as its first 10 hex chars — enough to identify and to

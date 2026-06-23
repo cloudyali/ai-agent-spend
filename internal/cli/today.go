@@ -30,9 +30,11 @@ func (a *App) cmdToday(args []string) int {
 	fs.SetOutput(a.Err)
 	repo := fs.String("repo", ".", "repo to preview uncommitted trailer spend for (defaults to cwd)")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
+	noRefresh := fs.Bool("no-refresh", false, "skip the automatic price refresh-on-launch; use cached/embedded rates as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	a.refreshOnLaunch(*noRefresh)
 	a.scanOnLaunch(*noScan)
 	now := a.Now()
 	st, err := a.openStore()

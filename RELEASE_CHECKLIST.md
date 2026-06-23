@@ -41,6 +41,21 @@ bottom; items already done in this OSS-prep pass are marked ✅.
 
 ## 5. Homebrew tap (macOS)
 
+> **Deferred during the private preview.** `.goreleaser.yaml` sets `skip_upload: true`,
+> so the cask is generated but **not pushed** — private release assets aren't installable
+> via brew without per-user tokens. Flip `skip_upload` back to `auto` and work through this
+> section **when the repo goes public**.
+>
+> **Interim install (collaborators only):** grab the asset with the `gh` CLI (handles
+> auth), or use `go install`:
+>
+> ```sh
+> gh release download vX.Y.Z --repo cloudyali/ai-agent-spend --pattern '*darwin_arm64.tar.gz'
+> tar xzf aispend_*_darwin_arm64.tar.gz && sudo mv aispend /usr/local/bin/
+> # or, with Go + repo access:
+> GOPRIVATE=github.com/cloudyali/* go install github.com/cloudyali/ai-agent-spend/cmd/aispend@vX.Y.Z
+> ```
+
 How it works: on a `v*` tag, GoReleaser builds the archives + `checksums.txt`, cuts
 the GitHub Release in this repo, then generates `Casks/aispend.rb` and commits it to a
 **separate** tap repo. Users then `brew install cloudyali/tap/aispend` (the `homebrew-`

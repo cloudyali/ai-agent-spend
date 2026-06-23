@@ -11,14 +11,17 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
 	"sort"
 	"time"
 
 	"github.com/cloudyali/ai-agent-spend/internal/budget"
 	"github.com/cloudyali/ai-agent-spend/internal/config"
 	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/pricing/refresh"
 	"github.com/cloudyali/ai-agent-spend/internal/provider"
 	"github.com/cloudyali/ai-agent-spend/internal/provider/claudecode"
 	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
@@ -93,12 +96,24 @@ func (a *App) buildCommits(events []event.AgentEvent, trailerName string) []tui.
 	return commits
 }
 
+// pricingStatus reports the active rate source for the TUI header, mirroring
+// pricingEngine's resolution: the LiteLLM cache when present and fresh (≤24h), else the
+// embedded floor (no sync date). Read per refresh so a watch-tick top-up shows up live.
+func (a *App) pricingStatus() tui.PricingStatus {
+	cache := refresh.CachePath(a.Resolver.AppHome())
+	if fi, err := os.Stat(cache); err == nil && a.Now().Sub(fi.ModTime()) <= 24*time.Hour {
+		return tui.PricingStatus{Source: "LiteLLM", SyncedAt: fi.ModTime()}
+	}
+	return tui.PricingStatus{Source: "embedded"}
+}
+
 func (a *App) cmdTui(args []string) int {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
 	periodSpec := fs.String("period", "week", "initial calendar window (same grammar as `report`)")
 	watch := fs.Bool("watch", false, "live mode: periodically re-scan logs and refresh the view in place")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
+	noRefresh := fs.Bool("no-refresh", false, "skip the automatic price refresh-on-launch; use cached/embedded rates as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -106,6 +121,9 @@ func (a *App) cmdTui(args []string) int {
 		fmt.Fprintln(a.Err, "aispend tui needs an interactive terminal; try `aispend top` or `aispend report`")
 		return 1
 	}
+	// Scan synchronously so the explorer opens on current data immediately (a fast,
+	// local, checkpoint-resuming read). The price top-up is deferred to the async
+	// background reload below, so opening never blocks on the network.
 	a.scanOnLaunch(*noScan)
 
 	st, err := a.openStore()
@@ -184,6 +202,7 @@ func (a *App) cmdTui(args []string) int {
 		WithQuota(func() []quota.Sample {
 			return append(a.claudeQuotaSamples(a.Now()), a.codexQuotaSamples(a.Now())...)
 		}).
+		WithPricingStatus(a.pricingStatus). // re-read per refresh so a watch tick reflects a top-up
 		WithBudget(func() (budget.Pace, bool) {
 			st2, err := a.openStore() // re-open so a watch tick re-paces against fresh spend
 			if err != nil {
@@ -226,11 +245,27 @@ func (a *App) cmdTui(args []string) int {
 			}
 			return a.buildCommits(evs, trailerName)
 		})
-	if *watch {
-		// Live mode: every few seconds re-scan + rebuild and advance the clock, so an
-		// ongoing session grows and liveness decays without leaving the explorer.
-		m = m.WithWatch(3*time.Second, a.Now, buildPeriods)
+	// reload is the background sync, run OFF the UI loop by tui.reloadCmd so neither the
+	// log re-scan nor the network price top-up ever blocks the explorer:
+	//   - an incremental, checkpoint-resuming re-scan (Full:false → resumes from the
+	//     last-scan watermark) unless --no-scan, so an ongoing session's new turns appear;
+	//   - a stale-cache (>24h) price top-up unless --no-refresh, at the full client
+	//     timeout (async, so the 10s ceiling is harmless);
+	//   - then a rebuild so repriced/rescanned numbers and the sync age refresh in place.
+	// --watch repeats it on a heartbeat; without --watch it runs once at launch (the
+	// async launch refresh). The tui serializes reloads, so only one runs at a time.
+	reload := func() []tui.Period {
+		if !*noScan {
+			a.incrementalScan()
+		}
+		a.refreshIfStale(context.Background(), *noRefresh)
+		return buildPeriods()
 	}
+	interval := time.Duration(0) // 0 → launch-only; --watch → periodic
+	if *watch {
+		interval = 3 * time.Second
+	}
+	m = m.WithWatch(interval, a.Now, reload)
 	if resolve := a.promptResolver(); resolve != nil {
 		m = m.WithPromptResolver(resolve)
 	}

@@ -1284,29 +1284,42 @@ func TestModel_WatchTickRefreshesAndAdvancesClock(t *testing.T) {
 	}
 
 	clock = now.Add(20 * time.Minute) // time moves on; the session goes stale
+	// The tick now kicks an async reload; data isn't applied until its message lands.
 	nm, cmd := m.Update(tickMsg(clock))
+	m = nm.(Model)
+	if len(m.rows) != 1 {
+		t.Errorf("the tick itself must not block-reload; data should still be the pre-tick snapshot, got %d rows", len(m.rows))
+	}
+	if cmd == nil {
+		t.Fatal("a tick should kick a background reload")
+	}
+	done, ok := cmd().(reloadDoneMsg)
+	if !ok {
+		t.Fatalf("the reload cmd should yield a reloadDoneMsg, got %T", cmd())
+	}
+	nm, cmd = m.Update(done)
 	m = nm.(Model)
 
 	if len(m.rows) != 2 {
-		t.Errorf("a tick should reload fresh data (2 sessions now), got %d", len(m.rows))
+		t.Errorf("the landed reload should bring fresh data (2 sessions now), got %d", len(m.rows))
 	}
 	if cmd == nil {
-		t.Error("a watch tick should re-arm the next tick")
+		t.Error("after a reload lands, the next watch tick should be armed")
 	}
 	if strings.Contains(m.View(), "active in the last") {
 		t.Errorf("after the clock advanced 20m nothing is live → legend should be gone:\n%s", m.View())
 	}
 }
 
-func TestModel_InitArmsTickOnlyWhenWatching(t *testing.T) {
+func TestModel_InitKicksReloadOnlyWhenWired(t *testing.T) {
 	eng := pricing.NewEngine()
 	base := []Period{{Label: "today", Events: nil}}
 	if New(base, 0, eng).Init() != nil {
-		t.Error("no watch configured → Init should arm no tick")
+		t.Error("no reload wired → Init should schedule nothing")
 	}
 	watched := New(base, 0, eng).WithWatch(time.Second, nil, func() []Period { return base })
 	if watched.Init() == nil {
-		t.Error("watch configured → Init should arm a tick")
+		t.Error("reload wired → Init should kick the first background reload")
 	}
 }
 

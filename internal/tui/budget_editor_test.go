@@ -80,6 +80,39 @@ func TestModel_BudgetEditor_EscAndInvalid(t *testing.T) {
 	}
 }
 
+// A configured budget must be visible — and editable — when the editor opens.
+// Pressing b prefills the field with the current ceiling (a fractional value here,
+// to prove the micros→dollars conversion) instead of a blank input.
+func TestModel_BudgetEditor_PrefillsExistingBudget(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	start, end := budget.MonthBounds(now)
+	m := New([]Period{{Label: "today"}}, 0, pricing.NewEngine()).WithNow(now).
+		WithBudget(func() (budget.Pace, bool) {
+			return budget.ComputePace(250_500_000, 100_000_000, start, now, end), true // $250.50 ceiling
+		}).
+		WithBudgetSetter(func(int64) (budget.Pace, bool) { return budget.Pace{}, true })
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 110, Height: 30})
+	m = nm.(Model)
+
+	nm, _ = m.Update(runeKey('b'))
+	m = nm.(Model)
+	if m.mode != modeBudget {
+		t.Fatalf("b should open the budget editor, mode=%v", m.mode)
+	}
+	if m.budgetBuf != "250.5" {
+		t.Errorf("editor should prefill the existing ceiling: budgetBuf=%q, want %q", m.budgetBuf, "250.5")
+	}
+	if v := m.View(); !strings.Contains(v, "$250.5") {
+		t.Errorf("editor should display the existing budget:\n%s", v)
+	}
+	// The prefill stays editable: backspace trims the seeded value.
+	nm, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m = nm.(Model)
+	if m.budgetBuf != "250." {
+		t.Errorf("prefilled value should be editable: budgetBuf=%q, want %q", m.budgetBuf, "250.")
+	}
+}
+
 func TestModel_BudgetKeyIgnoredWithoutSetter(t *testing.T) {
 	// Without WithBudgetSetter, 'b' is inert (no editor, no legend entry).
 	m := New([]Period{{Label: "today"}}, 0, pricing.NewEngine())

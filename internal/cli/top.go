@@ -20,6 +20,7 @@ func (a *App) cmdTop(args []string) int {
 	limit := fs.Int("limit", 10, "how many rows to list")
 	bySessions := fs.Bool("sessions", false, "rank whole sessions instead of individual turns")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
+	noRefresh := fs.Bool("no-refresh", false, "skip the automatic price refresh-on-launch; use cached/embedded rates as-is")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -31,6 +32,7 @@ func (a *App) cmdTop(args []string) int {
 	if *limit < 1 {
 		*limit = 10
 	}
+	a.refreshOnLaunch(*noRefresh)
 	a.scanOnLaunch(*noScan)
 	st, err := a.openStore()
 	if err != nil {
