@@ -231,7 +231,7 @@ func (a *App) cmdScan(args []string) int {
 		}
 		detected++
 		sources, _ := pr.p.Sources()
-		sc := &scan.Scanner{Provider: pr.p, Normalizer: pr.n, Pricing: eng, Plan: toPricingPlan(plans.For(pr.p.Name())), Store: st, Sink: st, Now: a.Now, Full: *full}
+		sc := &scan.Scanner{Provider: pr.p, Normalizer: pr.n, Pricing: eng, Plan: toPricingPlan(plans.For(pr.p.Name())), Store: st, Now: a.Now, Full: *full}
 		sum, err := sc.Run()
 		if err != nil {
 			fmt.Fprintf(a.Err, "aispend: %v\n", err)
@@ -281,7 +281,7 @@ func (a *App) cmdReport(args []string) int {
 	fs := flag.NewFlagSet("report", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
 	by := fs.String("by", "model", "group by: model|repo|provider|cost_tag|session|branch|commit|file")
-	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|billed|amortized|marginal")
+	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|amortized")
 	periodSpec := fs.String("period", "week", `calendar window: today|yesterday|week|month|"last week"|"last month"|quarter|"this year"|"N days"|"since YYYY-MM-DD"|YYYY-MM-DD..YYYY-MM-DD|all`)
 	jsonOut := fs.Bool("json", false, "emit the report as JSON instead of a table (metered views only)")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
@@ -303,7 +303,7 @@ func (a *App) cmdReport(args []string) int {
 		return 2
 	case "amortized":
 		if *jsonOut {
-			fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view amortized yet (use a metered view: api_equivalent, reported, estimated, billed, marginal)")
+			fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view amortized yet (use a metered view: api_equivalent, reported, estimated)")
 			return 2
 		}
 	}
@@ -901,7 +901,7 @@ func (a *App) incrementalScan() int {
 		if derr != nil || !present {
 			continue
 		}
-		sc := &scan.Scanner{Provider: pr.p, Normalizer: pr.n, Pricing: eng, Plan: toPricingPlan(plans.For(pr.p.Name())), Store: st, Sink: st, Now: a.Now, Full: false}
+		sc := &scan.Scanner{Provider: pr.p, Normalizer: pr.n, Pricing: eng, Plan: toPricingPlan(plans.For(pr.p.Name())), Store: st, Now: a.Now, Full: false}
 		sum, runErr := sc.Run()
 		if runErr != nil {
 			continue // best-effort; a provider error falls back to the existing ledger
@@ -1091,12 +1091,8 @@ func pickView(e event.AgentEvent, view string) (event.Money, bool) {
 		m = cv.Estimated
 	case "reported":
 		m = cv.Reported
-	case "billed":
-		m = cv.Billed
 	case "amortized":
 		m = cv.Amortized
-	case "marginal":
-		m = cv.Marginal
 	default:
 		m = cv.APIEquivalent
 	}
@@ -1345,7 +1341,7 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
               quarter | "last quarter" | "this year" | "last year" | "N days" (e.g. "90 days") |
               "since YYYY-MM-DD" | YYYY-MM-DD..YYYY-MM-DD | all   (always calendar time, never rolling)
   G (group):  model | repo | provider | cost_tag | session | branch | commit | file
-  V (view):   api_equivalent | reported | estimated | billed | amortized | marginal
+  V (view):   api_equivalent | reported | estimated | amortized
   --json:     emit the report as JSON instead of a table (metered views only)
 
   examples:

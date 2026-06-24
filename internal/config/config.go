@@ -304,11 +304,6 @@ func SetProviderPlan(appHome, provider, planID string, start time.Time) error {
 	return nil
 }
 
-// SetDefaultPlan sets the default (no-provider) plan. Convenience wrapper.
-func SetDefaultPlan(appHome, planID string, start time.Time) error {
-	return SetProviderPlan(appHome, "", planID, start)
-}
-
 // setConfigKey sets one flat top-level key in config.toml (replacing it in place if
 // present, else appending), leaving all other content untouched. rawValue is the
 // already-formatted right-hand side (e.g. a quoted string).
