@@ -138,7 +138,7 @@ func TestRenderBudget_ShowsPace(t *testing.T) {
 	m := event.USD(250_000_000) // $250 spent this month → 50% of a $500 budget at ~half the month
 	e := event.AgentEvent{EventID: "e1", SessionID: "s1", Provider: "claude_code", Model: "claude-opus-4-8",
 		TSStart: now.Add(-48 * time.Hour), TSEnd: now.Add(-48 * time.Hour), CostViews: event.CostViews{APIEquivalent: &m}}
-	if err := st.Write([]event.AgentEvent{e}); err != nil {
+	if err := st.Upsert([]event.AgentEvent{e}); err != nil {
 		t.Fatal(err)
 	}
 	a.renderBudget(st, now)

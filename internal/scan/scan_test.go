@@ -40,21 +40,20 @@ const (
 	brokenLine  = `{not json`
 )
 
-func newScanner(s store.Store, sink store.Sink, recs []provider.RawRecord) *Scanner {
+func newScanner(s store.Store, recs []provider.RawRecord) *Scanner {
 	return &Scanner{
 		Provider:   &fakeProvider{recs: recs},
 		Normalizer: normalize.ClaudeCode{GOOS: "linux", IdentityHash: "id"},
 		Pricing:    pricing.NewEngine(),
 		Plan:       pricing.Plan{Kind: "api"},
 		Store:      s,
-		Sink:       sink,
 		Now:        func() time.Time { return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC) },
 	}
 }
 
 func TestScan_CountsAndStores(t *testing.T) {
 	st := store.NewMemStore()
-	sc := newScanner(st, st, []provider.RawRecord{
+	sc := newScanner(st, []provider.RawRecord{
 		rec(1, userLine), rec(2, opusLine), rec(3, sonnetLine), rec(4, summaryLine), rec(5, brokenLine),
 	})
 
@@ -107,8 +106,8 @@ func TestScan_EnrichesGitSHABestEffort(t *testing.T) {
 		},
 		Pricing: pricing.NewEngine(),
 		Plan:    pricing.Plan{Kind: "api"},
-		Store:   st, Sink: st,
-		Now: func() time.Time { return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC) },
+		Store:   st,
+		Now:     func() time.Time { return time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC) },
 	}
 	if _, err := sc.Run(); err != nil {
 		t.Fatal(err)
@@ -132,7 +131,7 @@ const (
 
 func TestScan_DedupesStreamingPlaceholders(t *testing.T) {
 	st := store.NewMemStore()
-	sc := newScanner(st, st, []provider.RawRecord{
+	sc := newScanner(st, []provider.RawRecord{
 		rec(1, placeholderLine), rec(2, fullTurnLine),
 	})
 	sum, err := sc.Run()
@@ -151,13 +150,15 @@ func TestScan_DedupesStreamingPlaceholders(t *testing.T) {
 	}
 }
 
-type errSink struct{}
+// errStore is a Store whose Upsert always fails, to exercise the write-error path.
+// LastScan/SetLastScan/Query/Get delegate to the embedded MemStore.
+type errStore struct{ *store.MemStore }
 
-func (errSink) Write([]event.AgentEvent) error { return errors.New("sink boom") }
+func (errStore) Upsert([]event.AgentEvent) error { return errors.New("store boom") }
 
 func TestScan_ReadErrorPropagates(t *testing.T) {
 	st := store.NewMemStore()
-	sc := newScanner(st, st, nil)
+	sc := newScanner(st, nil)
 	sc.Provider = &fakeProvider{readErr: errors.New("read boom")}
 	if _, err := sc.Run(); err == nil {
 		t.Error("expected read error to propagate")
@@ -165,8 +166,7 @@ func TestScan_ReadErrorPropagates(t *testing.T) {
 }
 
 func TestScan_WriteErrorPropagates(t *testing.T) {
-	st := store.NewMemStore()
-	sc := newScanner(st, errSink{}, []provider.RawRecord{rec(2, opusLine)})
+	sc := newScanner(errStore{store.NewMemStore()}, []provider.RawRecord{rec(2, opusLine)})
 	if _, err := sc.Run(); err == nil {
 		t.Error("expected write error to propagate")
 	}
@@ -176,10 +176,10 @@ func TestScan_IsIdempotent(t *testing.T) {
 	st := store.NewMemStore()
 	recs := []provider.RawRecord{rec(2, opusLine), rec(3, sonnetLine)}
 
-	if _, err := newScanner(st, st, recs).Run(); err != nil {
+	if _, err := newScanner(st, recs).Run(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newScanner(st, st, recs).Run(); err != nil { // re-scan
+	if _, err := newScanner(st, recs).Run(); err != nil { // re-scan
 		t.Fatal(err)
 	}
 	got, _ := st.Query(store.Filter{})

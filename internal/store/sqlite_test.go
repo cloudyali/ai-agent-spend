@@ -9,7 +9,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
-func newSQLite(t *testing.T) storeSink {
+func newSQLite(t *testing.T) Store {
 	t.Helper()
 	s, err := OpenSQLite(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

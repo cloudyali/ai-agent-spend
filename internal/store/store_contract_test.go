@@ -7,12 +7,6 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
-// storeSink is the full contract: persistence (Store) + the egress seam (Sink).
-type storeSink interface {
-	Store
-	Sink
-}
-
 var base = time.Date(2026, 6, 14, 9, 0, 0, 0, time.UTC)
 
 func sample(id, provider, repo string, ts time.Time) event.AgentEvent {
@@ -29,9 +23,9 @@ func sample(id, provider, repo string, ts time.Time) event.AgentEvent {
 	}
 }
 
-// storeContract exercises the Store + Sink behavior against ANY implementation.
-// Both MemStore and SQLiteStore are run through it — same suite, two backends.
-func storeContract(t *testing.T, newStore func(t *testing.T) storeSink) {
+// storeContract exercises the Store behavior against ANY implementation. MemStore and
+// FileStore run through it by default; the -tags sqlite SQLiteStore runs the same suite.
+func storeContract(t *testing.T, newStore func(t *testing.T) Store) {
 	t.Run("upsert is idempotent and replaces in place", func(t *testing.T) {
 		s := newStore(t)
 		e := sample("evt_1", "claude_code", "payments", base)
@@ -103,16 +97,6 @@ func storeContract(t *testing.T, newStore func(t *testing.T) storeSink) {
 		}
 	})
 
-	t.Run("Write equals Upsert (Sink)", func(t *testing.T) {
-		s := newStore(t)
-		if err := s.Write([]event.AgentEvent{sample("w1", "claude_code", "r", base)}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := s.Get("w1"); err != nil {
-			t.Errorf("Write should persist like Upsert: %v", err)
-		}
-	})
-
 	t.Run("lossless round-trip of nested fields", func(t *testing.T) {
 		s := newStore(t)
 		e := sample("rt", "claude_code", "payments", base)
@@ -137,14 +121,14 @@ func storeContract(t *testing.T, newStore func(t *testing.T) storeSink) {
 
 // --- helpers (shared by both backends) ---
 
-func mustUpsert(t *testing.T, s storeSink, evs ...event.AgentEvent) {
+func mustUpsert(t *testing.T, s Store, evs ...event.AgentEvent) {
 	t.Helper()
 	if err := s.Upsert(evs); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 }
 
-func query(t *testing.T, s storeSink, f Filter) []event.AgentEvent {
+func query(t *testing.T, s Store, f Filter) []event.AgentEvent {
 	t.Helper()
 	got, err := s.Query(f)
 	if err != nil {
@@ -153,7 +137,7 @@ func query(t *testing.T, s storeSink, f Filter) []event.AgentEvent {
 	return got
 }
 
-func queryAll(t *testing.T, s storeSink) []event.AgentEvent { return query(t, s, Filter{}) }
+func queryAll(t *testing.T, s Store) []event.AgentEvent { return query(t, s, Filter{}) }
 
 func ids(evs []event.AgentEvent) []string {
 	out := make([]string, len(evs))

@@ -121,7 +121,7 @@ func TestAgentEvent_NilCostViewsAreOmitted(t *testing.T) {
 	e.CostViews = CostViews{} // everything not computable
 	b, _ := json.Marshal(e)
 	s := string(b)
-	if strings.Contains(s, "api_equivalent") || strings.Contains(s, "billed") {
+	if strings.Contains(s, "api_equivalent") || strings.Contains(s, "reported") {
 		t.Errorf("nil cost views should be omitted, got %s", s)
 	}
 	// the cost_views object itself is always present (a contract field).

@@ -1,8 +1,8 @@
 // Package store persists AgentEvents idempotently and answers queries over them.
-// The Store and Sink interfaces are the seam: Phase 0A ships an in-memory
-// implementation (proving the contract under TDD) and a SQLite-backed LocalSink
-// that satisfies the SAME interface and the SAME test suite. Nothing above this
-// package knows which implementation it holds.
+// The Store interface is the seam: an in-memory implementation (proving the contract
+// under TDD), the default JSON FileStore, and the -tags sqlite SQLiteStore all satisfy
+// the SAME interface and the SAME contract test suite, so nothing above this package
+// knows which implementation it holds.
 //
 // See design-documents/02-data-model.md (storage) and
 // design-documents/phase-0A-trusted-explainable-ledger.md (interfaces).
@@ -34,19 +34,10 @@ type Store interface {
 	SetLastScan(provider string, t time.Time) error
 }
 
-// Sink is the single egress seam. In the default build the only implementation
-// is local (in-memory now, SQLite next) — the cloud sink lives behind a build tag.
-type Sink interface {
-	Write(events []event.AgentEvent) error
-}
+// Compile-time proof the in-memory store satisfies the Store seam.
+var _ Store = (*MemStore)(nil)
 
-// Compile-time proof the in-memory store satisfies both seams.
-var (
-	_ Store = (*MemStore)(nil)
-	_ Sink  = (*MemStore)(nil)
-)
-
-// MemStore is a goroutine-safe in-memory Store + Sink.
+// MemStore is a goroutine-safe in-memory Store.
 type MemStore struct {
 	mu       sync.RWMutex
 	events   map[string]event.AgentEvent
@@ -73,9 +64,6 @@ func (s *MemStore) Upsert(events []event.AgentEvent) error {
 	}
 	return nil
 }
-
-// Write implements Sink; it is the same idempotent operation as Upsert.
-func (s *MemStore) Write(events []event.AgentEvent) error { return s.Upsert(events) }
 
 // Query returns events matching the filter, ordered by TSStart ascending.
 func (s *MemStore) Query(f Filter) ([]event.AgentEvent, error) {

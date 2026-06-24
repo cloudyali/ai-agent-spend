@@ -1,8 +1,9 @@
-// FileStore is the default 0A persistent Store + Sink: a single JSON file, zero
-// external dependencies, which keeps the binary a pure-Go static artifact. It is
-// ample for a single developer's local ledger (thousands of events); the
-// -tags sqlite SQLiteStore is the drop-in for larger/fleet scale, behind the same
-// interface. See design-documents/02-data-model.md §6.
+// FileStore is the default 0A persistent Store: a single JSON file, zero external
+// dependencies, which keeps the binary a pure-Go static artifact. It is ample for a
+// single developer's local ledger (thousands of events); the -tags sqlite SQLiteStore
+// is the multi-writer-safe drop-in (cross-process locking) behind the same interface,
+// for when a background daemon shares the ledger with manual scans.
+// See design-documents/02-data-model.md §6.
 package store
 
 import (
@@ -18,10 +19,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
-var (
-	_ Store = (*FileStore)(nil)
-	_ Sink  = (*FileStore)(nil)
-)
+var _ Store = (*FileStore)(nil)
 
 // FileStore persists events to a JSON file, written atomically (temp + rename).
 type FileStore struct {
@@ -98,9 +96,6 @@ func (s *FileStore) Upsert(events []event.AgentEvent) error {
 	}
 	return s.persist()
 }
-
-// Write implements Sink; same idempotent operation as Upsert.
-func (s *FileStore) Write(events []event.AgentEvent) error { return s.Upsert(events) }
 
 // Query returns events matching the filter, ordered by TSStart ascending.
 func (s *FileStore) Query(f Filter) ([]event.AgentEvent, error) {

@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-// SetDefaultPlan writes/replaces the `plan` key without disturbing other lines,
-// and the result resolves to a subscription plan (fee seeded from the table).
+// SetProviderPlan with an empty provider writes/replaces the `plan` key without
+// disturbing other lines, and resolves to a subscription plan (fee seeded from the table).
 func TestSetDefaultPlan(t *testing.T) {
 	home := t.TempDir()
 	start := time.Date(2026, 1, 15, 0, 0, 0, 0, time.UTC)
 
 	// Fresh: creates config.toml and resolves to a subscription with a seeded fee
 	// and the start date (the billing-cycle anchor) persisted.
-	if err := SetDefaultPlan(home, "claude-max-20x", start); err != nil {
+	if err := SetProviderPlan(home, "", "claude-max-20x", start); err != nil {
 		t.Fatal(err)
 	}
 	p, err := LoadAppConfig(home)
@@ -35,7 +35,7 @@ func TestSetDefaultPlan(t *testing.T) {
 	if err := os.WriteFile(path, []byte("currency = \"USD\"\nplan = \"old-plan\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := SetDefaultPlan(home, "claude-max-20x", start); err != nil {
+	if err := SetProviderPlan(home, "", "claude-max-20x", start); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(path)
@@ -48,7 +48,7 @@ func TestSetDefaultPlan(t *testing.T) {
 	}
 
 	// Empty id → api / no subscription.
-	if err := SetDefaultPlan(home, "", time.Time{}); err != nil {
+	if err := SetProviderPlan(home, "", "", time.Time{}); err != nil {
 		t.Fatal(err)
 	}
 	if p, _ := LoadAppConfig(home); p.Kind != "api" {

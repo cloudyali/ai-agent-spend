@@ -56,7 +56,7 @@ func LoadTrailers(repoDir string) (Trailers, error) {
 	setBool(tr, "interactions", &t.Interactions)
 	if v, ok := tr["precision"]; ok {
 		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
-			t.Precision = clampInt(n, 0, 8)
+			t.Precision = max(0, min(n, 8))
 		}
 	}
 	if name := strings.TrimSpace(secs["trailers.rename"]["cost"]); name != "" {
@@ -135,16 +135,6 @@ func setBool(m map[string]string, key string, dst *bool) {
 	case "false":
 		*dst = false
 	}
-}
-
-func clampInt(n, lo, hi int) int {
-	if n < lo {
-		return lo
-	}
-	if n > hi {
-		return hi
-	}
-	return n
 }
 
 // sectionedTOML parses the same flat key=value subset as parseTOML but tracks

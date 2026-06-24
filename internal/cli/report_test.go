@@ -161,19 +161,19 @@ func TestBuildReportResult_Components1h(t *testing.T) {
 }
 
 // Components are an api-equivalent decomposition, so they must be omitted for
-// non-token-priced views (e.g. billed) where they wouldn't reconcile.
+// non-token-priced views (e.g. reported) where they wouldn't reconcile.
 func TestBuildReportResult_ComponentsGatedByView(t *testing.T) {
 	eng := pricing.NewEngine()
-	billed := event.USD(500000)
+	reported := event.USD(500000)
 	ev := event.AgentEvent{Model: "claude-opus-4-8", Provider: "claude_code",
 		Tokens:    event.Tokens{Input: 1_000_000},
-		CostViews: event.CostViews{Billed: &billed}}
-	r := buildReportResult([]event.AgentEvent{ev}, "model", "billed", mustWindow(t, "all"), eng)
+		CostViews: event.CostViews{Reported: &reported}}
+	r := buildReportResult([]event.AgentEvent{ev}, "model", "reported", mustWindow(t, "all"), eng)
 	if len(r.Groups) != 1 {
 		t.Fatalf("groups=%d, want 1", len(r.Groups))
 	}
 	if r.Groups[0].Components != nil || r.TotalComponents != nil {
-		t.Error("components must be omitted for the billed (non-token-priced) view")
+		t.Error("components must be omitted for the reported (non-token-priced) view")
 	}
 }
 

@@ -817,7 +817,7 @@ func TestHelpers(t *testing.T) {
 	if groupKey(e, "repo") != "r" || groupKey(e, "provider") != "p" || groupKey(e, "cost_tag") != "team" || groupKey(e, "model") != "m" {
 		t.Error("groupKey wrong")
 	}
-	if _, ok := pickView(event.AgentEvent{}, "billed"); ok {
+	if _, ok := pickView(event.AgentEvent{}, "reported"); ok {
 		t.Error("nil view should report not-ok")
 	}
 	// amortized maps to the renamed CostViews.Amortized lens (was EffectiveAllocated).

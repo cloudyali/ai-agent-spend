@@ -1,5 +1,5 @@
 // Package scan orchestrates the 0A pipeline: a Provider's raw records are
-// normalized, priced, and written to the sink, with a summary of what happened.
+// normalized, priced, and written to the store, with a summary of what happened.
 // It is the seam the `aispend scan` command drives. Re-scanning is safe because
 // EventIDs are stable, so the idempotent Upsert collapses any re-read.
 //
@@ -41,15 +41,14 @@ type Summary struct {
 	Skips        []Skip // capped sample of skipped records, for `scan --verbose`
 }
 
-// Scanner wires the pipeline stages. The Store is used for scan-state; the Sink
-// receives events (a FileStore satisfies both).
+// Scanner wires the pipeline stages. The Store persists events and per-provider
+// scan-state.
 type Scanner struct {
 	Provider   provider.Provider
 	Normalizer normalize.Normalizer
 	Pricing    *pricing.Engine
 	Plan       pricing.Plan
 	Store      store.Store
-	Sink       store.Sink
 	Now        func() time.Time // injectable clock; defaults to time.Now
 	Full       bool             // re-read all sessions, ignoring the last-scan watermark
 }
@@ -140,7 +139,7 @@ func (s *Scanner) Run() (Summary, error) {
 	}
 
 	if len(events) > 0 {
-		if err := s.Sink.Write(events); err != nil {
+		if err := s.Store.Upsert(events); err != nil {
 			return Summary{}, fmt.Errorf("scan: write: %w", err)
 		}
 	}

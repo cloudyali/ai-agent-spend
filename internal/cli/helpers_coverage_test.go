@@ -41,13 +41,11 @@ func TestPickView_AllViews(t *testing.T) {
 	api := event.USD(1)
 	est := event.USD(2)
 	rep := event.USD(3)
-	bil := event.USD(4)
-	mar := event.USD(5)
-	cv := event.CostViews{APIEquivalent: &api, Estimated: &est, Reported: &rep, Billed: &bil, Marginal: &mar}
+	cv := event.CostViews{APIEquivalent: &api, Estimated: &est, Reported: &rep}
 	e := event.AgentEvent{CostViews: cv}
 
 	want := map[string]int64{
-		"api_equivalent": 1, "estimated": 2, "reported": 3, "billed": 4, "marginal": 5,
+		"api_equivalent": 1, "estimated": 2, "reported": 3,
 		"totally_unknown": 1, // default → api_equivalent
 	}
 	for view, micros := range want {

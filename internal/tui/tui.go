@@ -60,7 +60,7 @@ const amortizedView = "amortized"
 // cycleViews are the distinct per-event cost lenses `v` can rotate through.
 // estimated mirrors api-equivalent in 0A so it is omitted; only views actually
 // present in the data are offered, so `v` never lands on an all-$0 screen.
-var cycleViews = []string{"api_equivalent", "reported", "billed", "marginal"}
+var cycleViews = []string{"api_equivalent", "reported"}
 
 // TrailerSettings is the editable subset of a repo's [trailers] config, surfaced by
 // the in-explorer trailers editor (the `t` key). The cli maps it to/from
@@ -1549,10 +1549,6 @@ func viewMicros(e event.AgentEvent, view string) (int64, bool) {
 	switch view {
 	case "reported":
 		m = cv.Reported
-	case "billed":
-		m = cv.Billed
-	case "marginal":
-		m = cv.Marginal
 	default: // api_equivalent (and the amortized basis)
 		m = cv.APIEquivalent
 	}
@@ -1608,11 +1604,11 @@ func nextView(avail []string, cur string) string {
 	return avail[0]
 }
 
-func spendBar(micros, max int64, width int) string {
-	if max <= 0 || width <= 0 {
-		return strings.Repeat("░", maxInt(width, 0))
+func spendBar(micros, maxMicros int64, width int) string {
+	if maxMicros <= 0 || width <= 0 {
+		return strings.Repeat("░", max(width, 0))
 	}
-	fill := int(micros * int64(width) / max)
+	fill := int(micros * int64(width) / maxMicros)
 	if micros > 0 && fill < 1 {
 		fill = 1
 	}
@@ -2638,13 +2634,6 @@ func comma(n int64) string {
 		b.WriteString(s[i : i+3])
 	}
 	return b.String()
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func turnsWord(n int) string {

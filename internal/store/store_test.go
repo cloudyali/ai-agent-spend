@@ -7,12 +7,12 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
-// MemStore runs the full Store + Sink contract.
+// MemStore runs the full Store contract.
 func TestMemStore_Contract(t *testing.T) {
-	storeContract(t, func(t *testing.T) storeSink { return NewMemStore() })
+	storeContract(t, func(t *testing.T) Store { return NewMemStore() })
 }
 
-func newFileStore(t *testing.T) storeSink {
+func newFileStore(t *testing.T) Store {
 	t.Helper()
 	s, err := OpenFileStore(filepath.Join(t.TempDir(), "events.json"))
 	if err != nil {
