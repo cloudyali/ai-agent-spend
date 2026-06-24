@@ -44,6 +44,12 @@ aispend report --period <today|yesterday|week|month|"last week"|"last month"|
                          YYYY-MM-DD..YYYY-MM-DD|all> [--by G] [--view V] [--json]
                          # --by: model|repo|provider|cost_tag|session|branch|commit|file
 aispend today                  # arbitrage-first daily glance: ROI, cache savings, hourly spike bar
+aispend budget [set <amt>|clear] [--json] [--strict]
+                                # monthly api-equivalent ceiling (off by default). Bare = month-to-date
+                                # PACE (spent + run-rate projection vs ceiling, via the shared budgetPace);
+                                # `set`/`clear` write `budget_usd` to ~/.aispend/config.toml (CLI surface
+                                # for config.SetBudget). Informational only — never enforced. --json emits a
+                                # stable pace object; --strict exits non-zero when projected > ceiling (CI gate).
 aispend scan | doctor | plans
                                 # NOTE: the `explain` command was removed — per-turn/session evidence
                                 # now lives in the TUI drill (receipt → file → turn). Offline/non-TTY
