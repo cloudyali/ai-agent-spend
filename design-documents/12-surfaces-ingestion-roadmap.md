@@ -79,6 +79,21 @@ per the current priority.
 > build + `doctor --network` verified unchanged. **Remaining:** the opt-in session-end **hook** (the
 > "milestone" trigger) and a stricter mtime pre-gate (skip the stat-walk when nothing changed).
 
+> **Status (2026-06-24): opt-in `aispend daemon` shipped under t-wada TDD.** A wall-clock
+> background loop (`daemonLoop` → `App.runDaemon`, `internal/cli/daemon.go`) that scans once
+> immediately, then every `scan_interval` (config.toml, default `config.DefaultScanInterval` =
+> 15m; `--interval` overrides; `--once` = one cycle for an external scheduler). It reuses
+> `App.incrementalScan` and the **same** per-provider watermark as scan-on-launch — one
+> checkpoint, idempotent upserts collapse overlap. Stops on Ctrl-C/SIGTERM
+> (`signal.NotifyContext`); offline-safe (local reads only, **no** price refresh); all output on
+> stderr. **This refines the "not a wall-clock daemon" stance below, it doesn't break it:** the
+> daemon is **never auto-started** — it's an explicit command the user runs, so the default
+> posture still owns no background process. Running `aispend daemon` (or wrapping `--once` in
+> launchd/systemd) is the *user's* chosen schedule, the same principle as "the schedule is the
+> user's, not ours" (Item 2). Coverage: config `LoadScanInterval` table-tested; `daemonLoop`,
+> `runDaemon`, `resolveScanInterval`, and the `--once` path covered. The signal-wiring sliver in
+> `cmdDaemon` is the only intentionally-untested line (real SIGTERM would kill the test process).
+
 **Goal.** Collapse "install → `scan` → `today`" into "install → run." A bare `aispend`,
 `today`, `report`, or the TUI brings its own data current; the manual `scan` step stops being
 a prerequisite. Keep `scan` as an explicit command — we add a trigger, we don't remove the
@@ -93,10 +108,12 @@ control.
   Print one line (`scanned 3 new sessions since 09:14`) or stay silent when nothing's new. A
   `--no-scan` escape hatch and a `scan_on_launch = false` config key for people who want the
   old explicit flow.
-- **Milestone-based refresh, not a wall-clock daemon.** "Periodic" = triggered by milestones,
-  not a battery-burning timer: (a) on launch, (b) on file-mtime change during `tui --watch`
-  (already shipped), (c) optionally on agent **session-end** via an opt-in hook (below). No
-  always-running background process in the default posture.
+- **Milestone-based refresh, not a wall-clock daemon *by default*.** "Periodic" = triggered by
+  milestones, not a battery-burning timer: (a) on launch, (b) on file-mtime change during
+  `tui --watch` (already shipped), (c) optionally on agent **session-end** via an opt-in hook
+  (below). No always-running background process in the default posture. *(An explicit, opt-in
+  wall-clock loop now exists as `aispend daemon` for users who want one — see the 2026-06-24
+  status note above. It is never auto-started, so the default posture is unchanged.)*
 - **Opt-in `aispend hooks install`.** Mirrors `aispend git install` exactly: a safe,
   disclosed, uninstallable hook in the agent's config (Claude Code `SessionEnd`, Codex TOML
   `notify`) that runs `aispend scan` when a session ends — near-real-time without us polling.

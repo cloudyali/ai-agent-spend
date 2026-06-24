@@ -50,10 +50,19 @@ aispend budget [set <amt>|clear] [--json] [--strict]
                                 # `set`/`clear` write `budget_usd` to ~/.aispend/config.toml (CLI surface
                                 # for config.SetBudget). Informational only — never enforced. --json emits a
                                 # stable pace object; --strict exits non-zero when projected > ceiling (CI gate).
-aispend scan | doctor | plans
+aispend scan [--full] | doctor | plans
+                                # scan: incremental import (watermark-gated); --full re-reads every
+                                # session, ignoring the checkpoint, then resets it to the latest.
                                 # NOTE: the `explain` command was removed — per-turn/session evidence
                                 # now lives in the TUI drill (receipt → file → turn). Offline/non-TTY
                                 # builds have no receipt surface.
+aispend daemon [--interval D] [--once] [--verbose]
+                                # background scan loop: scans once immediately (catch-up), then every
+                                # D from the same per-provider checkpoint as scan-on-launch. D defaults
+                                # to `scan_interval` in config.toml, else 15m; --interval overrides.
+                                # --once runs a single cycle and exits (cron / launchd / systemd-timer
+                                # entrypoint). Stops cleanly on Ctrl-C / SIGTERM. Offline-safe: local
+                                # reads only, no price refresh. All output on stderr.
 aispend pricing [refresh]       # show the active rate source; `refresh` pulls live LiteLLM rates
 ```
 
@@ -82,6 +91,21 @@ remains the explicit import. Shared seam: `App.scanOnLaunch` → `App.incrementa
 the trailer hook's live refresh); offline-safe (local files only, no `net/*`). The opt-in
 session-end **hook** (the "milestone" trigger) is still pending — see
 `design-documents/12-surfaces-ingestion-roadmap.md` Item 7.
+
+**Background daemon.** `aispend daemon` keeps the ledger current without any read
+command: a `time.Ticker` loop (`daemonLoop`/`App.runDaemon`) that scans once
+immediately, then every `scan_interval` (config.toml, default
+`config.DefaultScanInterval` = 15m; `--interval` overrides; `--once` runs a single
+cycle for an external scheduler). It reuses the **same** `App.incrementalScan` and the
+**same** per-provider watermark as scan-on-launch — no separate checkpoint — so the
+daemon, a manual `scan`, and a read-command launch all advance one pointer (idempotent
+upserts collapse any overlap). Cadence resolves via `App.resolveScanInterval` (positive
+`--interval` > `scan_interval` > 15m; non-positive rejected so `NewTicker` never panics).
+It shuts down on the first Ctrl-C / SIGTERM (`signal.NotifyContext`) and is offline-safe
+— local reads only, **no** price refresh (unlike the read-command launch). All output is
+on **stderr** (startup banner, `[hh:mm:ss] scanned N new turn(s)` per non-empty cycle,
+`--verbose` heartbeats idle cycles, shutdown line). The in-process loop is the chosen
+mechanism; wrapping `--once` in launchd/systemd for reboot-survival is left to the user.
 
 Rich static surfaces are **hand-rolled, zero-dependency ANSI** (no Bubble Tea /
 lipgloss / x/term — keeps the offline-build + `doctor --network` promise). They

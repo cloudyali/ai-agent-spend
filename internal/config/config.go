@@ -191,6 +191,37 @@ func LoadRefreshOnLaunch(appHome string) (bool, error) {
 	}
 }
 
+// DefaultScanInterval is the cadence of the background `aispend daemon` scan loop
+// when `scan_interval` is unset (or invalid). Fifteen minutes keeps the ledger
+// near-current without busy-reading the session logs.
+const DefaultScanInterval = 15 * time.Minute
+
+// LoadScanInterval reads the optional `scan_interval` cadence from
+// ~/.aispend/config.toml, used by the background `aispend daemon` loop. The value is
+// any Go duration string (e.g. "15m", "30m", "1h", "90s"); a bare number with no
+// unit is rejected (Go requires a unit). It defaults to DefaultScanInterval when
+// absent or blank. A malformed or non-positive value returns (DefaultScanInterval,
+// err) so the caller keeps the safe default — a daemon must never spin on a zero or
+// negative interval — and may surface the error.
+func LoadScanInterval(appHome string) (time.Duration, error) {
+	m, err := loadConfigMap(appHome)
+	if err != nil {
+		return DefaultScanInterval, err
+	}
+	v := strings.TrimSpace(m["scan_interval"])
+	if v == "" {
+		return DefaultScanInterval, nil
+	}
+	d, perr := time.ParseDuration(v)
+	if perr != nil {
+		return DefaultScanInterval, fmt.Errorf("config: scan_interval %q (want a duration like 15m, 1h): %w", v, perr)
+	}
+	if d <= 0 {
+		return DefaultScanInterval, fmt.Errorf("config: scan_interval %q must be positive", v)
+	}
+	return d, nil
+}
+
 // SetBudget writes the monthly api-equivalent budget ceiling (in micros) to
 // ~/.aispend/config.toml as `budget_usd`, preserving every other line. The value is
 // rendered in dollars — the unit LoadBudget reads back. Callers validate the amount;

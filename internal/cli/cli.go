@@ -83,6 +83,8 @@ func (a *App) dispatch(args []string) int {
 	switch cmd, rest := args[0], args[1:]; cmd {
 	case "scan":
 		return a.cmdScan(rest)
+	case "daemon":
+		return a.cmdDaemon(rest)
 	case "report":
 		return a.cmdReport(rest)
 	case "today":
@@ -922,11 +924,7 @@ func (a *App) scanOnLaunch(skip bool) {
 	if n <= 0 {
 		return
 	}
-	noun := "turns"
-	if n == 1 {
-		noun = "turn"
-	}
-	fmt.Fprintf(a.Err, "scanned %d new %s\n", n, noun)
+	fmt.Fprintf(a.Err, "scanned %d new %s\n", n, turnNoun(n))
 }
 
 // scanOnLaunchEnabled reports whether the launch scan should run: off when
@@ -1322,7 +1320,8 @@ func (a *App) usage() {
 
 Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it shows `+"`today`"+`)
 
-  scan [--verbose]              import & price new sessions (no network); --verbose shows skips
+  scan [--verbose] [--full]     import & price new sessions (no network); --full re-reads all & resets the checkpoint
+  daemon [--interval D] [--once] background scan loop: every D (default 15m) import from the last checkpoint; --once = one cycle
   report [--period P] [flags]   spend over a calendar window (default: this week)
   today                         arbitrage-first daily glance: ROI, cache savings, hourly spikes
   budget [set <amt>|clear]      monthly spend ceiling: bare shows pace; set/clear manage it (--json, --strict)
@@ -1336,6 +1335,7 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
 
   today/report/top/tui/budget scan new sessions on launch first; --no-scan reads the ledger as-is
   (or set scan_on_launch = false in ~/.aispend/config.toml, or AISPEND_NO_SCAN=1)
+  daemon keeps the ledger current in the background; set its cadence with scan_interval (e.g. 15m) in config.toml
 
   report flags: --period P  --by G  --view V  --json
   P (period): today | yesterday | week | month | "last week" | "last month" |

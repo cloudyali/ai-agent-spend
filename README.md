@@ -35,6 +35,7 @@ Single static Go binary — no Node, no Python, no daemon, no database. It reads
   - [Prove it's offline](#prove-its-offline)
   - [Commands \& usage](#commands--usage)
     - [`scan` — import \& price](#scan--import--price)
+    - [`daemon` — keep the ledger current in the background](#daemon--keep-the-ledger-current-in-the-background)
     - [`today` — the daily glance](#today--the-daily-glance)
     - [`report` — spend over any calendar window](#report--spend-over-any-calendar-window)
     - [`top` — the priciest turns (or sessions)](#top--the-priciest-turns-or-sessions)
@@ -291,7 +292,22 @@ codex · 1 source(s) · imported 6 · 2026-06-22 → 2026-06-22
 Imported 23 events total · stored in /Users/you/.aispend/events.json · no network calls made
 ```
 
-Use `--full` after upgrading to re-read everything, and `--verbose` to see a sample of any records it skipped.
+Use `--full` after upgrading to re-read everything (it ignores the watermark, then resets the checkpoint to the latest), and `--verbose` to see a sample of any records it skipped.
+
+### `daemon` — keep the ledger current in the background
+
+If you'd rather not rely on a read command to trigger the scan, `aispend daemon` runs the same incremental import on a timer. It scans once immediately (catch-up), then every interval — default **15 minutes** — picking up only sessions newer than the last checkpoint. It's the same per-provider watermark `scan` and the read commands use, so nothing is scanned twice.
+
+```text
+$ aispend daemon
+aispend daemon: scanning every 15m0s · incremental from the last checkpoint · press Ctrl-C to stop
+[09:15:02] scanned 6 new turns
+[09:30:01] scanned 2 new turns
+^C
+aispend daemon: stopped
+```
+
+Set the cadence with `--interval 5m` (or `scan_interval = 5m` in `~/.aispend/config.toml`). Use `--once` to run a single cycle and exit — the clean entrypoint when you'd rather have **cron**, **launchd**, or a **systemd timer** own the schedule. The daemon is offline-safe: local reads only, and unlike a read-command launch it never refreshes prices. It stops cleanly on Ctrl-C / SIGTERM, and all of its output goes to stderr.
 
 ### `today` — the daily glance
 
@@ -641,6 +657,7 @@ plan           = "claude-max-20x"  # unlocks the ROI line; see `aispend plans`
 codex_plan     = "chatgpt-plus"    # per-provider override: <provider>_plan
 budget_usd     = 300               # optional monthly ceiling → pace line in `today`
 scan_on_launch = true              # default; read commands auto-scan new sessions (false to require `aispend scan`)
+scan_interval  = 15m               # cadence for `aispend daemon` (default 15m; any Go duration, e.g. 5m, 1h)
 ```
 
 Rather not hand-edit TOML? Set both from the TUI — `p` opens the plan picker, `b` the budget editor:
