@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# pre-commit — the FAST gate. Keeps every commit gofmt-clean (TDD "commit on green").
+# Heavy checks (vet, tests, coverage floor, reviews) run at push time, not here.
+# Escape hatch: AISPEND_SKIP_HOOKS=1 git commit ...
+set -eu
+[ "${AISPEND_SKIP_HOOKS:-}" = "1" ] && exit 0
+
+staged="$(git diff --cached --name-only --diff-filter=ACM -- '*.go')"
+[ -z "$staged" ] && exit 0
+
+# shellcheck disable=SC2086  # word-splitting the newline list into args is intentional
+unformatted="$(printf '%s\n' $staged | xargs gofmt -l)"
+if [ -n "$unformatted" ]; then
+  echo "pre-commit: these files need gofmt:" >&2
+  # shellcheck disable=SC2086
+  printf '  %s\n' $unformatted >&2
+  echo "fix with: gofmt -w" $unformatted >&2
+  exit 1
+fi
+exit 0
