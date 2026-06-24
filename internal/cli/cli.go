@@ -666,7 +666,10 @@ func (a *App) cmdPricingRefresh(cache string) int {
 		fmt.Fprintln(a.Err, "aispend: offline build — pricing refresh is disabled (using embedded table)")
 		return 1
 	}
-	data, err := refresh.Fetch(refresh.LiteLLMURL)
+	// Fetch through the same injected seam as the launch refresh (priceFetcher), so the
+	// one explicit network command is testable hermetically; production falls back to
+	// refresh.FetchContext — identical to the previous refresh.Fetch(url).
+	data, err := a.priceFetcher()(context.Background(), refresh.LiteLLMURL)
 	if err != nil {
 		fmt.Fprintf(a.Err, "aispend: pricing refresh: %v\n", err)
 		return 1
