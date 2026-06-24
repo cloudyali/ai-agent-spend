@@ -9,9 +9,9 @@ or strengthen that promise are exactly the kind we want.
 Please report security or privacy issues **privately** — don't open a public issue,
 PR, or discussion for them.
 
-- **Preferred:** GitHub's private vulnerability reporting — open the
-  [Security tab](https://github.com/cloudyali/ai-agent-spend/security/advisories) and
-  choose **Report a vulnerability**.
+- **Preferred:** GitHub's private vulnerability reporting — use
+  [**Report a vulnerability**](https://github.com/cloudyali/ai-agent-spend/security/advisories/new)
+  on the repo's **Security** tab.
 - **Email:** `nishant.thorat@cloudyali.io` — put `aispend security` in the subject.
 
 Please include enough to reproduce: the version (`aispend version`), your OS, the
