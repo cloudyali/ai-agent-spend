@@ -23,7 +23,7 @@
 <!-- Fonts: Inter (body), Roboto Mono (code) via Google Fonts; TASA Orbiter (display) via Fontshare -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link href="https://api.fontshare.com/v2/css?f[]=tasa-orbiter@400,500,600,700&display=swap" rel="stylesheet" />
 
 <script type="application/ld+json">
@@ -150,6 +150,9 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);bac
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:19px;letter-spacing:-.02em}
 .brand .mark{width:30px;height:30px;border-radius:8px;background:var(--cobalt-500);display:grid;place-items:center;box-shadow:var(--shadow-brand)}
 .brand .mark svg{width:18px;height:18px}
+.brand-logo{height:34px;width:auto;display:block}
+.ft .brand-logo{height:30px}
+@media (max-width:380px){.brand-logo{height:30px}}
 .brand b{font-weight:600}.brand b span{color:var(--brand)}
 .nav-links{display:flex;align-items:center;gap:30px}
 .nav-links a{font-size:15px;color:var(--text-2);font-weight:500;transition:.15s}
@@ -439,10 +442,7 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="#top" aria-label="AiSpend home">
-      <span class="mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="none"><path d="M9 8h14v17l-3-2-2 2-2-2-2 2-2-2-3 2V8Z" fill="#fff"/><path d="M12 13h8M12 17h6" stroke="#334EFF" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </span>
-      <b>Ai<span>Spend</span></b>
+      <img class="brand-logo" src="ai-spend-logo.png" width="737" height="165" alt="AiSpend" />
     </a>
     <nav class="nav-links" aria-label="Primary">
       <a href="#why">Why</a>
@@ -487,7 +487,7 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
     <div>
       <span class="eyebrow">Local · Explainable · Offline by default</span>
       <h1>Know what your AI coding agents cost — <span class="grad">and whether the subscription pays off.</span></h1>
-      <p class="lead">AiSpend reads the session logs Claude Code and Codex already write to disk, prices every turn at published API rates, and traces each dollar back to its turn, file, and commit. No API keys. Nothing leaves your machine.</p>
+      <p class="lead">AI coding tools charge a flat fee and quietly hide what you're actually getting for it. AiSpend turns that black box into a clear picture — whether your subscription is paying off, where your money really goes, and what your work is worth. All of it stays private, on your own computer.</p>
       <div class="hero-cta">
         <a class="btn btn-primary" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
@@ -799,9 +799,8 @@ go build ./cmd/aispend" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" s
   <div class="wrap">
     <div class="ft-grid">
       <div>
-        <a class="brand" href="#top">
-          <span class="mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M9 8h14v17l-3-2-2 2-2-2-2 2-2-2-3 2V8Z" fill="#fff"/><path d="M12 13h8M12 17h6" stroke="#334EFF" stroke-width="1.8" stroke-linecap="round"/></svg></span>
-          <b style="color:#fff">Ai<span style="color:var(--teal-500)">Spend</span></b>
+        <a class="brand" href="#top" aria-label="AiSpend home">
+          <img class="brand-logo" src="ai-spend-logo.png" width="737" height="165" alt="AiSpend" />
         </a>
         <p class="blurb">Local, explainable spend for AI coding agents. Prices every Claude Code &amp; Codex turn at real API rates — one static Go binary, offline by default.</p>
       </div>
