@@ -43,6 +43,7 @@ func testCfg() Config {
 		MinModels:       5,
 		MaxDropFraction: 0.20,
 		MaxSwingFactor:  10,
+		MaxSwingModels:  2, // 3+ non-anchor swings in one sync = systemic
 		RequiredModels:  []string{"gpt-4o", "claude-opus-4-8"},
 	}
 }
@@ -121,15 +122,107 @@ func TestValidate_RejectsPriceCollapseToZero(t *testing.T) {
 	}
 }
 
-func TestValidate_RejectsExtremeSwing(t *testing.T) {
+func warningsJoined(r Report) string { return strings.Join(r.Warnings, " | ") }
+
+// A lone out-of-band swing on a non-anchor model is a warning that still
+// publishes — it must NOT wedge the pipeline (the amazon.titan-embed regression).
+func TestValidate_LoneSwingWarnsAndPublishes(t *testing.T) {
 	m := baseModels()
-	m["extra-1"] = 0.00005 // 50x jump from 0.000001
+	m["extra-1"] = 0.00005 // 50x jump from 0.000001, non-anchor, alone
 	rep, err := Validate(tbl(t, m), tbl(t, baseModels()), testCfg())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if rep.OK() || !strings.Contains(violationsJoined(rep), "extra-1") {
-		t.Errorf("expected extra-1 swing violation, got: %s", violationsJoined(rep))
+	if !rep.OK() {
+		t.Fatalf("a lone non-anchor swing must publish, got violations: %s", violationsJoined(rep))
+	}
+	if !strings.Contains(warningsJoined(rep), "extra-1") {
+		t.Errorf("expected an extra-1 swing warning, got: %s", warningsJoined(rep))
+	}
+	if rep.Repriced != 1 {
+		t.Errorf("Repriced = %d, want 1", rep.Repriced)
+	}
+}
+
+// Swings up to (and including) the tolerance still publish.
+func TestValidate_SwingsAtToleranceStillPublish(t *testing.T) {
+	m := baseModels()
+	m["extra-1"] = 0.00005 // 50x
+	m["extra-2"] = 0.00005 // 50x — 2 swings == MaxSwingModels(2), not yet systemic
+	rep, err := Validate(tbl(t, m), tbl(t, baseModels()), testCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rep.OK() {
+		t.Fatalf("swings at tolerance must publish, got: %s", violationsJoined(rep))
+	}
+	if len(rep.Warnings) != 2 {
+		t.Errorf("Warnings = %d, want 2", len(rep.Warnings))
+	}
+}
+
+// A burst of swings beyond tolerance is the corrupt-table signal — hold the publish.
+func TestValidate_SystemicSwingsFail(t *testing.T) {
+	m := baseModels()
+	m["extra-1"] = 0.00005
+	m["extra-2"] = 0.00005
+	m["extra-3"] = 0.00005 // 3 non-anchor swings > MaxSwingModels(2) = systemic
+	rep, err := Validate(tbl(t, m), tbl(t, baseModels()), testCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rep.OK() || !strings.Contains(violationsJoined(rep), "systemic") {
+		t.Errorf("expected a systemic-reprice violation, got: %s", violationsJoined(rep))
+	}
+}
+
+// A lone non-anchor collapse-to-0 is also just a warning (same wedge class).
+func TestValidate_LoneCollapseNonAnchorWarns(t *testing.T) {
+	m := baseModels()
+	m["extra-1"] = 0 // non-anchor model goes free, alone
+	rep, err := Validate(tbl(t, m), tbl(t, baseModels()), testCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !rep.OK() {
+		t.Fatalf("a lone non-anchor collapse must publish, got: %s", violationsJoined(rep))
+	}
+	if !strings.Contains(warningsJoined(rep), "extra-1") {
+		t.Errorf("expected an extra-1 collapse warning, got: %s", warningsJoined(rep))
+	}
+}
+
+// Upstream ids are attacker-influenceable (a compromised LiteLLM push); a crafted id
+// must not smuggle terminal escape bytes into operator-visible output (CWE-150).
+func TestValidate_SanitizesUpstreamModelIDs(t *testing.T) {
+	const evil = "evil\x1b[2Jmodel" // ESC + clear-screen embedded in the model id
+	cur, prv := baseModels(), baseModels()
+	cur[evil] = 0.00005 // swings 50x vs prev → a non-anchor warning
+	prv[evil] = 0.000001
+	rep, err := Validate(tbl(t, cur), tbl(t, prv), testCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	joined := warningsJoined(rep)
+	if strings.ContainsRune(joined, '\x1b') {
+		t.Errorf("ESC byte leaked into warning output: %q", joined)
+	}
+	if !strings.ContainsRune(joined, '�') {
+		t.Errorf("expected the stripped byte to surface as U+FFFD: %q", joined)
+	}
+}
+
+// Anchors are canaries the client prices on: any swing of one is a hard failure,
+// even alone — never silently ship a bad price for a model that matters.
+func TestValidate_AnchorSwingAlwaysFails(t *testing.T) {
+	m := baseModels()
+	m["gpt-4o"] = 0.000125 // 50x jump on an anchor, alone
+	rep, err := Validate(tbl(t, m), tbl(t, baseModels()), testCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rep.OK() || !strings.Contains(violationsJoined(rep), "gpt-4o") {
+		t.Errorf("expected a gpt-4o anchor swing violation, got: %s", violationsJoined(rep))
 	}
 }
 
@@ -284,7 +377,7 @@ func TestRun_MissingInputErrors(t *testing.T) {
 
 func TestDefaultConfigIsSane(t *testing.T) {
 	c := DefaultConfig()
-	if c.MinModels <= 0 || c.MaxDropFraction <= 0 || c.MaxSwingFactor <= 1 || len(c.RequiredModels) == 0 {
+	if c.MinModels <= 0 || c.MaxDropFraction <= 0 || c.MaxSwingFactor <= 1 || c.MaxSwingModels <= 0 || len(c.RequiredModels) == 0 {
 		t.Errorf("DefaultConfig looks unsafe: %+v", c)
 	}
 }

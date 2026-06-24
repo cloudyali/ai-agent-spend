@@ -34,8 +34,20 @@ func main() {
 		fmt.Fprintln(os.Stderr, "pricing-sync:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("models: %d (prev %d) · added %d · removed %d · repriced %d\n",
-		rep.CurrentModels, rep.PreviousModels, rep.Added, rep.Removed, rep.Repriced)
+	fmt.Printf("models: %d (prev %d) · added %d · removed %d · repriced %d · swings %d\n",
+		rep.CurrentModels, rep.PreviousModels, rep.Added, rep.Removed, rep.Repriced, len(rep.Warnings))
+
+	// Surface out-of-band swings so a wrongly-accepted (or systemically corrupt)
+	// price is visible in the Actions log, not silent. The outcome line below says
+	// whether they were waved through (OK) or held (a systemic violation).
+	const maxShow = 10
+	for i, w := range rep.Warnings {
+		if i == maxShow {
+			fmt.Fprintf(os.Stderr, "  ~ ...and %d more\n", len(rep.Warnings)-maxShow)
+			break
+		}
+		fmt.Fprintln(os.Stderr, "  ~ swing: "+w)
+	}
 
 	if !rep.OK() {
 		fmt.Fprintln(os.Stderr, "pricing-sync: VALIDATION FAILED — refusing to publish:")

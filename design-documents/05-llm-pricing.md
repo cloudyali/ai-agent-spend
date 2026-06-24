@@ -103,7 +103,7 @@ filled `CostViews` + pricing `Evidence`. Steps:
 2. **Select the rate** — by `priced_at` ∈ `[ValidFrom,ValidTo)` and by context
    tier (prompt size vs `MinPromptTokens`).
 3. **Compute each view** — api-equivalent (always), estimated (flagged),
-   marginal (vs `Included`), effective-allocated (subscription amortization, at
+   marginal (vs `Included`), amortized (subscription amortization, at
    the aggregation step), credit-consumption (credit kinds), and **reported**
    when the source carried its own cost. The **reported-else-computed precedence**
    is ccusage's three modes made concrete: `Display` (reported only), `Calculate`
@@ -148,8 +148,15 @@ process" described below is now the `pricing-sync` GitHub Action
 LiteLLM, then `internal/pricesync` + `cmd/pricing-sync` **curate and validate** it
 through the real `pricing.ParseLiteLLM` canonicalizer behind a circuit breaker: a floor
 on priced-model count, a max-drop guard against the "invalid cost map" cliff, required
-anchor models, and a per-model price-swing/collapse-to-0 guard. Only a table that passes
-is published to **GitHub Pages at `aispendllm.cloudyali.io`** as `litellm.json` +
+anchor models, and a per-model price-swing/collapse-to-0 guard. The swing guard is
+**systemic, not per-model** [updated 2026-06-24]: a lone out-of-band swing (or
+collapse-to-0) on a non-anchor model is recorded as a *warning* and still publishes —
+otherwise a single legitimate vendor correction on a model aispend never prices (e.g.
+`amazon.titan-embed-text-v2:0`) wedges the pipeline forever, since nothing publishes and
+`prev` never advances past the swing. Only a *burst* beyond `MaxSwingModels` (the
+units-error / corrupt-table signal) fails the publish; a swing on an **anchor** still
+fails alone, so a bad price for a model that matters is never waved through. Only a table
+that passes is published to **GitHub Pages at `aispendllm.cloudyali.io`** as `litellm.json` +
 `index.json` (generated_at, model count, sha256) — the checksummed index this section
 anticipated. On any violation it
 **publishes nothing and keeps serving the last-good file** (stale-but-correct) and opens

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/termtext"
 )
 
 // IndexSchemaVersion is the version stamp on index.json.
@@ -26,8 +27,9 @@ const IndexSchemaVersion = 1
 type Config struct {
 	MinModels       int      // floor on priced (canonicalized) models
 	MaxDropFraction float64  // fail if priced count drops more than this vs the previous publish
-	MaxSwingFactor  float64  // fail if a shared model's input price changes by >= this factor (or to 0)
-	RequiredModels  []string // canonical anchor ids that must be present and priced
+	MaxSwingFactor  float64  // a shared model's input price moving by >= this factor (or to 0) is an out-of-band "swing"
+	MaxSwingModels  int      // fail only when MORE than this many non-anchor models swing in one sync (systemic corruption); <=0 disables the systemic gate
+	RequiredModels  []string // canonical anchor ids that must be present and priced; a swing on one of these always fails
 }
 
 // DefaultConfig is the gate used by the daily pipeline. Anchors are deliberately
@@ -37,12 +39,19 @@ func DefaultConfig() Config {
 		MinModels:       50,
 		MaxDropFraction: 0.20,
 		MaxSwingFactor:  10,
-		RequiredModels:  []string{"gpt-4o", "gpt-3.5-turbo"},
+		// A real daily diff reprices a handful of models; a corrupt table (e.g. a
+		// units error scaling every price) swings hundreds at once. 25 sits well
+		// above legitimate churn and far below corruption, so a lone vendor
+		// correction publishes while a structural break still holds the line.
+		MaxSwingModels: 25,
+		RequiredModels: []string{"gpt-4o", "gpt-3.5-turbo"},
 	}
 }
 
 // Report is the outcome of a validation run. A non-empty Violations slice means the
 // table must NOT be published (OK reports it); Added/Removed/Repriced are counts.
+// Warnings are non-fatal notes — out-of-band swings on non-anchor models that were
+// waved through (published) because they were too few to look systemic.
 type Report struct {
 	CurrentModels  int
 	PreviousModels int
@@ -50,6 +59,7 @@ type Report struct {
 	Removed        int
 	Repriced       int
 	Violations     []string
+	Warnings       []string
 }
 
 // OK reports whether the table passed every gate.
@@ -119,7 +129,26 @@ func Validate(curr, prev []byte, cfg Config) (Report, error) {
 	}
 
 	// Per-model swing guard, on raw upstream ids shared by both tables.
+	//
+	// An out-of-band move — a collapse to 0, or an input price changing by >=
+	// MaxSwingFactor in either direction — is a "swing". A lone swing on the long
+	// tail is almost always a legitimate vendor correction (e.g. an embedding model
+	// aispend never prices), so failing on it just wedges the pipeline: nothing
+	// publishes, prev never advances, and every later run trips on the same diff.
+	// So lone/few swings become Warnings that still publish; only a *systemic* burst
+	// (more than MaxSwingModels at once) is the corrupt-table signal that holds it.
+	// Anchors are the exception — a swing on a canary the client prices on always
+	// fails, even alone, so a bad price for a model that matters is never waved through.
 	if prevRaw != nil {
+		// Anchor match is on the raw upstream id (this loop works on raw ids, not the
+		// canonicalized engine map). The anchors are stable base ids that appear
+		// verbatim upstream, so a snapshot-suffixed variant would fall through to the
+		// non-anchor (warn) path — acceptable: the base anchor entry stays protected.
+		anchor := make(map[string]bool, len(cfg.RequiredModels))
+		for _, m := range cfg.RequiredModels {
+			anchor[m] = true
+		}
+		var swings []string // out-of-band swings on non-anchor models
 		for id, ce := range currRaw {
 			pe, ok := prevRaw[id]
 			if !ok {
@@ -130,16 +159,36 @@ func Validate(curr, prev []byte, cfg Config) (Report, error) {
 				continue
 			}
 			rep.Repriced++
-			if ce.InputCostPerToken <= 0 {
-				rep.Violations = append(rep.Violations,
-					fmt.Sprintf("%s input price collapsed to 0 (was %g)", id, pe.InputCostPerToken))
-				continue
+
+			// Classify the move; msg stays empty for an in-band reprice (no concern).
+			// The id is an upstream-controlled map key, so neutralize terminal escape
+			// bytes before it reaches operator-visible output (CWE-150) — see termtext.
+			safeID := termtext.SanitizeLabel(id)
+			var msg string
+			switch {
+			case ce.InputCostPerToken <= 0:
+				msg = fmt.Sprintf("%s input price collapsed to 0 (was %g)", safeID, pe.InputCostPerToken)
+			default:
+				ratio := ce.InputCostPerToken / pe.InputCostPerToken
+				if cfg.MaxSwingFactor > 0 && (ratio >= cfg.MaxSwingFactor || ratio <= 1/cfg.MaxSwingFactor) {
+					msg = fmt.Sprintf("%s input price swung %g→%g (%.1fx)", safeID, pe.InputCostPerToken, ce.InputCostPerToken, ratio)
+				}
 			}
-			ratio := ce.InputCostPerToken / pe.InputCostPerToken
-			if cfg.MaxSwingFactor > 0 && (ratio >= cfg.MaxSwingFactor || ratio <= 1/cfg.MaxSwingFactor) {
-				rep.Violations = append(rep.Violations,
-					fmt.Sprintf("%s input price swung %g→%g (%.1fx)", id, pe.InputCostPerToken, ce.InputCostPerToken, ratio))
+			switch {
+			case msg == "":
+				// in-band reprice — counted, not flagged
+			case anchor[id]:
+				rep.Violations = append(rep.Violations, msg) // canary: always hard-fail
+			default:
+				swings = append(swings, msg)
 			}
+		}
+		// Long-tail swings publish with a warning; a burst beyond tolerance does not.
+		rep.Warnings = append(rep.Warnings, swings...)
+		if cfg.MaxSwingModels > 0 && len(swings) > cfg.MaxSwingModels {
+			rep.Violations = append(rep.Violations, fmt.Sprintf(
+				"systemic reprice: %d non-anchor models swung >=%gx or collapsed in one sync (tolerance %d) — likely a corrupt upstream table",
+				len(swings), cfg.MaxSwingFactor, cfg.MaxSwingModels))
 		}
 		for id := range prevRaw {
 			if _, ok := currRaw[id]; !ok {
@@ -149,6 +198,7 @@ func Validate(curr, prev []byte, cfg Config) (Report, error) {
 	}
 
 	sort.Strings(rep.Violations)
+	sort.Strings(rep.Warnings)
 	return rep, nil
 }
 
