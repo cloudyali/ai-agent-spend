@@ -268,27 +268,6 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);bac
 .pillar .roi-line .vs{font-size:13px;color:var(--text-3)}
 .pillar .roi-line .badge{margin-left:auto;font-size:13px;font-weight:600;color:var(--green-600);background:rgba(48,184,84,.12);padding:4px 10px;border-radius:var(--r-pill)}
 
-/* ===================== RECEIPT / TOKEN-CLASS BAR ===================== */
-.receipt-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
-@media (max-width:860px){.receipt-grid{grid-template-columns:1fr;gap:36px}}
-.receipt-card{background:var(--coal-1100);border-radius:var(--r-lg);padding:28px;box-shadow:var(--shadow-lg);color:var(--coal-200);font-family:var(--font-mono)}
-.receipt-card .rc-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--coal-400);border-bottom:1px dashed rgba(255,255,255,.14);padding-bottom:14px;margin-bottom:18px}
-.receipt-card .rc-total{font-size:30px;color:#fff;font-weight:600}
-.tc-bar{display:flex;height:18px;border-radius:6px;overflow:hidden;margin:8px 0 22px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
-.tc-bar i{display:block;height:100%}
-.tc-rows{display:grid;gap:11px}
-.tc-row{display:grid;grid-template-columns:14px 1fr auto auto;gap:12px;align-items:center;font-size:13px}
-.tc-row .sw{width:12px;height:12px;border-radius:3px}
-.tc-row .nm{color:var(--coal-200)}
-.tc-row .tok{color:var(--coal-500);font-size:12px}
-.tc-row .amt{color:#fff;font-weight:500;text-align:right;min-width:74px}
-.receipt-copy h3{font-size:clamp(26px,3.4vw,36px);margin-bottom:16px}
-.receipt-copy p{color:var(--text-3);font-size:17px;margin-bottom:18px}
-.receipt-copy .legend-note{font-size:14px;color:var(--text-3);border-left:3px solid var(--cobalt-200,#E0E8FF);padding-left:14px}
-.receipt-copy ul{list-style:none;display:grid;gap:12px;margin-top:8px}
-.receipt-copy li{display:flex;gap:11px;font-size:15.5px;color:var(--text-2)}
-.receipt-copy li svg{width:20px;height:20px;color:var(--brand);flex:none;margin-top:2px}
-
 /* ===================== FEATURES GRID ===================== */
 .feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 @media (max-width:920px){.feature-grid{grid-template-columns:repeat(2,1fr)}}
@@ -406,7 +385,6 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
 @media (max-width:900px){
   .hero p.lead{font-size:18px}
   .term-body{font-size:12.4px;line-height:1.75}
-  .receipt-grid{gap:32px}
 }
 @media (max-width:640px){
   body{font-size:16px}
@@ -429,10 +407,6 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
   .pillars{gap:16px}
   .pillar{padding:24px}
   .pillar h3{font-size:21px}
-  .receipt-card{padding:20px}
-  .receipt-card .rc-total{font-size:25px}
-  .tc-row{grid-template-columns:13px 1fr auto;gap:10px}
-  .tc-row .tok{display:none}
 
   .feature-grid{grid-template-columns:1fr;gap:14px}
   .uc-grid{grid-template-columns:1fr;gap:14px}
@@ -566,7 +540,7 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">The hidden meter</span>
-      <h2>Flat pricing is an acquisition strategy. The bill underneath is still tokens.</h2>
+      <h2>AI coding tools hook you with flat monthly pricing. The bill underneath is still tokens.</h2>
       <p>Coding agents bill a flat monthly subscription and don't expose a per-token meter. But the real cost is still tokens: input, output, and cache reads and writes. Price your actual usage at published API rates and the number is often nowhere near what you pay, and most setups can't even measure the gap.</p>
     </div>
     <div class="pillars">
@@ -590,41 +564,9 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
   </div>
 </section>
 
-<!-- ============================ RECEIPT / TOKEN-CLASS ============================ -->
-<section class="section" style="background:var(--bg-2);border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)">
-  <div class="wrap receipt-grid">
-    <div class="receipt-card" aria-label="Cost breakdown of a single turn by token class">
-      <div class="rc-head"><span>turn · opus-4-8 · auth.go</span><span>13:42</span></div>
-      <div class="rc-total">$0.4123</div>
-      <div class="tc-bar" aria-hidden="true">
-        <i style="width:14%;background:var(--tc-input)"></i>
-        <i style="width:23%;background:var(--tc-output)"></i>
-        <i style="width:51%;background:var(--tc-cache-read)"></i>
-        <i style="width:12%;background:var(--tc-cache-write)"></i>
-      </div>
-      <div class="tc-rows">
-        <div class="tc-row"><span class="sw" style="background:var(--tc-input)"></span><span class="nm">input</span><span class="tok">6,420 tok</span><span class="amt">$0.0578</span></div>
-        <div class="tc-row"><span class="sw" style="background:var(--tc-output)"></span><span class="nm">output</span><span class="tok">1,890 tok</span><span class="amt">$0.0945</span></div>
-        <div class="tc-row"><span class="sw" style="background:var(--tc-cache-read)"></span><span class="nm">cache read</span><span class="tok">312,500 tok</span><span class="amt">$0.2109</span></div>
-        <div class="tc-row"><span class="sw" style="background:var(--tc-cache-write)"></span><span class="nm">cache write (1h)</span><span class="tok">24,000 tok</span><span class="amt">$0.0491</span></div>
-      </div>
-    </div>
-    <div class="receipt-copy">
-      <span class="eyebrow">Open any number</span>
-      <h3>See exactly what a dollar is made of</h3>
-      <p>Coding-agent bills are dominated by prompt-cache reads and writes, so AiSpend prices the 5-minute and 1-hour cache tiers separately and shows you the split.</p>
-      <p class="legend-note"><strong style="color:var(--tc-input)">Input</strong> · <strong style="color:var(--teal-700)">Output</strong> · <strong style="color:var(--tc-cache-read)">Cache read</strong> · <strong style="color:var(--yellow-500)">Cache write</strong>. One consistent palette, everywhere.</p>
-      <ul>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Cache-aware: 5-minute and 1-hour write tiers priced apart</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> See what prompt caching actually shaved off the day</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Every figure reconciles back to the day's total</li>
-      </ul>
-    </div>
-  </div>
-</section>
 
 <!-- ============================ FEATURES ============================ -->
-<section class="section" id="features">
+<section class="section" id="features" style="background:var(--bg-2);border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">What you get</span>
@@ -667,12 +609,13 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
 </section>
 
 <!-- ============================ SCREENSHOTS ============================ -->
-<section class="section" id="screens" style="background:var(--bg-2);border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)">
+<section class="section" id="screens">
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">See it in action</span>
       <h2>The whole story, straight from your terminal.</h2>
       <p>Real captures from real sessions. Drill from the day's spend down to the exact prompt that spent it.</p>
+      <p style="font-size:15px;color:var(--text-3);margin-top:10px"><strong style="color:var(--tc-input)">Input</strong> · <strong style="color:var(--teal-700)">Output</strong> · <strong style="color:var(--tc-cache-read)">Cache read</strong> · <strong style="color:var(--yellow-500)">Cache write</strong>. One consistent palette across every view.</p>
     </div>
     <div class="shots">
       <figure class="shot">
@@ -770,10 +713,7 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
     <div class="uc-grid">
       <div class="uc"><q>Am I getting my money's worth?</q><p>You're on a $20–$200/mo plan and the meter is hidden. <code>aispend today</code> puts api-equivalent spend next to your plan's daily cost, and the ROI line settles it.</p></div>
       <div class="uc"><q>What on earth happened at 2 a.m.?</q><p>An agent looped overnight and you can feel it but can't see it. The hourly spike bar points at the hour; <code>aispend top</code> names the exact runaway turns.</p></div>
-      <div class="uc"><q>Which feature did the spend go to?</q><p>Group by <code>branch</code>, <code>commit</code>, or <code>file</code> to tie cost to shipped work: a client invoice, a cost-per-feature readout, or your own "was that refactor worth it?"</p></div>
-      <div class="uc"><q>Opus or Codex for this task?</q><p><code>report --by model</code> / <code>--by provider</code> shows what each agent actually costs you on real work, so you reach for the right one instead of the expensive one out of habit.</p></div>
       <div class="uc"><q>I can't send code to a SaaS dashboard.</q><p>Under an NDA, in a regulated shop, or just privacy-minded? AiSpend reads only local files and has no code path that can send your data anywhere. <code>doctor --network</code> proves it.</p></div>
-      <div class="uc"><q>Did caching actually save me anything?</q><p>Cache-aware pricing shows what prompt caching shaved off the day, so you can tell whether your prompt structure is pulling its weight.</p></div>
     </div>
   </div>
 </section>
@@ -791,8 +731,6 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
         <button class="tab" role="tab" aria-selected="true" id="tab-brew" aria-controls="panel-brew">Homebrew</button>
         <button class="tab" role="tab" aria-selected="false" id="tab-script" aria-controls="panel-script">Install script</button>
         <button class="tab" role="tab" aria-selected="false" id="tab-go" aria-controls="panel-go">Go</button>
-        <button class="tab" role="tab" aria-selected="false" id="tab-src" aria-controls="panel-src">From source</button>
-        <button class="tab" role="tab" aria-selected="false" id="tab-offline" aria-controls="panel-offline">Offline build</button>
       </div>
 
       <div class="tab-panel" id="panel-brew" role="tabpanel" aria-labelledby="tab-brew">
@@ -810,19 +748,6 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
         <div class="codeblock"><button class="copy" data-copy="go install github.com/cloudyali/ai-agent-spend/cmd/aispend@latest" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="p">$ </span>go install github.com/cloudyali/ai-agent-spend/cmd/aispend@latest</div>
       </div>
 
-      <div class="tab-panel" id="panel-src" role="tabpanel" aria-labelledby="tab-src" hidden>
-        <p>Pure Go, vendored, no codegen. Clone and build:</p>
-        <div class="codeblock"><button class="copy" data-copy="git clone https://github.com/cloudyali/ai-agent-spend
-cd ai-agent-spend
-go build ./cmd/aispend" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="p">$ </span>git clone https://github.com/cloudyali/ai-agent-spend
-<span class="p">$ </span>cd ai-agent-spend
-<span class="p">$ </span>go build ./cmd/aispend</div>
-      </div>
-
-      <div class="tab-panel" id="panel-offline" role="tabpanel" aria-labelledby="tab-offline" hidden>
-        <p>The binary that <em>physically can't</em> reach the network. A build tag compiles out every <code>net/*</code> import (and the TUI):</p>
-        <div class="codeblock"><button class="copy" data-copy="go build -tags offline ./cmd/aispend" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="p">$ </span>go build -tags offline ./cmd/aispend  <span class="cm"># 4.5 MB · net/* + TUI gone</span></div>
-      </div>
     </div>
   </div>
 </section>
