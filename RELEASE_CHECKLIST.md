@@ -30,6 +30,20 @@ bottom; items already done in this OSS-prep pass are marked ✅.
       To upgrade either claim, add `macos-latest` / `windows-latest` to the test job
       matrix first, then update the [Supported OS](README.md#supported-os) table.
 
+## 3b. Deep security audit
+
+The per-push gate is the fast diff-scoped `/security-review`. Before cutting a release, run
+the **deep, whole-repo audit** once — it's too heavy for every push but exactly right here.
+
+- [ ] Run `/security-audit` (the vendored Cloudflare multi-phase skill,
+      `.claude/skills/security-audit/`): recon → hunt → validate → report → structured output →
+      independent verification. Artifacts land in `~/security-audit-skill/ai-agent-spend/run-<N>/`.
+- [ ] Confirm the structured findings validate:
+      `node .claude/skills/security-audit/validate-findings.cjs <run>/findings.json`.
+- [ ] Triage `REPORT.md`: no open Critical/High findings (or each has a logged, accepted
+      exception). Confirm the trust anchors held — offline build net-free, only `*_path_hash`
+      persisted, TTY surfaces via `internal/termtext`.
+
 ## 4. Release build (GoReleaser)
 
 - [ ] `goreleaser check` (needs GoReleaser ≥ v2.10 for `homebrew_casks`).

@@ -32,7 +32,20 @@ git clone https://github.com/cloudyali/ai-agent-spend
 cd ai-agent-spend
 go build ./cmd/aispend
 go test ./...
+bash scripts/setup-hooks.sh    # enable the checkin gates (pre-commit + pre-push)
 ```
+
+`setup-hooks.sh` points `core.hooksPath` at the version-controlled `.githooks/`, so the same
+gates run for everyone. The AI review at push time uses your **local** Claude Code login — there
+is no API key in this repo or in CI. If you don't have Claude Code, the AI review step is skipped
+and the deterministic gate still runs.
+
+The code, YAGNI, and deep-security skills are vendored in `.claude/` (no install needed). The one
+exception is the **Security Guidance plugin** that backs the fast `/security-review` gate — it's
+first-party Anthropic tooling under "all rights reserved" (so it can't be vendored), free on all
+plans, and installed once from Claude Code's marketplace: run `/plugins` and add **Security
+Guidance**. `/security-review` works without it (falls back to the in-repo checklist), just less
+thoroughly.
 
 You'll want a recent Go toolchain (see the `go` directive in [`go.mod`](go.mod) for the
 minimum). Dependencies are vendored, so builds run offline — set `GOFLAGS=-mod=vendor`
@@ -66,7 +79,13 @@ gofmt -l internal/ cmd/        # must print nothing
 go vet ./...                   # must be clean
 go test ./...                  # must be green
 go test ./internal/... -cover  # 85–90% min per package
+bash scripts/coverage-gate.sh  # enforces the 85% floor per package (no exemptions)
 ```
+
+The `pre-push` hook runs all of the above, builds both SKUs, asserts the offline build is
+net-free, and then runs `/checkin-review` (code + security + YAGNI) through your local Claude
+Code. The review is advisory by default; set `AISPEND_AI_REVIEW_BLOCKING=1` to make a BLOCK
+verdict actually stop the push. Full rationale: [`docs/review-automation.md`](docs/review-automation.md).
 
 CI also re-runs the suite under non-UTC timezones (`Asia/Kolkata`,
 `America/Los_Angeles`) — `aispend` is UTC end-to-end internally and only renders local

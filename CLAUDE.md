@@ -30,7 +30,37 @@ gofmt -l internal/ && go vet ./...
 - **t-wada-style TDD**: write the failing test first (confirm RED), minimal code to
   GREEN, then refactor. Every change lands with tests.
 - **Coverage 85–90% minimum** per package.
-- **Reviews**: run the code-review skill and a security review on changes before done.
+- **YAGNI by default**: the laziest solution that works — stdlib/native before custom code or a new
+  dependency, no abstraction with a single caller. The vendored **`ponytail`** skill
+  (`.claude/skills/ponytail/`) is the dev-time reflex; **`ponytail-review`** backs the
+  `/yagni-review` gate. Mark deliberate simplifications with a `ponytail:` comment (and name the
+  ceiling + upgrade path for a shortcut).
+- **Reviews**: run all three repo review commands on the change-set before done —
+  `/review` (code), `/security-review`, `/yagni-review`. `/checkin-review` runs all three and
+  prints one verdict; the `pre-push` hook calls it.
+
+## Review & checkin automation
+
+The review gates live in the repo as version-controlled Claude Code commands under
+`.claude/commands/` (`review`, `security-review`, `yagni-review`, `checkin-review`), so every
+contributor and every run shares the same definitions. They are invoked **consistently at
+checkin** by git hooks in `.githooks/` (enable once with `scripts/setup-hooks.sh`):
+
+- `pre-commit` — fast: `gofmt` on staged Go files (keeps "commit on green" cheap).
+- `pre-push` — full gate: `gofmt` · `vet` · `go test` + the **85% coverage floor**
+  (`scripts/coverage-gate.sh`, no exemptions) · both build SKUs · offline net-free assertion —
+  then `/checkin-review` via your **local** Claude Code (no API key anywhere; advisory unless
+  `AISPEND_AI_REVIEW_BLOCKING=1`).
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the deterministic, secret-free half on every
+push/PR (coverage floor, both SKUs, offline egress assertion). The AI reviews stay **out** of CI
+by design — rationale and the optional server-side upgrade path are in `docs/review-automation.md`.
+
+**Security review is layered by depth:** `/security-review` (the fast per-diff checkin gate, driven
+by Anthropic's **Security Guidance** plugin) runs every push; `/security-audit` (the **vendored
+Cloudflare** six-phase, multi-agent skill in `.claude/skills/security-audit/`) is the deep whole-repo
+audit, reserved for **pre-release** (`RELEASE_CHECKLIST.md` §3b) and on-demand — too heavy for every
+push. See `docs/review-automation.md` § "Security review — two layers".
 
 ## CLI surface
 
