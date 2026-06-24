@@ -7,6 +7,7 @@
 <meta name="description" content="AiSpend prices every Claude Code and Codex turn at real API rates, proves whether your subscription pays off, and traces each dollar to its turn, file, and commit. One static Go binary. No API keys. Offline by default." />
 <link rel="canonical" href="https://aispend.cloudyali.io/" />
 <meta name="theme-color" content="#334EFF" />
+<meta property="og:image" content="https://aispend.cloudyali.io/og.png">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
@@ -16,6 +17,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="AiSpend — local, explainable spend for AI coding agents" />
 <meta name="twitter:description" content="Price every Claude Code & Codex turn at real API rates. Trace each dollar to its turn, file, and commit. One static binary, offline by default." />
+<meta name="twitter:image" content="https://aispend.cloudyali.io/og.jpg" />
 
 <!-- Favicon: cobalt receipt mark -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23334EFF'/%3E%3Cpath d='M9 8h14v17l-3-2-2 2-2-2-2 2-2-2-3 2V8Z' fill='white'/%3E%3Cpath d='M12 13h8M12 17h6' stroke='%23334EFF' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
@@ -153,6 +155,25 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);bac
 .brand-logo{height:34px;width:auto;display:block}
 .ft .brand-logo{height:30px}
 @media (max-width:380px){.brand-logo{height:30px}}
+.gh-stars{display:inline-flex;align-items:stretch;font-size:14px;font-weight:600;color:var(--text);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:.15s}
+.gh-stars:hover{border-color:var(--coal-300)}
+.gh-stars .lbl{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;background:#fff;transition:.15s}
+.gh-stars:hover .lbl{background:var(--coal-25)}
+.gh-stars svg{width:17px;height:17px}
+.gh-stars .cnt{display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border-left:1px solid var(--border-subtle);background:var(--coal-25);color:var(--text-2);font-variant-numeric:tabular-nums;min-width:30px}
+.install-note{margin-top:16px;font-size:13.5px;color:var(--text-3)}
+.install-note b{color:var(--text-2);font-weight:600}
+.shots{display:grid;gap:36px;max-width:940px;margin:0 auto}
+.shot{margin:0}
+.shotframe{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow);background:#fff}
+.shotbar{display:flex;align-items:center;gap:7px;padding:10px 14px;background:var(--bg-2);border-bottom:1px solid var(--border-subtle)}
+.shotbar i{width:10px;height:10px;border-radius:50%;display:block}
+.shotbar .ttl{margin-left:6px;font-family:var(--font-mono);font-size:12px;color:var(--text-3)}
+.shotframe img{display:block;width:100%;height:auto}
+.shotcap{margin-top:14px}
+.shotcap .st{font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--brand);display:block;margin-bottom:6px}
+.shotcap h3{font-size:19px;margin-bottom:4px}
+.shotcap p{font-size:15px;color:var(--text-3)}
 .brand b{font-weight:600}.brand b span{color:var(--brand)}
 .nav-links{display:flex;align-items:center;gap:30px}
 .nav-links a{font-size:15px;color:var(--text-2);font-weight:500;transition:.15s}
@@ -176,7 +197,7 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);bac
 .mobile-menu .mm-cta .btn,.mobile-menu .mm-cta .gh-pill{width:100%;justify-content:center}
 .mobile-menu.open{display:block;animation:menuIn .18s ease}
 @keyframes menuIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-@media (max-width:960px){.nav-links,.nav-cta .gh-pill,.nav-cta .btn-primary{display:none}.nav-toggle{display:inline-flex}}
+@media (max-width:960px){.nav-links,.nav-cta .gh-stars,.nav-cta .btn-primary{display:none}.nav-toggle{display:inline-flex}}
 
 /* ============================ HERO ============================ */
 .hero{position:relative;overflow:hidden;padding:84px 0 72px}
@@ -452,9 +473,9 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
       <a href="#install">Install</a>
     </nav>
     <div class="nav-cta">
-      <a class="gh-pill" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
-        <span>GitHub</span>
+      <a class="gh-stars" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener" aria-label="Star AiSpend on GitHub">
+        <span class="lbl"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>Star</span>
+        <span class="cnt" id="gh-star-count" aria-hidden="true">★</span>
       </a>
       <a class="btn btn-primary" href="#install">Get started</a>
       <button class="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
@@ -500,6 +521,7 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
           </button>
         </div>
       </div>
+      <p class="install-note">Installs in seconds — one command, one static binary. <b>No Node, no Python, no account.</b></p>
       <div class="microtrust">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> MIT licensed</span>
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> One static binary, no runtime</span>
@@ -643,6 +665,40 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
   </div>
 </section>
 
+<!-- ============================ SCREENSHOTS ============================ -->
+<section class="section" id="screens" style="background:var(--bg-2);border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">See it in action</span>
+      <h2>The whole story, straight from your terminal.</h2>
+      <p>Real captures from real sessions — drill from the day's spend down to the exact prompt that spent it.</p>
+    </div>
+    <div class="shots">
+      <figure class="shot">
+        <div class="shotframe">
+          <div class="shotbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="ttl">aispend — explorer</span></div>
+          <img src="shots/explorer.jpg" width="1500" height="837" loading="lazy" alt="AiSpend explorer: sessions ranked by api-equivalent spend, with cache savings and budget pace" />
+        </div>
+        <figcaption class="shotcap"><span class="st">01 · explore</span><h3>Every session, ranked by spend</h3><p>Day-grouped sessions with api-equivalent cost, cache savings, and your budget pace — at a glance.</p></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shotframe">
+          <div class="shotbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="ttl">aispend — receipt</span></div>
+          <img src="shots/receipt.jpg" width="1500" height="837" loading="lazy" alt="AiSpend session receipt: per-token-class split, cache arbitrage, and a cost-by-file heatmap" />
+        </div>
+        <figcaption class="shotcap"><span class="st">02 · receipt</span><h3>Open a session — see where the money went</h3><p>The per-token-class split, cache arbitrage (what caching saved you), and a cost-by-file heatmap that drills deeper.</p></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="shotframe">
+          <div class="shotbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="ttl">aispend — turn evidence</span></div>
+          <img src="shots/turn-evidence.jpg" width="1500" height="837" loading="lazy" alt="AiSpend turn evidence: a single turn's token-by-token cost traced to the exact prompt" />
+        </div>
+        <figcaption class="shotcap"><span class="st">03 · evidence</span><h3>Down to a single turn — and its prompt</h3><p>Every turn's token-by-token cost, traced to the exact prompt, re-read live from your local session log.</p></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ HOW IT WORKS ============================ -->
 <section class="section" id="how" style="background:var(--bg-2);border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle)">
   <div class="wrap">
@@ -727,7 +783,7 @@ footer.ft{background:var(--coal-1100);color:var(--coal-300);padding:64px 0 36px;
     <div class="section-head">
       <span class="eyebrow">Install</span>
       <h2>Pick whichever fits. Every path lands the same binary.</h2>
-      <p>And every path lets you verify exactly what you ran.</p>
+      <p>Most people just run the one-liner — it's done in seconds. And every path lets you verify exactly what you ran.</p>
     </div>
     <div class="install-card">
       <div class="tabs" role="tablist" aria-label="Install methods">
@@ -913,6 +969,20 @@ go build ./cmd/aispend" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" s
     });
     window.addEventListener('resize', function(){ if(window.innerWidth > 960) setMenu(false); });
     document.addEventListener('keydown', function(e){ if(e.key === 'Escape') setMenu(false); });
+  }
+
+  // ---- live GitHub star count ----
+  var starEl = document.getElementById('gh-star-count');
+  if(starEl){
+    fetch('https://api.github.com/repos/cloudyali/ai-agent-spend')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(d && typeof d.stargazers_count === 'number'){
+          var n = d.stargazers_count;
+          starEl.textContent = n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+        }
+      })
+      .catch(function(){});
   }
 })();
 </script>
