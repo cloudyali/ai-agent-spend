@@ -4,12 +4,15 @@
 
 **Local, explainable spend tracking for AI coding agents.**
 
-`aispend` reads the session logs that Claude Code and Codex already write to your
-disk, prices every turn against a pinned rate table, and keeps an evidence ledger
-you can open — so every number drills down to where it came from.
+AI coding agents bill a flat monthly fee and don't expose the per-token meter.
+`aispend` parses the session logs Claude Code and Codex already write to disk, prices
+every turn at published API rates, and stores an evidence ledger you can drill into.
+You get the API-equivalent cost of your work, and every number traces back to its
+source: turn, model, token class, file, commit.
 
-One static Go binary. No Node, no Python, no database to run. By default it never
-touches the network, and it can _prove_ it.
+Single static Go binary — no Node, no Python, no daemon, no database. It reads local
+files only; the one network call is an optional refresh of public price data, which
+`doctor --network` discloses.
 
 [![CI](https://github.com/cloudyali/ai-agent-spend/actions/workflows/ci.yml/badge.svg)](https://github.com/cloudyali/ai-agent-spend/actions/workflows/ci.yml)
 [![Go](https://img.shields.io/github/go-mod/go-version/cloudyali/ai-agent-spend)](go.mod)
@@ -30,74 +33,91 @@ touches the network, and it can _prove_ it.
 
 ## Table of contents
 
-- [Why this exists](#why-this-exists)
-- [What you get](#what-you-get)
-- [Use cases](#use-cases)
-- [Quickstart](#quickstart)
-- [Install](#install)
-- [Supported OS](#supported-os)
-- [Prove it's offline](#prove-its-offline)
-- [Commands & usage](#commands--usage)
-- [How it works](#how-it-works)
-- [How accurate is it?](#how-accurate-is-it)
-- [Configuration](#configuration)
-- [Where your data lives](#where-your-data-lives)
-- [Supported agents](#supported-agents)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [FAQ](#faq)
-- [License](#license)
+- [aispend](#aispend)
+  - [Table of contents](#table-of-contents)
+  - [Why this exists](#why-this-exists)
+  - [What you get](#what-you-get)
+  - [Use cases](#use-cases)
+  - [Quickstart](#quickstart)
+  - [Install](#install)
+    - [Homebrew (macOS)](#homebrew-macos)
+    - [Install script (macOS / Linux)](#install-script-macos--linux)
+    - [With Go](#with-go)
+    - [From a prebuilt binary](#from-a-prebuilt-binary)
+    - [From source](#from-source)
+    - [The offline build](#the-offline-build)
+  - [Supported OS](#supported-os)
+  - [Prove it's offline](#prove-its-offline)
+  - [Commands \& usage](#commands--usage)
+    - [`scan` — import \& price](#scan--import--price)
+    - [`today` — the daily glance](#today--the-daily-glance)
+    - [`report` — spend over any calendar window](#report--spend-over-any-calendar-window)
+    - [`top` — the priciest turns (or sessions)](#top--the-priciest-turns-or-sessions)
+    - [`aispend` / `tui` — the interactive explorer](#aispend--tui--the-interactive-explorer)
+    - [`git` — per-commit cost trailers (opt-in)](#git--per-commit-cost-trailers-opt-in)
+    - [`plans` \& `pricing`](#plans--pricing)
+  - [How it works](#how-it-works)
+  - [How accurate is it?](#how-accurate-is-it)
+  - [Configuration](#configuration)
+    - [`~/.aispend/config.toml` — your plan \& budget](#aispendconfigtoml--your-plan--budget)
+    - [`.aispend.toml` — per-repo attribution \& trailers](#aispendtoml--per-repo-attribution--trailers)
+  - [Where your data lives](#where-your-data-lives)
+  - [Supported agents](#supported-agents)
+  - [Contributing](#contributing)
+    - [Build \& test](#build--test)
+  - [FAQ](#faq)
+  - [License](#license)
 
 ---
 
 ## Why this exists
 
-Your coding agent runs on a flat monthly subscription. The meter is hidden. So a
-fair question — _"what did I actually spend on AI coding this week, and on what?"_ —
-has no honest answer in the tools you already use. The dashboard shows a usage bar,
-not dollars. Third-party scripts spit out one number with no way to check it.
+Coding agents — Claude Code, Codex, Cursor, OpenCode, and others — mostly bill a flat
+monthly subscription and don't expose a per-token meter. The cost underneath is still
+tokens: input, output (priced higher), and cache reads/writes, with prompt caching
+absorbing much of the bill on cache-heavy workloads. Price your real usage at the
+providers' published API rates and the API-equivalent number is often nowhere near the
+subscription price. Flat pricing is an acquisition strategy; metered pricing is the
+likely endgame, and most setups can't measure the gap.
 
-`aispend` takes the opposite stance. It treats the session transcripts your agents
-_already_ write to `~/.claude` and `~/.codex` as the source of truth, prices each
-turn the way the API would bill it, and then — this is the part that matters — lets
-you **open any number and see the evidence underneath it**: which turn, which model,
-which token classes, which file, which commit.
+`aispend` measures it. It reads the session transcripts your agents already write to
+`~/.claude` and `~/.codex`, prices each turn the way the API would (per token class,
+caches included), and lets you open any number to see what it's made of: which turn,
+model, file, and commit. Group spend by `branch`, `commit`, or `file` for cost per
+check-in; the hourly view surfaces an overnight session that looped.
 
-Think of it less like a meter and more like an itemized receipt for work you've
-already done. The total is only as trustworthy as your ability to question it, so
-the whole tool is built around making numbers _questionable_ — in the good sense.
+Because everything is derived from local files, it also tells you whether the
+subscription pays off: API-equivalent spend next to your plan's daily cost. A `$200/mo`
+plan that would have metered at `$11.71` today is a clear ROI signal.
 
-And because it reads local files, it answers a second question most teams never get
-to ask: **is the subscription actually a good deal?** If your `$200/mo` plan would
-have cost `$11.71` in API-equivalent metering _today alone_, you have your answer.
+No API keys, no credentials, and none of your session data leaves the machine. The only
+outbound request is a refresh of public model prices to keep rates current; it sends no
+user data, `doctor --network` discloses it, and the `offline` build removes it.
 
 ---
 
 ## What you get
 
-- **A daily glance worth opening.** `aispend today` leads with value, not a bare
-  total: api-equivalent spend, your subscription ROI, what prompt caching saved
-  you, and an hourly bar that surfaces the 2 a.m. session that looped.
-- **Every number is explainable.** Drill from a day → a session → a file → a single
-  turn's token-by-token cost. No "trust me," ever.
-- **Subscription arbitrage, made visible.** See metered-equivalent cost next to your
-  plan's daily cost, so you know whether you're under- or over-using your seat.
-- **Cache-aware pricing.** Claude Code workloads are dominated by prompt-cache reads
-  and writes; `aispend` prices the 5-minute and 1-hour cache tiers correctly, which
-  is where naive trackers drift.
-- **Spend tied to shipped code.** Group by `branch`, `commit`, or `file`, and
-  optionally write per-commit cost back into your git history as trailers.
-- **Provably offline.** The default build contains no network-capable code path.
-  `aispend doctor --network` asserts it; an `offline` build compiles `net/*` out
-  entirely.
-- **One binary, zero runtime.** Pure Go, vendored, no codegen. Drop it on your PATH
-  and go.
+- **Daily glance.** `aispend today` shows api-equivalent spend, subscription ROI,
+  prompt-cache savings, and an hourly bar that flags a runaway 2 a.m. session.
+- **Every number is explainable.** Drill from a day → session → file → a single turn's
+  token-by-token cost. Nothing is asserted without evidence.
+- **Subscription arbitrage.** Metered-equivalent cost sits next to your plan's daily
+  cost, so you can tell whether you're under- or over-using the seat.
+- **Cache-aware pricing.** Coding agent workloads are dominated by prompt-cache reads and
+  writes; `aispend` prices the 5-minute and 1-hour cache tiers separately.
+- **Spend tied to shipped code.** Group by `branch`, `commit`, or `file`, and optionally
+  write per-commit cost back to git history as trailers.
+- **Provably offline.** The default build has no code path that can send your data
+  anywhere; `aispend doctor --network` asserts it. Its one network call is an inbound
+  pull of public model prices, and the `offline` build compiles `net/*` out entirely.
+- **One binary, no runtime.** Pure Go, vendored, no codegen. Put it on your PATH and run.
 
 ---
 
 ## Use cases
 
-Different people open `aispend` for different reasons. A few of the common ones:
+Common reasons to reach for it:
 
 - **"Am I getting my money's worth?"** You're on a `$20`–`$200/mo` plan and the
   meter is hidden. `aispend today` puts api-equivalent spend next to your plan's
@@ -114,8 +134,9 @@ Different people open `aispend` for different reasons. A few of the common ones:
   shows what each agent actually costs you on real work, so you reach for the right
   one instead of the expensive one out of habit.
 - **"I can't send my code to a SaaS dashboard."** Under an NDA, in a regulated shop,
-  or just privacy-minded? `aispend` reads only local files and has no
-  network-capable code path to begin with — and `doctor --network` proves it.
+  or just privacy-minded? `aispend` reads only local files and has no code path that
+  can send your data anywhere — `doctor --network` proves it (its one network call just
+  pulls public model prices, and the `offline` build removes even that).
 - **"Did caching actually save me anything?"** Cache-aware pricing shows what prompt
   caching shaved off the day, so you can tell whether your prompt structure is
   pulling its weight.
@@ -288,10 +309,12 @@ inbound only: `aispend pricing refresh` may GET https://aispendllm.cloudyali.io/
 RESULT: PASS — this binary cannot phone home
 ```
 
-The only outbound call the default build can _ever_ make is a single inbound GET to
-refresh public price data — and it only happens when you explicitly run
-`aispend pricing refresh`. Nothing about your sessions, code, or spend leaves your
-machine. The offline build can't even do that:
+The only network call the default build can _ever_ make is an inbound GET that refreshes
+public price data. It runs automatically when the cached rates are missing or older than
+24h, and on demand via `aispend pricing refresh` — you can switch the automatic top-up
+off with `--no-refresh`, `AISPEND_NO_REFRESH=1`, or `refresh_on_launch = false`. Either
+way the call only pulls prices in; nothing about your sessions, code, or spend ever
+leaves your machine. The offline build can't even do that:
 
 ```text
 $ aispend doctor --network          # offline build
@@ -306,6 +329,22 @@ your own copy.
 ---
 
 ## Commands & usage
+
+`aispend` has two modes:
+
+- **TUI — the default.** Run `aispend` with no command and it opens the interactive
+  Terminal UI: a day-grouped session list you arrow through, then `↵` to drill from a
+  session into its receipt → a file → a single turn's evidence, each `↵` one level
+  deeper. The TUI is the default channel — new surfaces land here first, and `--watch`
+  live-refreshes it in place.
+- **CLI — one-shot and scriptable.** Every command also prints a static answer and
+  exits: `aispend today`, `report`, `top`, `scan`, `doctor`, and the rest. These
+  degrade to plain ASCII off a TTY, under `NO_COLOR`, or with `TERM=dumb`, and never
+  bleed an escape code into a pipe — safe for scripts, cron, and CI.
+
+A bare `aispend` opens the TUI only when it can: with no real terminal, piped output,
+or the `offline` build (where the TUI is compiled out), it falls back to the static
+`today` glance, which carries the same numbers.
 
 ```text
 $ aispend help
@@ -326,11 +365,6 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
 
   today/report/top/tui scan new sessions on launch first; --no-scan reads the ledger as-is
 ```
-
-A bare `aispend` (no command) opens the interactive explorer when it can — it needs
-a real terminal. Off a TTY, in a pipe, or in the offline build, it falls back to the
-static `today` glance, which carries the same numbers and never bleeds color codes
-into your pipe.
 
 ### `scan` — import & price
 
@@ -522,24 +556,28 @@ dependency that pulls net/*). Use `aispend top`, `aispend today`, or `aispend re
 
 ### `git` — per-commit cost trailers (opt-in)
 
-Want spend recorded _in_ your git history? `aispend git install` adds a safe commit
-hook (it honors existing hook managers) that stamps each commit with the
-api-equivalent cost of the work on that branch.
+`aispend` attributes spend to commits on the read side (`report --by commit`, the
+receipt's `branch · SHA` line). This is the write side: an opt-in git hook stamps the
+api-equivalent cost of a commit's work _into_ the commit message as a trailer
+(`AI-Cost: 0.42`). The number then travels with the code — visible in `git log`, a PR
+diff, or GitHub blame, with nothing installed on the other end — and still drills back
+to the full receipt in `aispend` via the commit SHA.
+
+**Setup is per-repo.** The hooks live in that clone's `.git/hooks` (or its hook
+manager) and are never committed, so run `install` from inside the repo, once per clone
+(or pass the path: `aispend git install <dir>`):
 
 ```text
+$ cd /path/to/your/repo
 $ aispend git install
-✓ aispend trailer hooks installed (/path/to/repo/.git/hooks)
+✓ aispend trailer hooks installed (/path/to/your/repo/.git/hooks)
   trailers attach on your next commit; tune them in .aispend.toml [trailers]
   `aispend git status` to check · `aispend git uninstall` to remove
 ```
 
-`aispend today` previews what your next commit would carry:
-
-```text
-  pending commit main: $11.56 · 19 turns (uncommitted)
-```
-
-…and the commit itself comes out stamped:
+That's the whole setup. With no config the default is a single `AI-Cost` line, and your
+next commit is stamped automatically — the hook runs a quick incremental scan first, so
+you don't have to `aispend scan` by hand:
 
 ```text
 $ git log -1
@@ -553,7 +591,52 @@ Author: Nishant <dev@example.com>
     AI-Tokens: input=246700,output=54100,cache_read=13595000,cache_write=351000,cache_write_1h=18000
 ```
 
-Every field is configurable (or off) in the repo's `.aispend.toml [trailers]` block.
+A commit with no attributable AI usage gets **no** trailer (never a misleading
+`AI-Cost: 0.00`). Check the hook state with `aispend git status`; `aispend git uninstall`
+removes only aispend's hooks:
+
+```text
+$ aispend git uninstall
+✓ removed 2 aispend hook(s) from /path/to/your/repo/.git/hooks
+```
+
+**Which lines attach** is set in the repo's `.aispend.toml` — committed and reviewed, so
+a whole team emits identical trailers:
+
+```toml
+[trailers]
+enabled      = true   # repo-wide gate; false suppresses trailers even with hooks installed
+cost         = true   # AI-Cost:          total api-equivalent (the default line)
+cost_models  = false  # AI-Cost-Models:   per-model breakdown
+tokens       = false  # AI-Tokens:        input/output/cache_read/cache_write/cache_write_1h
+interactions = false  # AI-Interactions:  deduped request count
+precision    = 2      # decimals on cost (clamped 0–8)
+
+[trailers.rename]
+cost = "AI-Cost"      # rename the cost key if you prefer
+```
+
+> The trailer is the **api-equivalent** cost — what the work would have metered at the
+> API — not cash billed against your subscription.
+
+**Hook managers.** If the repo uses Husky, Lefthook, or pre-commit (or sets
+`core.hooksPath`), `install` won't clobber them: it prints the paste-ready line to add
+to the manager's `prepare-commit-msg` / `post-commit`, and `aispend git status` (and
+`doctor`) report `trailer wiring: detected | NOT detected`, so a managed repo never
+silently looks installed while stamping nothing.
+
+**In the TUI.** Trailers surface back in the interactive explorer:
+
+- `aispend today` and the TUI preview the pending stamp before you commit —
+  `pending commit main: $11.56 · 19 turns (uncommitted)`.
+- The **session receipt** adds a reconciliation badge under `branch · SHA`, e.g.
+  `✓ trailer $0.42 in git · ledger $0.41 · Δ +$0.01`, comparing the cost frozen in the
+  commit against the live ledger (no badge if the commit isn't in the current repo).
+- Press **`c`** for the commit view: per-commit ledger spend (SHA · cost · turns ·
+  branch · time), git-independent, gaining the commit title and an in-git-trailer badge
+  when the repo is present; `↵` opens the message and a ledger-vs-trailer reconciliation.
+- Press **`t`** for the trailers editor: toggle the `[trailers]` lines above and write
+  them straight to `.aispend.toml` — no hand-editing TOML.
 
 ### `plans` & `pricing`
 
@@ -728,25 +811,6 @@ is handled by a single platform layer.
 
 ---
 
-## Roadmap
-
-`aispend` is **Phase 0A** — early, but working end-to-end on real `~/.claude` and
-`~/.codex` data. The through-line across every phase is _explainability_: any number,
-at any tier, opens to its evidence. The commercial layer (cloud reconciliation in
-CloudYali) is strictly **additive** — no local feature is ever removed or gated
-behind an account.
-
-| Phase | Goal |
-|---|---|
-| **0A** _(now)_ | A trusted, explainable local ledger for Claude Code + Codex. |
-| **0B** | More agents (Cursor) without silent estimates; fact-based cost-driver findings. |
-| **1A** | Durable ingestion (OTel / admin APIs) that matches file parsing on someone else's machine. |
-| **1B** | Self-hosted team roll-up with k-anonymity — aggregate without a per-person scoreboard. |
-| **2** | Reconcile coding-agent spend with API / invoice / seat spend in one pane. |
-| **3** | Emit a fix (a LiteLLM rule, a Claude Code hook) from a detected cost driver. |
-
----
-
 ## Contributing
 
 Contributions are welcome. The project has a few **non-negotiable** conventions —
@@ -777,9 +841,12 @@ complete and is the fastest way to understand _why_ a thing is the way it is.
 ## FAQ
 
 **Does it send my code or prompts anywhere?**
-No. The default build has no network-capable code path at all (`doctor --network`
-proves it), and the offline build compiles `net/*` out entirely. The only outbound
-call that exists is an opt-in GET of public price data via `pricing refresh`.
+No. Nothing about your sessions, code, or spend ever leaves your machine, and `doctor
+--network` proves there's no code path that could send it. The one network call the
+default build makes is an _inbound_ GET of public model prices — automatic when your
+cached rates go stale (>24h), or on demand via `aispend pricing refresh`. You can turn
+the automatic refresh off (`--no-refresh`, `AISPEND_NO_REFRESH=1`, or
+`refresh_on_launch = false`), and the `offline` build compiles `net/*` out entirely.
 
 **Do I need an API key or to log in?**
 No. `aispend` reads the session logs your agents already write locally. There's

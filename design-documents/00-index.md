@@ -65,6 +65,9 @@ _Last updated: 2026-06-20 · UX/UI concept captures (07–11) added — 11 propo
 | [09-session-view.md](09-session-view.md) | Session as a first-class unit: `report --by session` + the TUI session receipt, spike-not-streak temporal view, cost+churn heatmap | Implemented |
 | [10-session-explorer-budgets-quota.md](10-session-explorer-budgets-quota.md) | Session as the explorer spine (live + historical), prompt-chain travel, API-equivalent budgets, and the local plan-quota window (Codex `rate_limits` / Claude usage snapshot) | Largely implemented (A–D shipped; residue: nesting, scoped budgets, ←/→ travel, alerts) |
 | [11-commit-cost-trailers.md](11-commit-cost-trailers.md) | Per-commit cost trailers: writing api-equivalent spend back into git history via hooks (claude-budget-style); the write-back complement to 09 | Concept (proposal) |
+| [12-surfaces-ingestion-roadmap.md](12-surfaces-ingestion-roadmap.md) | Surfaces & ingestion roadmap (scan-on-launch, the pending session-end hook = Item 7, et al.) | Roadmap / reference |
+| [13-spend-to-effectiveness.md](13-spend-to-effectiveness.md) | Spend → effectiveness: the waste denominator (rework-loops, right-sizing, dead spend, surviving churn) — measure waste, not productivity | Concept (brainstorm capture) |
+| [14-spend-outcome-yield.md](14-spend-outcome-yield.md) | Spend ↔ outcome: our cost trailers (write) vs CodeBurn's `yield` (read); verified comparison, what to borrow, the shared denominator with 13 | Concept (comparison capture) |
 | [research-local-session-data.md](research-local-session-data.md) | Source note: mining agents' local session data (verified vs ccusage/CodeBurn) | Reference |
 | [phase-0A-trusted-explainable-ledger.md](phase-0A-trusted-explainable-ledger.md) | Claude Code local ledger + `explain` | **Detailed — building now** |
 | [phase-0B-provider-coverage-and-findings.md](phase-0B-provider-coverage-and-findings.md) | Codex + Cursor, fixtures, cost-driver findings, TUI | Planned |

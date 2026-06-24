@@ -47,7 +47,7 @@ var Version = "0.1.0-dev"
 // the version and help banners. Purely informational text — printing them makes
 // no network call.
 const (
-	Website = "https://ai-spend.cloudyali.io/"
+	Website = "https://aispend.cloudyali.io/"
 	Issues  = "https://github.com/agentspend/ai-agent-spend/issues"
 )
 
