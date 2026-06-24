@@ -117,13 +117,13 @@ func (m Money) String() string {
 // CostViews models spend through several lenses. A nil pointer means "not
 // computable from available evidence" — never zero. See design-documents/02-data-model.md.
 type CostViews struct {
-	Billed             *Money `json:"billed,omitempty"`
-	Reported           *Money `json:"reported,omitempty"` // a cost the tool itself wrote to disk (e.g. Claude costUSD, OpenCode/Pi cost) — present & >0 only
-	EffectiveAllocated *Money `json:"effective_allocated,omitempty"`
-	Marginal           *Money `json:"marginal,omitempty"`
-	APIEquivalent      *Money `json:"api_equivalent,omitempty"`
-	CreditConsumption  *int64 `json:"credit_consumption,omitempty"`
-	Estimated          *Money `json:"estimated,omitempty"`
+	Billed            *Money `json:"billed,omitempty"`
+	Reported          *Money `json:"reported,omitempty"` // a cost the tool itself wrote to disk (e.g. Claude costUSD, OpenCode/Pi cost) — present & >0 only
+	Amortized         *Money `json:"amortized,omitempty"`
+	Marginal          *Money `json:"marginal,omitempty"`
+	APIEquivalent     *Money `json:"api_equivalent,omitempty"`
+	CreditConsumption *int64 `json:"credit_consumption,omitempty"`
+	Estimated         *Money `json:"estimated,omitempty"`
 }
 
 // Evidence is the provenance ledger rendered by `aispend explain`. It is a

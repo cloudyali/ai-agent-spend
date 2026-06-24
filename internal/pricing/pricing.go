@@ -4,7 +4,7 @@
 //
 // Phase 0A computes the always-available lenses — api_equivalent (high
 // confidence) and estimated — and records full pricing provenance. Plan-aware
-// lenses that need period aggregation (effective_allocated, marginal) are
+// lenses that need period aggregation (amortized, marginal) are
 // computed at the aggregation step, not per event; the engine notes them as
 // known-missing here. See design-documents/phase-0A-trusted-explainable-ledger.md.
 package pricing
@@ -128,7 +128,7 @@ func (e *Engine) Price(ev *event.AgentEvent, plan Plan) error {
 	// Subscription amortization is a period-level operation; note it as missing
 	// so `explain` is honest about which lenses aren't yet computed.
 	if plan.Kind == "subscription" {
-		ev.Evidence.KnownMissingFields = appendMissing(ev.Evidence.KnownMissingFields, "effective_allocated")
+		ev.Evidence.KnownMissingFields = appendMissing(ev.Evidence.KnownMissingFields, "amortized")
 	}
 	return nil
 }
@@ -230,7 +230,7 @@ func appendMissing(xs []string, s string) []string {
 // ProratedFee returns the share of a monthly subscription fee attributable to a
 // window of `days` (a month is treated as 30 days). Returns (zero, false) unless
 // the plan is an amortizable subscription with a known monthly fee. This is the
-// basis for the effective_allocated cost view, which is a period-level concept —
+// basis for the amortized cost view, which is a period-level concept —
 // hence computed here at aggregation time, not per event.
 func ProratedFee(plan Plan, days int) (event.Money, bool) {
 	if plan.Kind != "subscription" || plan.MonthlyFee == nil || days <= 0 {
@@ -254,7 +254,7 @@ func ProratedFee(plan Plan, days int) (event.Money, bool) {
 // so it takes [since, until] rather than a day count. It returns (zero, false)
 // unless the plan is an amortizable subscription with a fee and a known StartDate
 // and at least one whole active day lies in the window. This is the date-aware
-// basis for the effective_allocated view.
+// basis for the amortized view.
 func AmortizeSubscription(plan Plan, since, until time.Time) (event.Money, bool) {
 	if plan.Kind != "subscription" || plan.MonthlyFee == nil || plan.StartDate.IsZero() {
 		return event.Money{}, false

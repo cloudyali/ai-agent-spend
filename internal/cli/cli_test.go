@@ -293,9 +293,23 @@ func TestRun_WindowsAndVerbose(t *testing.T) {
 	if _, _, c := run(t, "report", "--period", "2026-01-01..nonsense"); c != 2 {
 		t.Errorf("bad range end should exit 2, got %d", c)
 	}
-	// `all` + effective_allocated exercises the spanDays derivation
-	if _, _, c := run(t, "report", "--period", "all", "--view", "effective_allocated"); c != 0 {
-		t.Errorf("all allocated should exit 0, got %d", c)
+	// `all` + amortized exercises the spanDays derivation
+	if _, _, c := run(t, "report", "--period", "all", "--view", "amortized"); c != 0 {
+		t.Errorf("all amortized should exit 0, got %d", c)
+	}
+}
+
+// The view was renamed effective_allocated → amortized (hard cut, no alias). The
+// old name must not silently fall through to api_equivalent: it errors with a hint.
+func TestReportView_EffectiveAllocatedRenamed(t *testing.T) {
+	for _, old := range []string{"effective_allocated", "effective-allocated"} {
+		_, errs, code := run(t, "report", "--period", "all", "--view", old)
+		if code != 2 {
+			t.Errorf("--view %s should exit 2 (renamed), got %d", old, code)
+		}
+		if !strings.Contains(errs, "amortized") || !strings.Contains(errs, "renamed") {
+			t.Errorf("--view %s error should name the new view and that it was renamed: %s", old, errs)
+		}
 	}
 }
 
@@ -423,9 +437,9 @@ func TestRenderAllocated(t *testing.T) {
 	t.Run("subscription plan amortizes", func(t *testing.T) {
 		var buf bytes.Buffer
 		a := &App{Out: &buf, Now: time.Now}
-		a.renderReport(events, "model", "effective_allocated", jun1, jul1, "last 30d", subPlans, len(events)) // 30d ⇒ full $200
+		a.renderReport(events, "model", "amortized", jun1, jul1, "last 30d", subPlans, len(events)) // 30d ⇒ full $200
 		got := buf.String()
-		for _, want := range []string{"effective-allocated", "subscription_amortized", "$200.00", "not a metered price"} {
+		for _, want := range []string{"view: amortized", "subscription_amortized", "$200.00", "not a metered price"} {
 			if !strings.Contains(got, want) {
 				t.Errorf("allocated report missing %q:\n%s", want, got)
 			}
@@ -445,7 +459,7 @@ func TestRenderAllocated(t *testing.T) {
 			Default:    config.Plan{Kind: "subscription", Name: "claude-max-20x", MonthlyFeeUSD: 200},
 			ByProvider: map[string]config.Plan{"codex": {Kind: "subscription", Name: "chatgpt-pro", MonthlyFeeUSD: 200}},
 		}
-		a.renderReport(evs, "provider", "effective_allocated", jun1, jul1, "last 30d", set, len(evs))
+		a.renderReport(evs, "provider", "amortized", jun1, jul1, "last 30d", set, len(evs))
 		got := buf.String()
 		if !strings.Contains(got, "$400.00") || !strings.Contains(got, "2 plan(s)") {
 			t.Errorf("per-provider total should be $400 across 2 plans:\n%s", got)
@@ -461,7 +475,7 @@ func TestRenderAllocated(t *testing.T) {
 			Default:    config.Plan{Kind: "subscription", Name: "claude-max-20x", MonthlyFeeUSD: 200, StartDate: time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC)},
 			ByProvider: map[string]config.Plan{},
 		}
-		a.renderReport(events, "model", "effective_allocated", jun1, jul1, "last 30d", start, len(events))
+		a.renderReport(events, "model", "amortized", jun1, jul1, "last 30d", start, len(events))
 		got := buf.String()
 		if !strings.Contains(got, "$126.67") {
 			t.Errorf("mid-window start should prorate to $126.67, not full $200:\n%s", got)
@@ -478,7 +492,7 @@ func TestRenderAllocated(t *testing.T) {
 			Default:    config.Plan{Kind: "subscription", Name: "claude-max-20x", MonthlyFeeUSD: 200, StartDate: time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)},
 			ByProvider: map[string]config.Plan{},
 		}
-		a.renderReport(events, "model", "effective_allocated", jun1, jul1, "last 30d", future, len(events))
+		a.renderReport(events, "model", "amortized", jun1, jul1, "last 30d", future, len(events))
 		got := buf.String()
 		if !strings.Contains(got, "plan starts 2026-08-01") {
 			t.Errorf("a not-yet-active plan should be explained:\n%s", got)
@@ -488,7 +502,7 @@ func TestRenderAllocated(t *testing.T) {
 	t.Run("no plan configured is explained, not n/a", func(t *testing.T) {
 		var buf bytes.Buffer
 		a := &App{Out: &buf, Now: time.Now}
-		a.renderReport(events, "model", "effective_allocated", jun1, jul1, "last 30d", apiPlans(), len(events))
+		a.renderReport(events, "model", "amortized", jun1, jul1, "last 30d", apiPlans(), len(events))
 		if !strings.Contains(buf.String(), "no subscription plan configured") {
 			t.Errorf("expected guidance when no plan: %s", buf.String())
 		}
@@ -805,5 +819,10 @@ func TestHelpers(t *testing.T) {
 	}
 	if _, ok := pickView(event.AgentEvent{}, "billed"); ok {
 		t.Error("nil view should report not-ok")
+	}
+	// amortized maps to the renamed CostViews.Amortized lens (was EffectiveAllocated).
+	amt := event.USD(200_000_000)
+	if m, ok := pickView(event.AgentEvent{CostViews: event.CostViews{Amortized: &amt}}, "amortized"); !ok || m.Micros != 200_000_000 {
+		t.Errorf("amortized view should return cv.Amortized, got %v ok=%v", m, ok)
 	}
 }

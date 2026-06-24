@@ -431,7 +431,7 @@ func eventsInWindow(all []event.AgentEvent, win window) []event.AgentEvent {
 }
 
 // amortizedByProvider prorates each present provider's subscription fee for the
-// window — the same per-provider proration `report --view effective_allocated`
+// window — the same per-provider proration `report --view amortized`
 // uses (cycle-aware via the plan's start-date anchor) — keyed by provider so the
 // TUI can allocate each provider's fee only among its own sessions. Empty map when
 // no provider has an amortizable plan.

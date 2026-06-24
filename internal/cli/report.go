@@ -1,7 +1,7 @@
 // Machine-readable projection of a metered spend report (`report --json`). The
 // table and the JSON are two renderings of ONE aggregation (aggregateReport), so
 // a scripted consumer and a human reading the terminal can never disagree about
-// the numbers. The effective_allocated view is intentionally not covered here —
+// the numbers. The amortized view is intentionally not covered here —
 // it is an allocation, not a metered total, and gets its own shape later.
 package cli
 
@@ -287,7 +287,7 @@ func toComponentsJSON(c pricing.CostComponents) *componentsJSON {
 }
 
 // emitReportJSON writes the report as indented JSON. Metered views only; the
-// caller rejects effective_allocated before reaching here.
+// caller rejects amortized before reaching here.
 func (a *App) emitReportJSON(events []event.AgentEvent, by, view string, win window, eng *pricing.Engine) int {
 	enc := json.NewEncoder(a.Out)
 	enc.SetIndent("", "  ")

@@ -87,6 +87,8 @@ func (a *App) dispatch(args []string) int {
 		return a.cmdReport(rest)
 	case "today":
 		return a.cmdToday(rest)
+	case "budget":
+		return a.cmdBudget(rest)
 	case "top":
 		return a.cmdTop(rest)
 	case "tui":
@@ -277,7 +279,7 @@ func (a *App) cmdReport(args []string) int {
 	fs := flag.NewFlagSet("report", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
 	by := fs.String("by", "model", "group by: model|repo|provider|cost_tag|session|branch|commit|file")
-	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|billed|effective_allocated|marginal")
+	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|billed|amortized|marginal")
 	periodSpec := fs.String("period", "week", `calendar window: today|yesterday|week|month|"last week"|"last month"|quarter|"this year"|"N days"|"since YYYY-MM-DD"|YYYY-MM-DD..YYYY-MM-DD|all`)
 	jsonOut := fs.Bool("json", false, "emit the report as JSON instead of a table (metered views only)")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
@@ -291,9 +293,17 @@ func (a *App) cmdReport(args []string) int {
 		fmt.Fprintf(a.Err, "aispend: %v\n", err)
 		return 2
 	}
-	if *jsonOut && dash(*view) == "effective-allocated" {
-		fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view effective_allocated yet (use a metered view: api_equivalent, reported, estimated, billed, marginal)")
+	switch dash(*view) {
+	case "effective-allocated":
+		// Hard rename (no alias): the old name must not silently fall through to
+		// api_equivalent — point the user at the new view instead.
+		fmt.Fprintln(a.Err, "aispend: --view effective_allocated was renamed to --view amortized")
 		return 2
+	case "amortized":
+		if *jsonOut {
+			fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view amortized yet (use a metered view: api_equivalent, reported, estimated, billed, marginal)")
+			return 2
+		}
 	}
 
 	a.refreshOnLaunch(*noRefresh)
@@ -400,7 +410,7 @@ func (a *App) emptyRange(label string, storeTotal int) {
 }
 
 func (a *App) renderReport(events []event.AgentEvent, by, view string, since, until time.Time, label string, plans config.PlanSet, storeTotal int) {
-	if dash(view) == "effective-allocated" {
+	if dash(view) == "amortized" {
 		a.renderAllocated(events, by, since, until, label, plans, storeTotal)
 		return
 	}
@@ -475,7 +485,7 @@ func topUnpriced(m map[string]int, limit int) string {
 	return b.String()
 }
 
-// renderAllocated renders the effective_allocated view: a subscription's prorated
+// renderAllocated renders the amortized view: a subscription's prorated
 // fee for the window, distributed across groups by api-equivalent share. It is a
 // period-level view (subscription_amortized, lower confidence) — an allocation,
 // not a metered price.
@@ -516,7 +526,7 @@ func (a *App) renderAllocated(events []event.AgentEvent, by string, since, until
 		currency = m.Currency
 	}
 
-	fmt.Fprintf(a.Out, "AI-coding spend · %s · by %s · view: effective-allocated (subscription_amortized, confidence 0.70)\n", label, by)
+	fmt.Fprintf(a.Out, "AI-coding spend · %s · by %s · view: amortized (subscription_amortized, confidence 0.70)\n", label, by)
 	if len(order) == 0 {
 		a.emptyRange(label, storeTotal)
 		return
@@ -1082,8 +1092,8 @@ func pickView(e event.AgentEvent, view string) (event.Money, bool) {
 		m = cv.Reported
 	case "billed":
 		m = cv.Billed
-	case "effective-allocated":
-		m = cv.EffectiveAllocated
+	case "amortized":
+		m = cv.Amortized
 	case "marginal":
 		m = cv.Marginal
 	default:
@@ -1315,6 +1325,7 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
   scan [--verbose]              import & price new sessions (no network); --verbose shows skips
   report [--period P] [flags]   spend over a calendar window (default: this week)
   today                         arbitrage-first daily glance: ROI, cache savings, hourly spikes
+  budget [set <amt>|clear]      monthly spend ceiling: bare shows pace; set/clear manage it (--json, --strict)
   top [--period P] [--sessions] priciest turns (or sessions) in a window
   tui [--period P]              interactive explorer: arrow sessions, ↵ to drill to the receipt → file → turn evidence (not in offline build)
   doctor [--network] [--paths]  prove the trust promise / show data locations
@@ -1323,7 +1334,7 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
   git <install|status|…>        install per-commit cost-trailer hooks (safe; honors hook managers)
   version                       print version
 
-  today/report/top/tui scan new sessions on launch first; --no-scan reads the ledger as-is
+  today/report/top/tui/budget scan new sessions on launch first; --no-scan reads the ledger as-is
   (or set scan_on_launch = false in ~/.aispend/config.toml, or AISPEND_NO_SCAN=1)
 
   report flags: --period P  --by G  --view V  --json
@@ -1331,13 +1342,13 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
               quarter | "last quarter" | "this year" | "last year" | "N days" (e.g. "90 days") |
               "since YYYY-MM-DD" | YYYY-MM-DD..YYYY-MM-DD | all   (always calendar time, never rolling)
   G (group):  model | repo | provider | cost_tag | session | branch | commit | file
-  V (view):   api_equivalent | reported | estimated | billed | effective_allocated | marginal
+  V (view):   api_equivalent | reported | estimated | billed | amortized | marginal
   --json:     emit the report as JSON instead of a table (metered views only)
 
   examples:
     aispend report --period today
     aispend report --period "last month" --by cost_tag
-    aispend report --period "90 days" --view effective_allocated
+    aispend report --period "90 days" --view amortized
     aispend report --period 2026-01-01..2026-03-31 --by repo --json
 
 Report bugs to: %s

@@ -203,11 +203,11 @@ func TestPrice_SubscriptionDefersAllocation(t *testing.T) {
 		t.Error("APIEquivalent should still be computed under a subscription plan")
 	}
 	// ...but per-event amortization is a period-level operation, deferred here.
-	if ev.CostViews.EffectiveAllocated != nil {
-		t.Error("EffectiveAllocated must be nil at per-event time (computed during aggregation)")
+	if ev.CostViews.Amortized != nil {
+		t.Error("Amortized must be nil at per-event time (computed during aggregation)")
 	}
-	if !contains(ev.Evidence.KnownMissingFields, "effective_allocated") {
-		t.Errorf("expected effective_allocated noted as missing, got %v", ev.Evidence.KnownMissingFields)
+	if !contains(ev.Evidence.KnownMissingFields, "amortized") {
+		t.Errorf("expected amortized noted as missing, got %v", ev.Evidence.KnownMissingFields)
 	}
 }
 

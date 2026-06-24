@@ -377,11 +377,11 @@ func TestReportJSON_Empty(t *testing.T) {
 func TestReportJSON_AllocatedUnsupported(t *testing.T) {
 	setupHome(t)
 	run(t, "scan")
-	_, errs, code := run(t, "report", "--period", "all", "--view", "effective_allocated", "--json")
+	_, errs, code := run(t, "report", "--period", "all", "--view", "amortized", "--json")
 	if code != 2 {
 		t.Errorf("exit=%d, want 2", code)
 	}
-	if !strings.Contains(errs, "effective_allocated") {
+	if !strings.Contains(errs, "amortized") {
 		t.Errorf("stderr should name the unsupported view: %s", errs)
 	}
 }
