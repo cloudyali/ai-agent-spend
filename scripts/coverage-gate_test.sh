@@ -19,12 +19,12 @@ fa="$(mktemp)"
   printf 'ok  \tgithub.com/x/internal/exact\t0.010s\tcoverage: 85.0%% of statements\n'    # pass (inclusive)
 } > "$fa"
 outA="$(COVERAGE_FLOOR=85 bash "$gate" --from "$fa" 2>&1)"; codeA=$?
-[ "$codeA" -eq 1 ]                                          && ok "below-floor logic pkg blocks (exit 1)"     || bad "expected exit 1, got $codeA"
-[ "$(printf '%s\n' "$outA" | grep -c '^  FAIL')" -eq 1 ]    && ok "exactly one FAIL row"                      || bad "expected exactly 1 FAIL row"
-printf '%s\n' "$outA" | grep -q '^  FAIL.*internal/cli'     && ok "the FAIL is internal/cli"                  || bad "internal/cli not the failure"
-printf '%s\n' "$outA" | grep -q 'warn .*sqlcgen'            && ok "generated sqlcgen (0.0%%) warns, not fails" || bad "sqlcgen should warn"
-printf '%s\n' "$outA" | grep -q 'warn .*cmd/aispend'        && ok "thin main (no test files) warns"           || bad "cmd/aispend should warn"
-printf '%s\n' "$outA" | grep -q '^  ok .*internal/exact'    && ok "85.0%% exactly passes (floor inclusive)"   || bad "85.0%% should pass"
+if [ "$codeA" -eq 1 ]; then ok "below-floor logic pkg blocks (exit 1)"; else bad "expected exit 1, got $codeA"; fi
+if [ "$(printf '%s\n' "$outA" | grep -c '^  FAIL')" -eq 1 ]; then ok "exactly one FAIL row"; else bad "expected exactly 1 FAIL row"; fi
+if printf '%s\n' "$outA" | grep -q '^  FAIL.*internal/cli'; then ok "the FAIL is internal/cli"; else bad "internal/cli not the failure"; fi
+if printf '%s\n' "$outA" | grep -q 'warn .*sqlcgen'; then ok "generated sqlcgen (0.0%%) warns, not fails"; else bad "sqlcgen should warn"; fi
+if printf '%s\n' "$outA" | grep -q 'warn .*cmd/aispend'; then ok "thin main (no test files) warns"; else bad "cmd/aispend should warn"; fi
+if printf '%s\n' "$outA" | grep -q '^  ok .*internal/exact'; then ok "85.0%% exactly passes (floor inclusive)"; else bad "85.0%% should pass"; fi
 
 # Fixture B: everything tested is at/above floor -> PASS (scaffolding present but ignored).
 fb="$(mktemp)"
@@ -33,12 +33,12 @@ fb="$(mktemp)"
   printf 'ok  \tgithub.com/x/internal/store\t0.2s\tcoverage: 88.6%% of statements\n'
   printf '?   \tgithub.com/x/cmd/aispend\t[no test files]\n'
 } > "$fb"
-outB="$(COVERAGE_FLOOR=85 bash "$gate" --from "$fb" 2>&1)"; codeB=$?
-[ "$codeB" -eq 0 ] && ok "all tested pkgs pass -> exit 0" || bad "expected exit 0, got $codeB"
+COVERAGE_FLOOR=85 bash "$gate" --from "$fb" >/dev/null 2>&1; codeB=$?
+if [ "$codeB" -eq 0 ]; then ok "all tested pkgs pass -> exit 0"; else bad "expected exit 0, got $codeB"; fi
 
 # Fixture C: raising the floor reclassifies the 88.6% pkg as FAIL.
-outC="$(COVERAGE_FLOOR=89 bash "$gate" --from "$fb" 2>&1)"; codeC=$?
-[ "$codeC" -eq 1 ] && ok "COVERAGE_FLOOR=89 blocks the 88.6%% pkg" || bad "raised floor should block (got $codeC)"
+COVERAGE_FLOOR=89 bash "$gate" --from "$fb" >/dev/null 2>&1; codeC=$?
+if [ "$codeC" -eq 1 ]; then ok "COVERAGE_FLOOR=89 blocks the 88.6%% pkg"; else bad "raised floor should block (got $codeC)"; fi
 
 rm -f "$fa" "$fb"
 echo

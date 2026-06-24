@@ -14,6 +14,7 @@ if [ -n "$unformatted" ]; then
   echo "pre-commit: these files need gofmt:" >&2
   # shellcheck disable=SC2086
   printf '  %s\n' $unformatted >&2
+  # shellcheck disable=SC2086  # one-line copy-pasteable gofmt command; word-splitting intentional
   echo "fix with: gofmt -w" $unformatted >&2
   exit 1
 fi
