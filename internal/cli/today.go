@@ -22,6 +22,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
 	"github.com/cloudyali/ai-agent-spend/internal/quota"
 	"github.com/cloudyali/ai-agent-spend/internal/store"
+	"github.com/cloudyali/ai-agent-spend/internal/termtext"
 	"github.com/cloudyali/ai-agent-spend/internal/trailer"
 )
 
@@ -72,8 +73,15 @@ func (a *App) renderPending(repoDir string) {
 	if !ok {
 		return
 	}
-	fmt.Fprintf(a.Out, "  %s %s: %s · %d turns (uncommitted)\n",
-		paint(useColor(a.Out), cBold, "pending commit"), branch, usd(u.Cost.Micros, u.Cost.Currency), u.Requests)
+	fmt.Fprintln(a.Out, pendingLine(useColor(a.Out), branch, u.Cost.Micros, u.Cost.Currency, u.Requests))
+}
+
+// pendingLine formats the read-only "pending commit" preview. The branch is lifted
+// verbatim from the repo/log, so it is sanitized here (CWE-150) before it reaches the
+// TTY — content sanitization is independent of the color gate.
+func pendingLine(color bool, branch string, micros int64, currency string, requests int) string {
+	return fmt.Sprintf("  %s %s: %s · %d turns (uncommitted)",
+		paint(color, cBold, "pending commit"), termtext.SanitizeLabel(branch), usd(micros, currency), requests)
 }
 
 // renderBudget prints the month-to-date budget pace line when a budget is configured

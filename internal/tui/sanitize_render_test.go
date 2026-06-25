@@ -94,6 +94,42 @@ func TestBuildPromptViewport_SanitizesPrompt(t *testing.T) {
 	}
 }
 
+func TestCommitsView_SanitizesTitle(t *testing.T) {
+	m := New([]Period{{Label: "today"}}, 0, pricing.NewEngine())
+	m.commits = []Commit{{SHA: "abcdef1234567890", Title: escPayload, Turns: 1, Micros: 5}}
+	if got := m.commitsView(); injectionPresent(got) {
+		t.Errorf("commitsView leaked an injection sequence: %q", got)
+	}
+}
+
+func TestCommitDetailView_SanitizesTitleBodyBranch(t *testing.T) {
+	m := New([]Period{{Label: "today"}}, 0, pricing.NewEngine())
+	m.selCommit = Commit{
+		SHA:    "abcdef1234567890",
+		Branch: escPayload,
+		Title:  escPayload,
+		Body:   "first line\n" + escPayload + "\nlast line",
+		Turns:  1,
+		Micros: 5,
+	}
+	got := m.commitDetailView()
+	if injectionPresent(got) {
+		t.Errorf("commitDetailView leaked an injection sequence: %q", got)
+	}
+	// The multi-line body keeps its structure (newlines preserved by SanitizeMultiline).
+	if !strings.Contains(got, "first line") || !strings.Contains(got, "last line") {
+		t.Errorf("commitDetailView dropped legitimate body lines: %q", got)
+	}
+}
+
+func TestPendingLine_SanitizesBranch(t *testing.T) {
+	m := New([]Period{{Label: "today"}}, 0, pricing.NewEngine())
+	m.pending = Pending{Branch: escPayload, Micros: 5, Turns: 1}
+	if got := m.pendingLine(); injectionPresent(got) {
+		t.Errorf("pendingLine leaked an injection sequence: %q", got)
+	}
+}
+
 // Integration: drilling into a session whose title, repo, branch, and file are all
 // poisoned must render a receipt free of injection sequences.
 func TestReceiptView_NoInjection(t *testing.T) {

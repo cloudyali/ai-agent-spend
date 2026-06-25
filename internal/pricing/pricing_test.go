@@ -1,11 +1,51 @@
 package pricing
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
+
+// A crafted session log (or a poisoned pricing rate) can drive the cost multiply
+// past int64. Go integer overflow is silent wraparound (CWE-190), so a naive
+// tokens*perMTok would fabricate a small or negative "trusted" cost. micros must
+// preserve every result that fits in int64 and saturate (never wrap) the rest.
+func TestMicros_PreservesLargeResultWithoutWrapping(t *testing.T) {
+	// tokens*perMTok overflows int64, but the /1e6 result fits exactly.
+	got := micros(4_600_000_000_000_000_000, 1_000_000)
+	if got != 4_600_000_000_000_000_000 {
+		t.Errorf("micros wrapped: got %d, want 4600000000000000000", got)
+	}
+}
+
+func TestMicros_SaturatesWhenResultExceedsInt64(t *testing.T) {
+	if got := micros(10_000_000_000_000, 1_000_000_000_000); got != math.MaxInt64 {
+		t.Errorf("micros = %d, want MaxInt64 (saturated, not wrapped)", got)
+	}
+}
+
+func TestMicros_ClampsNegativeTokens(t *testing.T) {
+	if got := micros(-1, 5_000_000); got != 0 {
+		t.Errorf("micros(negative tokens) = %d, want 0", got)
+	}
+}
+
+// WithoutCache sums three token classes before the multiply; the sum must not wrap
+// to a negative input count and produce a negative "no-cache" bill.
+func TestWithoutCache_NoNegativeOnHugeTokens(t *testing.T) {
+	e := NewEngine()
+	huge := int64(math.MaxInt64 / 2)
+	tk := event.Tokens{Input: huge, CacheRead: huge, CacheWrite: huge}
+	got, ok := e.WithoutCache("claude-opus-4-8", tk)
+	if !ok {
+		t.Fatal("known model should compute")
+	}
+	if got.Micros < 0 {
+		t.Errorf("WithoutCache wrapped negative: %d", got.Micros)
+	}
+}
 
 func fixedClock() *Engine {
 	e := NewEngine()

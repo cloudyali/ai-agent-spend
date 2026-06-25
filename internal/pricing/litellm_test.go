@@ -6,6 +6,20 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 )
 
+// A MITM'd / compromised litellm.json could set an absurd positive rate. The
+// float→int64 conversion of an out-of-range value is implementation-defined in Go
+// (it can yield MinInt64, a large *negative* rate), so the conversion must be
+// clamped deterministically to a non-negative value rather than trusted.
+func TestPerTokenToMicrosPerMTok_ClampsAbsurdRate(t *testing.T) {
+	if got := perTokenToMicrosPerMTok(1e10); got <= 0 {
+		t.Errorf("absurd rate yielded non-positive perMTok %d (overflow/sign-flip not clamped)", got)
+	}
+	// A real rate is unaffected: $75/Mtok = $0.000075/token → 75_000_000 micros/Mtok.
+	if got := perTokenToMicrosPerMTok(0.000075); got != 75_000_000 {
+		t.Errorf("perTokenToMicrosPerMTok(0.000075) = %d, want 75000000", got)
+	}
+}
+
 // A trimmed LiteLLM model_prices_and_context_window.json: a placeholder entry to
 // skip, an Anthropic model (explicit cache rates), and an OpenAI model (cache_read
 // but no cache_creation — no write charge).

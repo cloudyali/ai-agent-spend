@@ -12,6 +12,8 @@ package pricing
 import (
 	_ "embed"
 	"encoding/json"
+	"math"
+	"math/bits"
 	"sort"
 	"time"
 
@@ -134,7 +136,40 @@ func (e *Engine) Price(ev *event.AgentEvent, plan Plan) error {
 }
 
 // micros converts a token count and a per-1M-token rate into a micro-USD amount.
-func micros(tokens, perMTok int64) int64 { return tokens * perMTok / 1_000_000 }
+// Token counts (from attacker-influenceable session logs) and rates (from a fetched
+// LiteLLM table) are untrusted, so the multiply is overflow-safe (CWE-190): a corrupt
+// negative count is clamped to zero, and a product that exceeds int64 saturates at
+// MaxInt64 rather than silently wrapping to a small or negative "trusted" cost. The
+// full-width 128-bit divide keeps every result that genuinely fits in int64 exact.
+func micros(tokens, perMTok int64) int64 {
+	if tokens <= 0 || perMTok <= 0 {
+		return 0
+	}
+	hi, lo := bits.Mul64(uint64(tokens), uint64(perMTok))
+	if hi >= 1_000_000 { // quotient would exceed 64 bits
+		return math.MaxInt64
+	}
+	q, _ := bits.Div64(hi, lo, 1_000_000)
+	if q > math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(q)
+}
+
+// addSat adds two non-negative token counts, saturating at MaxInt64 instead of
+// wrapping — used where several token classes are summed before a single multiply.
+func addSat(a, b int64) int64 {
+	if a < 0 {
+		a = 0
+	}
+	if b < 0 {
+		b = 0
+	}
+	if a > math.MaxInt64-b {
+		return math.MaxInt64
+	}
+	return a + b
+}
 
 // oneHourCacheInputMultiple is Anthropic's 1-hour cache-write price as a multiple
 // of base input tokens (the 5-minute default is 1.25× input). 1-hour cache reads
@@ -213,7 +248,7 @@ func (e *Engine) WithoutCache(model string, tk event.Tokens) (event.Money, bool)
 	if !ok {
 		return event.Money{}, false
 	}
-	asInput := tk.Input + tk.CacheRead + tk.CacheWrite
+	asInput := addSat(addSat(tk.Input, tk.CacheRead), tk.CacheWrite)
 	total := micros(asInput, r.InputPerMTok) + micros(tk.Output, r.OutputPerMTok)
 	return event.Money{Micros: total, Currency: e.t.Currency}, true
 }

@@ -29,6 +29,14 @@ func TestDisplayKey_SanitizesGroupKeys(t *testing.T) {
 	}
 }
 
+// The `today` / offline-fallback pending-commit line prints the branch verbatim; a
+// poisoned branch (crafted .jsonl or hand-edited .git/HEAD) must come out inert.
+func TestPendingLine_SanitizesBranch(t *testing.T) {
+	if got := pendingLine(false, escPayload, 500, "USD", 3); ctrlBytePresent(got) {
+		t.Errorf("pendingLine leaked a control byte: %q", got)
+	}
+}
+
 // shortModel is the CLI model choke point (top, modelList, top --sessions); an
 // unknown model id is passed through, so it must be sanitized.
 func TestShortModel_SanitizesModel(t *testing.T) {

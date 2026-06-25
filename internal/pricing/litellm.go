@@ -126,7 +126,14 @@ func perTokenToMicrosPerMTok(costPerToken float64) int64 {
 	if costPerToken <= 0 {
 		return 0
 	}
-	return int64(math.Round(costPerToken * 1e12))
+	v := math.Round(costPerToken * 1e12)
+	// An out-of-range float→int64 conversion is implementation-defined in Go (it can
+	// yield MinInt64 — a large negative rate), so a poisoned/absurd rate is clamped to
+	// MaxInt64 deterministically rather than trusted. micros saturates downstream.
+	if v >= math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return int64(v)
 }
 
 // NewEngineWithRates returns an engine whose table is the embedded one with extra
