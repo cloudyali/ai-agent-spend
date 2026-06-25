@@ -102,13 +102,13 @@ lens and let the user pick:
 ```go
 // A nil pointer means "not computable from available evidence" — NEVER zero.
 type CostViews struct {
-    Billed             *Money `json:"billed,omitempty"`
-    Reported           *Money `json:"reported,omitempty"`
-    EffectiveAllocated *Money `json:"effective_allocated,omitempty"`
-    Marginal           *Money `json:"marginal,omitempty"`
-    APIEquivalent      *Money `json:"api_equivalent,omitempty"`
-    CreditConsumption  *int64 `json:"credit_consumption,omitempty"`
-    Estimated          *Money `json:"estimated,omitempty"`
+    Billed            *Money `json:"billed,omitempty"`
+    Reported          *Money `json:"reported,omitempty"`
+    Amortized         *Money `json:"amortized,omitempty"`
+    Marginal          *Money `json:"marginal,omitempty"`
+    APIEquivalent     *Money `json:"api_equivalent,omitempty"`
+    CreditConsumption *int64 `json:"credit_consumption,omitempty"`
+    Estimated         *Money `json:"estimated,omitempty"`
 }
 ```
 
@@ -187,7 +187,7 @@ working directory and stamps `Project` / `CostTag`. No local tracker has this; i
 is exactly the seam the centralized rollup uses to speak in cost-center terms.
 
 Plan configuration lives in `~/.aispend/config.toml` and drives the
-`effective_allocated` view. A default plus **per-provider** plans (one
+`amortized` view. A default plus **per-provider** plans (one
 subscription per agent) is supported, since a developer often pays two flat fees:
 
 ```toml
@@ -198,7 +198,7 @@ codex_plan_start = "2026-06-01"       # each plan can start on its own date
 ```
 
 Each provider's plan fee is amortized over *only that provider's* usage, so the
-`effective_allocated` total is the real sum of both subscriptions. Fees come from
+`amortized` total is the real sum of both subscriptions. Fees come from
 the seeded plans table (`internal/config/plans.json`); `monthly_fee_usd` (or
 `<provider>_monthly_fee_usd`) overrides.
 
@@ -271,7 +271,7 @@ hashes identically across platforms. See
 ## 7. FOCUS alignment
 
 `AgentEvent` maps onto the FinOps FOCUS spec so the Phase 2/3 FinOps export is a
-projection, not a migration: `Billed`/`EffectiveAllocated` → `BilledCost` /
+projection, not a migration: `Billed`/`Amortized` → `BilledCost` /
 `EffectiveCost`; `Provider` → `ProviderName`; tokens → `ConsumedQuantity`/`Unit`;
 `CostTag` → `Tags`; subscription fee → contract-commitment fields. AI-coding
 specifics ride as namespaced `x_*` columns until FOCUS 1.4's token work lands

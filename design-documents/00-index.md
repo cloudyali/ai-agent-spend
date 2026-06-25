@@ -122,7 +122,7 @@ not just prose:
 - **Local by default, truthfully.** The default `go build` contains *no cloud
   code* — the cloud sink lives behind `//go:build cloudyali`. A security audit of
   the default binary finds nothing that can phone home. CI asserts it.
-- **No single "true cost."** We model billed / effective-allocated / marginal /
+- **No single "true cost."** We model billed / amortized / marginal /
   api-equivalent / credit-consumption / estimated, each with provenance and a
   confidence marker. A `nil` cost view means "not computable here," never "zero."
 - **Evidence over assertion.** Every number carries where it came from, which
