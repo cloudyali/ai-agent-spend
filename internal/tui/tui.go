@@ -385,9 +385,10 @@ func (m Model) WithPromptResolver(fn func(event.AgentEvent) (string, bool)) Mode
 
 type sessionStat struct {
 	id        string
-	micros    int64 // cost in the active lens (allocated share when amortized)
-	apiMicros int64 // api-equivalent (always; the amortized allocation basis)
-	hasView   bool  // at least one turn carries the active lens (else cost is "—")
+	day       string // UTC calendar day (yyyymmdd) this row falls on (by TSStart); one row per day
+	micros    int64  // cost in the active lens (allocated share when amortized)
+	apiMicros int64  // api-equivalent (always; the amortized allocation basis)
+	hasView   bool   // at least one turn carries the active lens (else cost is "—")
 	turns     int
 	first     time.Time
 	last      time.Time
@@ -400,6 +401,19 @@ type sessionStat struct {
 
 // subCount is how many distinct Claude Code subagents rolled up under this session.
 func (s sessionStat) subCount() int { return len(s.subagents) }
+
+// dayBucket is the UTC calendar day this row is grouped and subtotaled under. Rows from
+// groupSessions always carry day; the TSStart fallback keeps hand-built rows sane.
+func (s sessionStat) dayBucket() string {
+	if s.day != "" {
+		return s.day
+	}
+	return dayKey(s.first, time.UTC)
+}
+
+// key uniquely identifies a row across the (session, UTC-day) split — the basis key the
+// amortized lens allocates the plan fee over, so each day-slice gets its own share.
+func (s sessionStat) key() string { return s.id + "\x00" + s.dayBucket() }
 
 // --- color language: a muted, low-saturation palette via AdaptiveColor, so it
 // stays legible and easy on the eyes on BOTH light and dark terminal backgrounds.
@@ -498,7 +512,7 @@ func (m Model) buildRows() []sessionStat {
 			if basisByProv[r.provider] == nil {
 				basisByProv[r.provider] = map[string]int64{}
 			}
-			basisByProv[r.provider][r.id] = r.apiMicros
+			basisByProv[r.provider][r.key()] = r.apiMicros
 		}
 		alloc := map[string]int64{}
 		for prov, basis := range basisByProv {
@@ -509,14 +523,14 @@ func (m Model) buildRows() []sessionStat {
 			}
 		}
 		for i := range rows {
-			rows[i].micros = alloc[rows[i].id]
+			rows[i].micros = alloc[rows[i].key()]
 			rows[i].hasView = per.Amortized[rows[i].provider] > 0 // covered by a plan
 		}
 	}
 	// Day-grouped ordering: most-recent day first, the live session leading its day,
 	// then priciest-first. A single-day period reduces to the legacy cost ordering, so
 	// existing single-day behavior (and its tests) is unchanged.
-	return orderForDayList(rows, m.now, time.Local, liveWindow)
+	return orderForDayList(rows, m.now, liveWindow)
 }
 
 // tickMsg is the watch-mode heartbeat; each one reloads fresh data and re-arms.
@@ -1104,20 +1118,21 @@ func (m Model) listView() string {
 		"COST", barW, "SHARE", "WHEN · SPAN", "PROJECT", "TURNS", "MODEL")) + "\n")
 
 	var maxMicros int64
-	daySubtotal := map[string]int64{}
 	for _, r := range m.rows {
 		if r.micros > maxMicros {
 			maxMicros = r.micros
 		}
-		daySubtotal[dayKey(r.last, time.Local)] += r.micros
 	}
+	// Subtotals are keyed by UTC calendar day (a CALCULATION), so each "· $X" is the real
+	// spend on that day and matches across windows. Row clocks below render in local time.
+	daySubtotal := daySubtotals(m.rows)
 	start, end := m.windowRange(len(m.rows))
 	prevDay := ""
 	for i := start; i < end; i++ {
 		r := m.rows[i]
-		if dk := dayKey(r.last, time.Local); dk != prevDay {
+		if dk := r.dayBucket(); dk != prevDay {
 			prevDay = dk
-			b.WriteString("  " + stBold.Render(dayLabel(r.last, m.now, time.Local)) + stFaint.Render(" · "+money(daySubtotal[dk])) + "\n")
+			b.WriteString("  " + stBold.Render(dayLabel(r.first, m.now, time.UTC)) + stFaint.Render(" · "+money(daySubtotal[dk])) + "\n")
 		}
 		cost := money(r.micros)
 		if !r.hasView {
@@ -1206,7 +1221,7 @@ func (m Model) windowRange(n int) (int, int) {
 	// Day-group headers cost a line each: one day needs a single header, but several
 	// days can put a header before nearly every row, so halve the row budget then —
 	// never overflowing the viewport (TestModel_ListFitsHeightWithDurationBar guards it).
-	if distinctSessionDays(m.rows, time.Local) > 1 {
+	if distinctSessionDays(m.rows) > 1 {
 		visible /= 2
 	} else {
 		visible--
@@ -1465,17 +1480,24 @@ func RunModel(m Model, out io.Writer) error {
 // --- aggregation + helpers -------------------------------------------------
 
 func groupSessions(events []event.AgentEvent, view string) []sessionStat {
-	byID := map[string]*sessionStat{}
+	byKey := map[string]*sessionStat{}
 	var order []string
 	for _, e := range events {
 		if e.SessionID == "" {
 			continue
 		}
-		g := byID[e.SessionID]
+		// Group by (session, UTC calendar day of TSStart): a session that runs across
+		// midnight UTC splits into one row per day, so a day-group subtotal is the real
+		// spend on that calendar day — and lines up with the UTC period window, so a day
+		// fully inside two windows reads identically in both. TSStart is the canonical
+		// "when" (the period filter buckets on TSStart too).
+		day := dayKey(e.TSStart, time.UTC)
+		k := e.SessionID + "\x00" + day
+		g := byKey[k]
 		if g == nil {
-			g = &sessionStat{id: e.SessionID, provider: e.Provider, first: e.TSStart, last: e.TSStart, byModel: map[string]int64{}}
-			byID[e.SessionID] = g
-			order = append(order, e.SessionID)
+			g = &sessionStat{id: e.SessionID, day: day, provider: e.Provider, first: e.TSStart, last: e.TSStart, byModel: map[string]int64{}}
+			byKey[k] = g
+			order = append(order, k)
 		}
 		g.turns++
 		g.evs = append(g.evs, e)
@@ -1509,8 +1531,8 @@ func groupSessions(events []event.AgentEvent, view string) []sessionStat {
 		}
 	}
 	out := make([]sessionStat, 0, len(order))
-	for _, id := range order {
-		out = append(out, *byID[id])
+	for _, k := range order {
+		out = append(out, *byKey[k])
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].micros > out[j].micros })
 	return out

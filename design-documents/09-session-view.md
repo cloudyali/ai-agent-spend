@@ -169,6 +169,17 @@ gates (see `03-engineering-process.md`).
 - **Later** — cross-session day grid as a navigation surface (drill-only), and the
   same session facet on web inside the spend prism.
 
+> **Update (2026-06-25) — multi-day sessions split by UTC day in the list.** The
+> day-grouped session list (the TUI default; see `08-cli-tui-concept.md`) resolves the
+> *spanning-days* half of the open question below: a resumed session is **split into one
+> row per UTC calendar day** (`groupSessions` keys on `(sessionID, UTC-day-of-TSStart)`),
+> so each day-group subtotal is the honest spend on that calendar day and stays identical
+> across period windows that contain the day — week vs month no longer disagree on
+> "Yesterday." Grouping pins to **UTC** (the calculation, matching the period window); the
+> per-row clock stays **local** (display). The **receipt** is unchanged: it still renders
+> one sitting's **wall-clock span** (first → last turn), so the span-vs-active-time
+> question below still stands.
+
 Open: **session boundary & duration** — a resumed Claude Code session can span days
 with long idle gaps; does "duration" mean wall-clock span or active time? (Honesty
 matters here — a misleading duration is the kind of number this tool exists to

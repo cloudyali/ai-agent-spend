@@ -55,6 +55,19 @@ A full Bubble Tea TUI drags in a dependency tree that cuts against "zero-depende
     carries the same VCS linkage as the static one — branch · SHA + per-file cost+churn
     heatmap. The earlier zero-dependency caution still holds: Bubble Tea pulls
     `net/url`+`net/netip`, so it stays compiled out of the air-gapped `offline` build.
+  - **Update (2026-06-25): the explorer's session list is day-grouped — split by
+    UTC calendar day.** Rows sit under `Today` / `Yesterday` / `Mon Jun 24` headers
+    (most-recent day first; the live session leads its day with a badge), each header
+    carrying a per-day subtotal. Day grouping is a **calculation**, so it pins to the
+    **UTC** calendar — the same one the period window snaps to — while the per-row clock
+    renders in **local** time (display). The rule, repo-wide: *calendar dates for
+    calculations (UTC), local only for display.* A session that spans several UTC days is
+    **split into one row per day** (`groupSessions` keys on `(sessionID, UTC-day-of-TSStart)`),
+    so a day's subtotal is the real spend on that calendar day and reads identically under
+    week / month / quarter / year — any day fully inside two windows reconciles. This
+    **reverses** the initial local-day grouping: before the split, a multi-day session's
+    whole window-clipped cost landed on its last-active day, so "Yesterday" shrank under a
+    narrower window than under a wider one.
 - **Later** — `watch` live meter, `compare` pane, OSC-8 links, shareable report card.
 
 Decided (2026-06-17): **primary user = the individual founder** → the default

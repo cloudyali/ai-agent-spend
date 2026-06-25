@@ -72,12 +72,13 @@ func sessionActiveMS(s sessionStat) int64 {
 
 // orderForDayList sorts sessions for the day-grouped list: most-recent day first,
 // and within a day the live session leads, then priciest-first. It returns a new
-// slice (input is not mutated). For a single day with no reference now this reduces
-// to the legacy priciest-first ordering, so existing single-day behavior is intact.
-func orderForDayList(rows []sessionStat, now time.Time, loc *time.Location, window time.Duration) []sessionStat {
+// slice (input is not mutated). Days are the row's UTC calendar day (dayBucket), so
+// ordering, headers, and subtotals all agree. For a single day with no reference now
+// this reduces to the legacy priciest-first ordering, so single-day behavior is intact.
+func orderForDayList(rows []sessionStat, now time.Time, window time.Duration) []sessionStat {
 	out := append([]sessionStat(nil), rows...)
 	sort.SliceStable(out, func(i, j int) bool {
-		ki, kj := dayKey(out[i].last, loc), dayKey(out[j].last, loc)
+		ki, kj := out[i].dayBucket(), out[j].dayBucket()
 		if ki != kj {
 			return ki > kj // later day first
 		}
@@ -90,16 +91,25 @@ func orderForDayList(rows []sessionStat, now time.Time, loc *time.Location, wind
 	return out
 }
 
-// distinctSessionDays counts the distinct calendar days (in loc) the rows' last
-// activity falls on — used to budget day-group header lines against the terminal
-// height. loc is the display zone (nil ⇒ local), so the count matches the headers.
-func distinctSessionDays(rows []sessionStat, loc *time.Location) int {
-	if loc == nil {
-		loc = time.Local
+// daySubtotals sums each row's cost into its UTC calendar-day bucket. Because rows are
+// per-UTC-day slices (groupSessions), a bucket is the true spend on that calendar day —
+// identical across any period window that fully contains the day, which is the property
+// that keeps "Yesterday" reading the same under week, month, quarter, and year.
+func daySubtotals(rows []sessionStat) map[string]int64 {
+	out := make(map[string]int64, len(rows))
+	for _, r := range rows {
+		out[r.dayBucket()] += r.micros
 	}
+	return out
+}
+
+// distinctSessionDays counts the distinct UTC calendar days the rows fall on (by their
+// dayBucket) — used to budget day-group header lines against the terminal height. It keys
+// on the same bucket the headers and subtotals use, so the count always matches the headers.
+func distinctSessionDays(rows []sessionStat) int {
 	seen := map[string]struct{}{}
 	for _, r := range rows {
-		seen[dayKey(r.last, loc)] = struct{}{}
+		seen[r.dayBucket()] = struct{}{}
 	}
 	return len(seen)
 }

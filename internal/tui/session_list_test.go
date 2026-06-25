@@ -87,7 +87,7 @@ func TestOrderForDayList_DayGroupsLiveFirstThenCost(t *testing.T) {
 	c := mk("c", time.Date(2026, 6, 19, 11, 57, 0, 0, loc), 50) // today, live (3m ago), cheapest
 	d := mk("d", time.Date(2026, 6, 19, 8, 30, 0, 0, loc), 900) // today, priciest
 
-	got := orderForDayList([]sessionStat{a, b, c, d}, now, loc, 10*time.Minute)
+	got := orderForDayList([]sessionStat{a, b, c, d}, now, 10*time.Minute)
 	want := []string{"c", "d", "b", "a"} // today (live c, then $900 d, then $100 b), then yesterday a
 	for i, id := range want {
 		if got[i].id != id {
@@ -103,7 +103,7 @@ func TestOrderForDayList_SingleDayPreservesCostDesc(t *testing.T) {
 		return sessionStat{id: id, first: d.Add(time.Duration(h) * time.Hour), last: d.Add(time.Duration(h) * time.Hour), micros: micros}
 	}
 	// no reference now → no liveness; single day must stay priciest-first (legacy order)
-	got := orderForDayList([]sessionStat{mk("x", 9, 100), mk("y", 10, 300), mk("z", 11, 200)}, time.Time{}, loc, 10*time.Minute)
+	got := orderForDayList([]sessionStat{mk("x", 9, 100), mk("y", 10, 300), mk("z", 11, 200)}, time.Time{}, 10*time.Minute)
 	want := []string{"y", "z", "x"}
 	for i, id := range want {
 		if got[i].id != id {
@@ -142,14 +142,17 @@ func TestLiveLegendText(t *testing.T) {
 
 func TestDistinctSessionDays(t *testing.T) {
 	d := time.Date(2026, 6, 19, 9, 0, 0, 0, time.UTC)
-	rows := []sessionStat{{last: d}, {last: d.Add(3 * time.Hour)}, {last: d.AddDate(0, 0, -1)}}
-	if got := distinctSessionDays(rows, time.UTC); got != 2 {
+	// dayBucket keys off the row's UTC day (via day, else TSStart=first), so set first.
+	rows := []sessionStat{{first: d}, {first: d.Add(3 * time.Hour)}, {first: d.AddDate(0, 0, -1)}}
+	if got := distinctSessionDays(rows); got != 2 {
 		t.Errorf("distinctSessionDays = %d, want 2 (two calendar days)", got)
 	}
 }
 
-// Visual times localize: a UTC instant renders its wall clock and calendar day in the
-// display zone, so day grouping (Today/Yesterday) tracks the LOCAL day, not UTC.
+// dayKey/dayLabel/clockTime localize when handed a zone — that capability drives the
+// per-row clock (rendered in local time). Day GROUPING, by contrast, passes time.UTC so
+// it pins to the UTC calendar that matches the period window (see daySubtotals); only the
+// displayed clock is local. This test exercises the localize capability directly.
 func TestClockTimeAndDayLabelLocalize(t *testing.T) {
 	ist := time.FixedZone("IST", 5*3600+30*60)
 	utc := time.Date(2026, 6, 19, 20, 0, 0, 0, time.UTC) // == 2026-06-20 01:30 IST
