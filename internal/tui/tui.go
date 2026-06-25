@@ -975,7 +975,7 @@ func (m Model) commitsView() string {
 		}
 		row := fmt.Sprintf("%-11s %10s  %3d turns  %-12s", shortSHA(c.SHA), money(c.Micros), c.Turns, when)
 		if c.Title != "" {
-			row += "  " + trunc(c.Title, 40)
+			row += "  " + trunc(termtext.SanitizeLabel(c.Title), 40) // commit subject is attacker-authorable (CWE-150)
 		}
 		if c.HasTrailer {
 			row += "  " + stOutput.Render("✓ trailer")
@@ -1019,16 +1019,16 @@ func (m Model) commitDetailView() string {
 	var b strings.Builder
 	hdr := shortSHA(c.SHA)
 	if c.Branch != "" {
-		hdr += "  ·  " + c.Branch
+		hdr += "  ·  " + termtext.SanitizeLabel(c.Branch) // verbatim from the log — neutralize escapes (CWE-150)
 	}
 	if !c.When.IsZero() {
 		hdr += "  ·  " + c.When.In(time.Local).Format("Mon Jan 2 15:04")
 	}
 	b.WriteString(stBold.Render(hdr) + "\n\n")
 	if c.Title != "" {
-		b.WriteString(stBold.Render(c.Title) + "\n")
+		b.WriteString(stBold.Render(termtext.SanitizeLabel(c.Title)) + "\n") // commit subject — attacker-authorable (CWE-150)
 		if c.Body != "" {
-			b.WriteString("\n" + c.Body + "\n")
+			b.WriteString("\n" + termtext.SanitizeMultiline(c.Body) + "\n") // multi-line body: keep newlines, neutralize escapes
 		}
 	} else {
 		b.WriteString(stFaint.Render("(commit message unavailable — git enrichment off / repo not present)") + "\n")
@@ -2550,7 +2550,7 @@ func (m Model) gaugeLines() []string {
 func (m Model) pendingLine() string {
 	p := m.pending
 	return "  " + stBold.Render("pending commit") +
-		stFaint.Render(fmt.Sprintf(" %s: %s · %d turns (uncommitted)", p.Branch, money(p.Micros), p.Turns))
+		stFaint.Render(fmt.Sprintf(" %s: %s · %d turns (uncommitted)", termtext.SanitizeLabel(p.Branch), money(p.Micros), p.Turns))
 }
 
 // budgetGaugeLine renders the monthly budget as PACE, not just level: used $ and %,
