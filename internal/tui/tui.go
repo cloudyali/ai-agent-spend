@@ -194,6 +194,25 @@ type Model struct {
 	nowFn    func() time.Time
 	reload   func() []Period
 
+	// reloading is the single-flight guard for the background sync: true from when a
+	// reload is kicked (a watch tick OR the on-demand `s` key) until its result lands.
+	// A sync requested while one is already in flight is a no-op ("if a sync is already
+	// running, don't do anything"), and a watch tick mid-reload skips its beat rather
+	// than stacking a second store writer.
+	reloading bool
+
+	// syncing flags a USER-initiated sync (the `s` key) in flight, so the header swaps its
+	// freshness stamp for an in-progress "syncing…" the frame after the keypress and resumes
+	// the stamp ("synced just now") when the result lands. It's the manual sibling of
+	// reloading: a quiet background watch tick never sets it (the periodic sync stays silent),
+	// so only the action the user took announces itself.
+	syncing bool
+
+	// clock heartbeat (optional; enabled via WithClockTick): every clockInt the model advances
+	// its clock (nowFn) and repaints — no re-scan, no store I/O — so relative ages (the "synced
+	// …" stamp) grow and "live" badges decay between the costly reload ticks. Zero → disabled.
+	clockInt time.Duration
+
 	// quota (optional; enabled via WithQuota): the provider's plan-limit windows read
 	// from its local usage snapshot — a reported point-in-time gauge, separate from the
 	// ledger. quotaFn re-reads on each refresh so a watch tick keeps it current.
@@ -211,6 +230,13 @@ type Model struct {
 	// reflects a mid-session refresh; off by default → no rates segment.
 	pricingFn func() PricingStatus
 	pricing   PricingStatus
+
+	// sync (optional; WithSyncStatus): the ledger's last incremental-scan time, shown in
+	// the header as a freshness stamp ("synced Nm ago"). syncFn is re-read on each refresh
+	// so a watch tick / the in-process auto-sync updates it in place; a zero time → no
+	// "synced" segment renders.
+	syncFn func() time.Time
+	synced time.Time
 
 	// pending (optional; WithPending): the read-only "pending commit" preview — the
 	// uncommitted trailer spend on the current branch. Re-read on each refresh.
@@ -300,6 +326,16 @@ func (m Model) WithPricingStatus(fn func() PricingStatus) Model {
 	return m
 }
 
+// WithSyncStatus enables the compact "synced …" freshness stamp in the header: fn returns
+// the ledger's last incremental-scan time (the cli reads the per-provider scan watermark).
+// Re-read on each refresh so a watch tick / the in-process auto-sync reflects in place; off
+// by default (or a zero time) → no synced segment renders.
+func (m Model) WithSyncStatus(fn func() time.Time) Model {
+	m.syncFn = fn
+	m.refresh()
+	return m
+}
+
 // WithPending enables the "pending commit" line in the list header: fn returns the
 // uncommitted trailer spend on the current branch (the cli reads it from cwd) and
 // whether there's anything pending. Re-read on each refresh; off by default.
@@ -362,6 +398,16 @@ func (m Model) WithWatch(interval time.Duration, nowFn func() time.Time, reload 
 	m.watchInt = interval
 	m.nowFn = nowFn
 	m.reload = reload
+	return m
+}
+
+// WithClockTick enables a cheap UI heartbeat: every interval the model advances its clock and
+// repaints — no re-scan, no store I/O — so relative ages (the "synced …" freshness stamp) grow
+// and "live" badges decay between the costly reload ticks. nowFn (from WithWatch) supplies the
+// clock; a zero interval disables it. Kept separate from the reload tick so the log re-scan stays
+// gentle (the 15m sync cadence) while the on-screen age stays live. No-op without nowFn.
+func (m Model) WithClockTick(interval time.Duration) Model {
+	m.clockInt = interval
 	return m
 }
 
@@ -454,6 +500,9 @@ func (m *Model) refresh() {
 	if m.pricingFn != nil {
 		m.pricing = m.pricingFn() // re-read the rate source so a watch tick reflects a refresh
 	}
+	if m.syncFn != nil {
+		m.synced = m.syncFn() // re-read the scan watermark so a watch tick / auto-sync keeps it fresh
+	}
 	if m.pendingFn != nil {
 		m.pending, m.pendingOK = m.pendingFn() // re-read the pending-commit preview
 	}
@@ -544,6 +593,18 @@ func (m Model) tickCmd() tea.Cmd {
 	return tea.Tick(m.watchInt, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
+// clockMsg is the cheap UI heartbeat (WithClockTick): it advances the clock and repaints without
+// touching the store, so relative ages tick and liveness decays between the reload ticks.
+type clockMsg time.Time
+
+// clockCmd schedules the next clock heartbeat, or nil when the heartbeat is off.
+func (m Model) clockCmd() tea.Cmd {
+	if m.clockInt <= 0 {
+		return nil
+	}
+	return tea.Tick(m.clockInt, func(t time.Time) tea.Msg { return clockMsg(t) })
+}
+
 // reloadDoneMsg carries the periods produced by a background reload (reloadCmd) back to
 // the main update loop, where they're applied on the model's own goroutine.
 type reloadDoneMsg struct{ periods []Period }
@@ -560,6 +621,23 @@ func (m Model) reloadCmd() tea.Cmd {
 	}
 	reload := m.reload
 	return func() tea.Msg { return reloadDoneMsg{periods: reload()} }
+}
+
+// syncDoneMsg carries the periods produced by an on-demand sync (the `s` key) back to the
+// update loop. It is distinct from reloadDoneMsg so that applying it does NOT re-arm the
+// watch tick: an on-demand sync is a one-shot, while the periodic cadence already owns its
+// pending tick, so re-arming here would leave two tickers running.
+type syncDoneMsg struct{ periods []Period }
+
+// syncCmd runs the wired reload OFF the update loop, like reloadCmd, but tags the result as
+// an on-demand sync (syncDoneMsg) so the cadence isn't re-armed. nil when no reload is
+// wired, so a static model's `s` key is inert.
+func (m Model) syncCmd() tea.Cmd {
+	if m.reload == nil {
+		return nil
+	}
+	reload := m.reload
+	return func() tea.Msg { return syncDoneMsg{periods: reload()} }
 }
 
 // applyReloadResult folds a completed reload into the model: advance the clock, swap in
@@ -591,10 +669,11 @@ func (m *Model) applyReloadResult(ps []Period) {
 	}
 }
 
-// Init kicks the first background reload (async launch sync) when one is wired; the
-// reload→tick cycle then keeps a watch session live. With no reload wired it schedules
-// nothing (a static snapshot).
-func (m Model) Init() tea.Cmd { return m.reloadCmd() }
+// Init kicks the first background reload (async launch sync) when one is wired, and starts the
+// clock heartbeat when one is wired; the reload→tick cycle keeps the data live while the cheap
+// clock beat ages the on-screen freshness/liveness in between. With neither wired it schedules
+// nothing (a static snapshot). tea.Batch drops the nil cmds.
+func (m Model) Init() tea.Cmd { return tea.Batch(m.reloadCmd(), m.clockCmd()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -602,10 +681,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.w, m.h = msg.Width, msg.Height
 		m.buildPromptViewport() // re-fit the prompt box to the new size
 	case tickMsg:
-		return m, m.reloadCmd() // heartbeat: kick a background reload; re-arm after it lands
+		// Single-flight: never stack a second reload. If one is already in flight (a prior
+		// tick or an on-demand `s` sync) just re-arm the cadence and skip this beat;
+		// otherwise mark in-flight and kick the background reload — the cadence re-arms when
+		// its reloadDoneMsg lands.
+		if m.reloading {
+			return m, m.tickCmd()
+		}
+		if cmd := m.reloadCmd(); cmd != nil {
+			m.reloading = true
+			return m, cmd
+		}
+		return m, m.tickCmd()
 	case reloadDoneMsg:
+		m.reloading = false
+		m.syncing = false                // defensive: a background reload also clears any in-progress stamp
 		m.applyReloadResult(msg.periods) // apply the off-thread reload, then arm the next tick
 		return m, m.tickCmd()
+	case syncDoneMsg:
+		// An on-demand sync (the `s` key) landed: clear the guard and fold the result in
+		// (fresh data + a snapped "synced just now" stamp) WITHOUT re-arming the watch tick —
+		// the periodic cadence still owns its own pending tick, so re-arming here would run
+		// two tickers.
+		m.reloading = false
+		m.syncing = false // sync done — the header resumes the "synced just now" stamp
+		m.applyReloadResult(msg.periods)
+		return m, nil
+	case clockMsg:
+		// Cheap heartbeat: advance the clock and repaint so the freshness stamp ages and liveness
+		// decays between the (costly) reload ticks. No re-scan, no store read — the reload tick owns
+		// data, this owns time. Re-arm for the next beat.
+		if m.nowFn != nil {
+			m.now = m.nowFn()
+		}
+		return m, m.clockCmd()
 	case tea.KeyMsg:
 		// q and ctrl+c quit from anywhere — including drill-downs — so q is never
 		// "back" (esc/←/h/backspace are). The plan picker owns its keys, so q is not
@@ -855,6 +964,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.commitCursor = 0
 					m.mode = modeCommits
 				}
+			case "s":
+				// On-demand sync: kick the same background reload the watch tick runs, off
+				// the UI loop. Single-flight — if a sync (tick-driven or a prior `s`) is
+				// already in flight, do nothing. The result lands as syncDoneMsg, folded in
+				// without re-arming the watch cadence.
+				if !m.reloading {
+					if cmd := m.syncCmd(); cmd != nil {
+						m.reloading = true
+						m.syncing = true // announce it: the header shows "syncing…" next frame
+						return m, cmd
+					}
+				}
 			case "enter":
 				if len(m.rows) > 0 {
 					m.sel = m.rows[m.cursor]
@@ -1061,6 +1182,9 @@ func (m Model) listView() string {
 	if t := m.pricingStatusText(); t != "" {
 		hdr += "   ·   " + t
 	}
+	if t := m.syncStatusText(); t != "" {
+		hdr += "   ·   " + t
+	}
 	b.WriteString(stBold.Render("aispend") + stFaint.Render(hdr) + "\n")
 	b.WriteString(m.headerLine(view) + "\n")
 
@@ -1080,6 +1204,9 @@ func (m Model) listView() string {
 	}
 	if m.commitsFn != nil {
 		parts = append(parts, "c commits")
+	}
+	if m.reload != nil {
+		parts = append(parts, "s sync")
 	}
 	parts = append(parts, "q quit")
 	b.WriteString(stFaint.Render(strings.Join(parts, " · ")) + "\n")
@@ -2433,6 +2560,25 @@ func (m Model) pricingStatusText() string {
 		return "rates: " + ps.Source
 	}
 	return "rates: " + ps.Source + " (" + relAge(m.now.Sub(ps.SyncedAt)) + ")"
+}
+
+// syncStatusText is the compact ledger-freshness stamp for the header — e.g. "synced 2m
+// ago" — from the last incremental-scan watermark. While a user-initiated sync (the `s`
+// key) is in flight it reads "syncing…" instead, so the keypress gets immediate feedback
+// and the stamp resumes ("synced just now") when the result lands. Empty when no sync
+// status is wired, so the header is unchanged for callers that don't supply it; a
+// never-scanned ledger (zero time) is likewise blank unless a sync is actively running.
+func (m Model) syncStatusText() string {
+	if m.syncFn == nil {
+		return "" // the freshness segment isn't configured at all
+	}
+	if m.syncing {
+		return "syncing…" // sync started — the in-progress twin of the stamp
+	}
+	if m.synced.IsZero() {
+		return ""
+	}
+	return "synced " + relAge(m.now.Sub(m.synced))
 }
 
 // relAge renders a duration as a compact relative age: "just now" under a minute (also

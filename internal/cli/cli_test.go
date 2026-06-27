@@ -261,6 +261,36 @@ func TestRun_MoreCommands(t *testing.T) {
 	}
 }
 
+// report --by is validated like --period and --view: an unknown dimension is
+// rejected (exit 2) with a message that names the bad value and the valid set —
+// never silently accepted and mislabeled as a by-model report (the `· by wombat ·`
+// header lie). Fail-fast: nothing reaches stdout, so --json pipes stay clean.
+func TestReport_RejectsUnknownBy(t *testing.T) {
+	setupHome(t)
+
+	out, errs, code := run(t, "report", "--period", "all", "--by", "wombat")
+	if code != 2 {
+		t.Fatalf("unknown --by should exit 2, got %d (out=%q errs=%q)", code, out, errs)
+	}
+	if !strings.Contains(errs, "wombat") {
+		t.Errorf("error should name the bad value, got: %q", errs)
+	}
+	if !strings.Contains(errs, "model") {
+		t.Errorf("error should list the valid dimensions, got: %q", errs)
+	}
+	if strings.Contains(out, "by wombat") {
+		t.Errorf("rejected --by must not render a report header, got stdout: %q", out)
+	}
+
+	// Boundary guard: every advertised dimension still passes validation, so the
+	// validator can't drift out of sync with the flag help / groupKey switch.
+	for _, by := range []string{"model", "repo", "provider", "cost_tag", "session", "branch", "commit", "file"} {
+		if _, _, c := run(t, "report", "--period", "all", "--by", by); c != 0 {
+			t.Errorf("valid --by %s should exit 0, got %d", by, c)
+		}
+	}
+}
+
 func TestRun_WindowsAndVerbose(t *testing.T) {
 	home := setupHome(t)
 	// a malformed line so `scan --verbose` has a skip to show
@@ -309,6 +339,37 @@ func TestReportView_EffectiveAllocatedRenamed(t *testing.T) {
 		}
 		if !strings.Contains(errs, "amortized") || !strings.Contains(errs, "renamed") {
 			t.Errorf("--view %s error should name the new view and that it was renamed: %s", old, errs)
+		}
+	}
+}
+
+// report --view is validated like --by and --period: an unknown lens is rejected
+// (exit 2) with a message naming the bad value and the valid set — never silently
+// fallen through pickView's default to api_equivalent under a lying `view: <garbage>`
+// header. The renamed effective_allocated keeps its own migration hint (above); this
+// guards every *other* unknown value.
+func TestReportView_RejectsUnknown(t *testing.T) {
+	setupHome(t)
+
+	out, errs, code := run(t, "report", "--period", "all", "--view", "wombat")
+	if code != 2 {
+		t.Fatalf("unknown --view should exit 2, got %d (out=%q errs=%q)", code, out, errs)
+	}
+	if !strings.Contains(errs, "wombat") {
+		t.Errorf("error should name the bad value, got: %q", errs)
+	}
+	if !strings.Contains(errs, "api_equivalent") {
+		t.Errorf("error should list the valid views, got: %q", errs)
+	}
+	if strings.Contains(out, "view: wombat") {
+		t.Errorf("rejected --view must not render a report header, got stdout: %q", out)
+	}
+
+	// Boundary guard: every advertised view still passes, in both the underscore and
+	// dash spellings the normalizer accepts, so the validator can't drift from pickView.
+	for _, v := range []string{"api_equivalent", "api-equivalent", "reported", "estimated", "amortized"} {
+		if _, _, c := run(t, "report", "--period", "all", "--view", v); c != 0 {
+			t.Errorf("valid --view %s should exit 0, got %d", v, c)
 		}
 	}
 }

@@ -94,6 +94,65 @@ per the current priority.
 > `runDaemon`, `resolveScanInterval`, and the `--once` path covered. The signal-wiring sliver in
 > `cmdDaemon` is the only intentionally-untested line (real SIGTERM would kill the test process).
 
+> **Status (2026-06-27): the TUI runs an in-process periodic sync by default, plus a last-sync
+> header stamp (t-wada TDD).** The interactive explorer's background re-scan is now ON without
+> `--watch`: `cmdTui` resolves the cadence via `App.tuiSyncInterval` — the daemon cadence
+> (`config.scan_interval`, else `DefaultScanInterval` = 15m) by default, the 3s live tick under
+> `--watch` — and drives the existing `WithWatch` → `reloadCmd` loop, which already reuses
+> `App.incrementalScan` and the one per-provider watermark (idempotent upserts; the tui serializes
+> reloads, so no overlapping writers). The header gains a `synced Nm ago` segment
+> (`tui.WithSyncStatus` ← `App.lastSyncTime`, the newest provider watermark), re-read each refresh
+> so the in-process sync's advance is visible. **This refines the "never auto-started" stance — it
+> doesn't break it:** the *OS* `aispend daemon` process is still never spawned on the user's behalf;
+> the periodic sync here lives **inside the foreground TUI process and dies with it** — no separate
+> process we own, no reboot-survival, no push anywhere. One-shot surfaces (`today`/`report`/`top`,
+> and the non-TTY/offline fallback) keep their single in-process scan-on-launch — they render and
+> exit, so there's no loop to host. Coverage: `tuiSyncInterval` (default vs `--watch`) and
+> `lastSyncTime` (newest watermark; zero when unscanned) unit-tested; the header `synced` segment
+> covered in `internal/tui`.
+>
+> **Follow-up (2026-06-27): the freshness stamp ages via a cheap clock heartbeat.** The relative
+> stamp is `relAge(now − watermark)`, but `now` only advanced on the reload tick — which, on the
+> 15m sync cadence, ALSO reset the watermark — so it sat frozen at "synced just now". Fix:
+> `tui.WithClockTick` (a separate `clockMsg` heartbeat, `tuiClockInterval` = 30s, wired only when
+> NOT `--watch`) advances the model clock and repaints **without** re-scanning or touching the
+> store — the reload tick owns data, the heartbeat owns time. The stamp now grows 0→15m between
+> syncs and snaps back to "just now" only when a real scan moves the watermark; "live" badges decay
+> on the same beat. No new I/O (so it's not the "battery-burning timer" the milestone bullet warns
+> against — pure clock + terminal diff, foreground-only). Covered by `TestModel_ClockTickAgesSyncStamp`.
+
+> **Follow-up (2026-06-27): on-demand sync — a `sync` command and a TUI `s` key, both single-flight
+> ("if a sync is already running, do nothing").** Two surfaces, one capability: a way to force a
+> sync *now* without waiting out the cadence. (a) **CLI `aispend sync`** (`internal/cli/sync.go`):
+> a bounded price refresh-if-stale + an incremental ledger scan, concise summary on stdout — the
+> explicit verb that pairs with the `synced …` stamp, reusing `refreshIfStale` + `incrementalScan`
+> (no new ingestion path). (b) **TUI `s`** (`Model.syncCmd` → `syncDoneMsg`): the same `WithWatch`
+> reload, off the UI loop, folded back **without** re-arming the watch tick (a one-shot, not a
+> cadence beat). The single-flight guard differs by surface, matching where "already running" is
+> real: the CLI takes a **cross-process advisory lock** (`acquireSyncLock`/`guardedScan`,
+> `internal/cli/synclock.go` — `~/.aispend/sync.lock`, pure-mtime TTL of 10m, **fail-open**, no
+> PID/liveness syscalls so it's cross-platform + offline-safe) that **also gates the daemon's
+> cycles**, so `sync`, a second `sync`, and the daemon never double-scan; the TUI uses an
+> **in-process** `Model.reloading` flag (an `s` or a watch tick while a reload is in flight is a
+> no-op). **Stays on-ethos:** no net (`sync`'s only network is the same disclosed price GET behind
+> the refresh opt-outs, compiled out of the offline build), every number still drills, and the
+> lock is advisory + self-healing (a crashed holder is stolen after the TTL), never a wedge. This
+> refines the cadence story; it doesn't add a process we own — `sync` runs and exits, the lock is
+> released on return. Coverage: `synclock_test.go` (acquire/steal/guard), `sync_cli_test.go`
+> (import / idempotent / no-op-when-held / stdout), and `on_demand_sync_test.go` (the TUI key,
+> guard, and no-tick-rearm) — all t-wada RED→GREEN.
+>
+> **Follow-up (2026-06-27): the `s` keypress announces itself — an in-progress `syncing…`
+> stamp, then back to `synced …`.** Pressing `s` used to mark the sync in flight silently
+> (the screen looked frozen until the reload landed). Now a `Model.syncing` flag — set ONLY
+> by the manual `s` path, never by a background watch tick, so the periodic sync stays quiet —
+> swaps the header's freshness segment to `syncing…` the frame after the keypress (Bubble Tea
+> paints the returned model before running the off-loop reload cmd), and the segment resumes
+> the stamp, snapped to `synced just now`, when `syncDoneMsg` folds the result back. The
+> segment only renders when sync-status is wired (`syncFn != nil`, which the cli always pairs
+> with the reload), so callers without it are unchanged. Covered by
+> `TestModel_OnDemandSync_ShowsSyncingThenSynced` (pre-stamp → `syncing…` → `synced just now`).
+
 **Goal.** Collapse "install → `scan` → `today`" into "install → run." A bare `aispend`,
 `today`, `report`, or the TUI brings its own data current; the manual `scan` step stops being
 a prerequisite. Keep `scan` as an explicit command — we add a trigger, we don't remove the
@@ -109,11 +168,13 @@ control.
   `--no-scan` escape hatch and a `scan_on_launch = false` config key for people who want the
   old explicit flow.
 - **Milestone-based refresh, not a wall-clock daemon *by default*.** "Periodic" = triggered by
-  milestones, not a battery-burning timer: (a) on launch, (b) on file-mtime change during
-  `tui --watch` (already shipped), (c) optionally on agent **session-end** via an opt-in hook
-  (below). No always-running background process in the default posture. *(An explicit, opt-in
-  wall-clock loop now exists as `aispend daemon` for users who want one — see the 2026-06-24
-  status note above. It is never auto-started, so the default posture is unchanged.)*
+  milestones, not a battery-burning timer: (a) on launch, (b) on the TUI's in-process periodic
+  sync (default-on at the 15m daemon cadence; `--watch` = the 3s live tick — see the 2026-06-27
+  status note above), (c) optionally on agent **session-end** via an opt-in hook (below). No
+  always-running background process *that we own outside a foreground surface*: the TUI's loop is
+  bounded by the TUI's own lifetime and dies with it. *(An explicit, opt-in OS-level wall-clock
+  loop also exists as `aispend daemon` for users who want one that survives the foreground — see
+  the 2026-06-24 status note above. That process is never auto-started.)*
 - **Opt-in `aispend hooks install`.** Mirrors `aispend git install` exactly: a safe,
   disclosed, uninstallable hook in the agent's config (Claude Code `SessionEnd`, Codex TOML
   `notify`) that runs `aispend scan` when a session ends — near-real-time without us polling.

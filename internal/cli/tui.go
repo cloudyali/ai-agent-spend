@@ -107,6 +107,51 @@ func (a *App) pricingStatus() tui.PricingStatus {
 	return tui.PricingStatus{Source: "embedded"}
 }
 
+// lastSyncTime returns the most recent per-provider incremental-scan watermark — the
+// ledger's freshness, stamped into the TUI header via WithSyncStatus. It reuses the same
+// provider list the scan pipeline drives (scanPairs; identity/attribution are irrelevant to
+// the provider names, so they're passed empty), reads each provider's LastScan from the
+// store, and returns the newest. Zero when nothing has been scanned yet or the store can't
+// be opened. Re-opened per call so the in-process auto-sync's advance shows up live. Local
+// read-only — no network.
+func (a *App) lastSyncTime() time.Time {
+	st, err := a.openStore()
+	if err != nil {
+		return time.Time{}
+	}
+	var latest time.Time
+	for _, pr := range a.scanPairs("", nil) {
+		if t, err := st.LastScan(pr.p.Name()); err == nil && t.After(latest) {
+			latest = t
+		}
+	}
+	return latest
+}
+
+// watchLiveInterval is the fast cadence --watch opts into: a near-real-time refresh so an
+// active session visibly grows. The default (no --watch) uses the gentler daemon cadence.
+const watchLiveInterval = 3 * time.Second
+
+// tuiClockInterval is the cheap UI heartbeat used in the default (non-watch) mode: it advances the
+// clock and repaints (no re-scan) so the "synced …" stamp ages and "live" badges decay between the
+// 15m syncs — otherwise the clock would only move on the sync tick, which resets the watermark too,
+// leaving the stamp frozen at "just now". Sub-minute so the minute-granular age stays accurate.
+const tuiClockInterval = 30 * time.Second
+
+// tuiSyncInterval picks the explorer's in-process sync cadence. The periodic sync is ON by
+// default — the TUI is a long-lived process, so it re-scans logs on the daemon's cadence
+// (config scan_interval, else 15m) to keep the ledger current while open: the daemon's job,
+// done in-process, with no separate process owned. --watch opts into the 3s live cadence for
+// watching an active session grow. A bad/absent config value falls back to the safe default
+// via resolveScanInterval — never to 0, so the sync stays on.
+func (a *App) tuiSyncInterval(watch bool) time.Duration {
+	if watch {
+		return watchLiveInterval
+	}
+	d, _ := a.resolveScanInterval(0)
+	return d
+}
+
 func (a *App) cmdTui(args []string) int {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
@@ -203,6 +248,7 @@ func (a *App) cmdTui(args []string) int {
 			return append(a.claudeQuotaSamples(a.Now()), a.codexQuotaSamples(a.Now())...)
 		}).
 		WithPricingStatus(a.pricingStatus). // re-read per refresh so a watch tick reflects a top-up
+		WithSyncStatus(a.lastSyncTime).     // ledger freshness stamp; re-read per refresh so the auto-sync's advance shows live
 		WithBudget(func() (budget.Pace, bool) {
 			st2, err := a.openStore() // re-open so a watch tick re-paces against fresh spend
 			if err != nil {
@@ -252,20 +298,33 @@ func (a *App) cmdTui(args []string) int {
 	//   - a stale-cache (>24h) price top-up unless --no-refresh, at the full client
 	//     timeout (async, so the 10s ceiling is harmless);
 	//   - then a rebuild so repriced/rescanned numbers and the sync age refresh in place.
-	// --watch repeats it on a heartbeat; without --watch it runs once at launch (the
-	// async launch refresh). The tui serializes reloads, so only one runs at a time.
+	// The periodic sync is ON by default (tuiSyncInterval: the daemon cadence, 15m), with
+	// --watch opting into the 3s live tick; either way the launch catch-up runs once via
+	// Init. The tui serializes reloads, so only one runs at a time (no overlapping writers).
 	reload := func() []tui.Period {
-		if !*noScan {
+		// Honor ALL the documented scan opt-outs for the now-default-on periodic auto-sync, not
+		// just the --no-scan flag: AISPEND_NO_SCAN / scan_on_launch=false disable it too
+		// (scanOnLaunchEnabled), so a user who turned launch scanning off isn't handed a 15m
+		// background scanner instead. The watch loop still ticks (clock + gauges stay live); only
+		// the log re-scan is suppressed, and the header's "synced" stamp then holds its last value.
+		if !*noScan && a.scanOnLaunchEnabled() {
 			a.incrementalScan()
 		}
 		a.refreshIfStale(context.Background(), *noRefresh)
 		return buildPeriods()
 	}
-	interval := time.Duration(0) // 0 → launch-only; --watch → periodic
-	if *watch {
-		interval = 3 * time.Second
-	}
+	// In-process periodic sync is ON by default (tuiSyncInterval): the explorer re-scans on
+	// the daemon cadence (config scan_interval, else 15m) so the ledger stays current while
+	// open — the daemon's job, done in-process, no separate process owned — with --watch
+	// opting into the 3s live tick. Either way the launch catch-up scan still runs once via
+	// Init/reloadCmd; --no-scan suppresses only the log re-scan inside reload, not the loop.
+	interval := a.tuiSyncInterval(*watch)
 	m = m.WithWatch(interval, a.Now, reload)
+	if !*watch {
+		// Age the freshness stamp + liveness between the 15m syncs with a cheap clock heartbeat (no
+		// re-scan). Under --watch the 3s reload already advances the clock every tick, so it's moot.
+		m = m.WithClockTick(tuiClockInterval)
+	}
 	if resolve := a.promptResolver(); resolve != nil {
 		m = m.WithPromptResolver(resolve)
 	}

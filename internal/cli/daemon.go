@@ -39,7 +39,9 @@ func (a *App) cmdDaemon(args []string) int {
 	}
 
 	if *once {
-		if n := a.incrementalScan(); n > 0 {
+		if n, ran := a.guardedScan(); !ran {
+			fmt.Fprintln(a.Err, "a sync is already running — skipping this cycle")
+		} else if n > 0 {
 			fmt.Fprintf(a.Err, "scanned %d new %s\n", n, turnNoun(n))
 		} else {
 			fmt.Fprintln(a.Err, "no new turns since the last checkpoint")
@@ -115,7 +117,11 @@ func (a *App) runDaemon(ctx context.Context, interval time.Duration, verbose boo
 	fmt.Fprintf(a.Err, "aispend daemon: scanning every %s · incremental from the last checkpoint · press Ctrl-C to stop\n", interval)
 	t := time.NewTicker(interval)
 	defer t.Stop()
-	daemonLoop(ctx, t.C, a.incrementalScan, a.Err, a.Now, verbose)
+	// Each cycle scans under the shared sync lock (guardedScan) so the daemon and an
+	// on-demand `aispend sync` never double-scan; a cycle that finds the lock held reports
+	// nothing this beat and retries on the next tick.
+	scan := func() int { n, _ := a.guardedScan(); return n }
+	daemonLoop(ctx, t.C, scan, a.Err, a.Now, verbose)
 	fmt.Fprintln(a.Err, "aispend daemon: stopped")
 }
 

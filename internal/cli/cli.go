@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -83,6 +84,8 @@ func (a *App) dispatch(args []string) int {
 	switch cmd, rest := args[0], args[1:]; cmd {
 	case "scan":
 		return a.cmdScan(rest)
+	case "sync":
+		return a.cmdSync(rest)
 	case "daemon":
 		return a.cmdDaemon(rest)
 	case "report":
@@ -280,8 +283,8 @@ func (a *App) cmdScan(args []string) int {
 func (a *App) cmdReport(args []string) int {
 	fs := flag.NewFlagSet("report", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
-	by := fs.String("by", "model", "group by: model|repo|provider|cost_tag|session|branch|commit|file")
-	view := fs.String("view", "api_equivalent", "cost view: api_equivalent|reported|estimated|amortized")
+	by := fs.String("by", "model", "group by: "+strings.Join(groupByDimensions, "|"))
+	view := fs.String("view", "api_equivalent", "cost view: "+strings.Join(reportViews, "|"))
 	periodSpec := fs.String("period", "week", `calendar window: today|yesterday|week|month|"last week"|"last month"|quarter|"this year"|"N days"|"since YYYY-MM-DD"|YYYY-MM-DD..YYYY-MM-DD|all`)
 	jsonOut := fs.Bool("json", false, "emit the report as JSON instead of a table (metered views only)")
 	noScan := fs.Bool("no-scan", false, "skip the automatic scan-on-launch; read the ledger as-is")
@@ -295,17 +298,31 @@ func (a *App) cmdReport(args []string) int {
 		fmt.Fprintf(a.Err, "aispend: %v\n", err)
 		return 2
 	}
-	switch dash(*view) {
-	case "effective-allocated":
-		// Hard rename (no alias): the old name must not silently fall through to
-		// api_equivalent — point the user at the new view instead.
+	// Validate --by like --period above: an unknown dimension is rejected (exit 2)
+	// rather than silently falling through groupKey's default to a by-model report
+	// under a lying `· by <garbage> ·` header. Fail fast — before scan/refresh — so
+	// nothing reaches stdout and --json pipes stay clean.
+	if !slices.Contains(groupByDimensions, *by) {
+		fmt.Fprintf(a.Err, "aispend: invalid --by %q (valid: %s)\n", *by, strings.Join(groupByDimensions, ", "))
+		return 2
+	}
+	// Hard rename (no alias): the old name must not silently fall through to
+	// api_equivalent — point the user at the new view instead. Checked before the
+	// generic validation below so it keeps its specific migration hint.
+	if dash(*view) == "effective-allocated" {
 		fmt.Fprintln(a.Err, "aispend: --view effective_allocated was renamed to --view amortized")
 		return 2
-	case "amortized":
-		if *jsonOut {
-			fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view amortized yet (use a metered view: api_equivalent, reported, estimated)")
-			return 2
-		}
+	}
+	// Validate --view like --by above: an unknown lens is rejected (exit 2) rather
+	// than falling through pickView's default to api_equivalent under a lying
+	// `view: <garbage>` header. underscore() normalizes so either spelling is accepted.
+	if !slices.Contains(reportViews, underscore(*view)) {
+		fmt.Fprintf(a.Err, "aispend: invalid --view %q (valid: %s)\n", *view, strings.Join(reportViews, ", "))
+		return 2
+	}
+	if dash(*view) == "amortized" && *jsonOut {
+		fmt.Fprintln(a.Err, "aispend: --json isn't supported with --view amortized yet (use a metered view: api_equivalent, reported, estimated)")
+		return 2
 	}
 
 	a.refreshOnLaunch(*noRefresh)
@@ -1102,6 +1119,18 @@ func pickView(e event.AgentEvent, view string) (event.Money, bool) {
 	return *m, true
 }
 
+// groupByDimensions are the valid report --by values, in help/error order. "file"
+// fans out in groupContributions; the rest resolve 1:1 via groupKey. Single source
+// of truth shared by the flag help, the --by validation, and the rejection message,
+// so the advertised set, the validator, and the switch below can't drift apart.
+var groupByDimensions = []string{"model", "repo", "provider", "cost_tag", "session", "branch", "commit", "file"}
+
+// reportViews are the valid --view cost lenses, in help/error order. Single source
+// of truth for the flag help, the --view validation, and the rejection message. The
+// engine matches these through dash()/underscore() so either spelling is accepted;
+// the renamed effective_allocated is rejected separately, with a migration hint.
+var reportViews = []string{"api_equivalent", "reported", "estimated", "amortized"}
+
 func groupKey(e event.AgentEvent, by string) string {
 	switch by {
 	case "repo":
@@ -1320,6 +1349,7 @@ func (a *App) usage() {
 Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it shows `+"`today`"+`)
 
   scan [--verbose] [--full]     import & price new sessions (no network); --full re-reads all & resets the checkpoint
+  sync [--no-refresh]           on-demand sync now: refresh prices (if stale) + import new sessions; no-op if a sync is already running
   daemon [--interval D] [--once] background scan loop: every D (default 15m) import from the last checkpoint; --once = one cycle
   report [--period P] [flags]   spend over a calendar window (default: this week)
   today                         arbitrage-first daily glance: ROI, cache savings, hourly spikes

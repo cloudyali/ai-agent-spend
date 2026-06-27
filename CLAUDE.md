@@ -68,7 +68,7 @@ One spend command, calendar-only windows (no rolling window):
 
 ```
 aispend                        # DEFAULT CHANNEL → interactive TUI; falls back to `today` off a TTY / in the offline build
-aispend tui [--period P] [--watch]   # interactive explorer: day-grouped session list (live badge + legend) → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them). --watch live-refreshes in place (periodic re-scan + clock advance). Visual times render in LOCAL tz; the backend/ledger stays UTC.
+aispend tui [--period P] [--watch]   # interactive explorer: day-grouped session list (live badge + legend) → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them). In-process periodic sync is ON by default (re-scan + clock advance on the daemon cadence — config scan_interval, else 15m — via App.tuiSyncInterval); --watch opts into the 3s live tick. The header carries a `synced Nm ago` stamp (App.lastSyncTime → tui.WithSyncStatus) — the in-process sync, no separate process owned (it dies with the TUI); it ages between syncs via a cheap 30s clock heartbeat (tui.WithClockTick / clockMsg — advances the clock + repaints, no re-scan, wired only when not --watch) so it isn't frozen at "just now". Press `s` for an on-demand sync without waiting out the cadence (Model.syncCmd → syncDoneMsg, the same reload off the UI loop; syncDoneMsg folds the result back WITHOUT re-arming the watch tick). The keypress gets immediate feedback: the header's freshness segment swaps to an in-progress `syncing…` the next frame (Model.syncing, set only by the manual `s` — a background watch tick stays silent) and resumes the stamp (`synced just now`) when the result lands. It's single-flight via the Model.reloading guard: an `s` (or a watch tick) while a sync is in flight is a no-op, so it never stacks a second store writer — the in-process twin of the CLI `sync` lock. Legend advertises `s sync` when a reload is wired. Visual times render in LOCAL tz; the backend/ledger stays UTC.
 aispend report --period <today|yesterday|week|month|"last week"|"last month"|
                          quarter|"this year"|"N days"|"since YYYY-MM-DD"|
                          YYYY-MM-DD..YYYY-MM-DD|all> [--by G] [--view V] [--json]
@@ -86,6 +86,15 @@ aispend scan [--full] | doctor | plans
                                 # NOTE: the `explain` command was removed — per-turn/session evidence
                                 # now lives in the TUI drill (receipt → file → turn). Offline/non-TTY
                                 # builds have no receipt surface.
+aispend sync [--no-refresh]     # on-demand "bring me current now": a bounded price refresh-if-stale
+                                # (--no-refresh / the usual opt-outs skip it) + an incremental ledger
+                                # scan, with a concise summary on stdout. The explicit verb that mirrors
+                                # the TUI's `s` key and the "synced …" stamp. SINGLE-FLIGHT: it takes a
+                                # shared lock (~/.aispend/sync.lock) first, so "if a sync is already
+                                # running, do nothing" — the daemon and `sync` (and a second `sync`)
+                                # never double-scan. Lock is pure-mtime TTL (10m), fail-open, offline-safe.
+                                # The same lock gates the daemon's cycles (guardedScan). The TUI's own
+                                # `s` key is the in-process equivalent (the reloading single-flight flag).
 aispend daemon [--interval D] [--once] [--verbose]
                                 # background scan loop: scans once immediately (catch-up), then every
                                 # D from the same per-provider checkpoint as scan-on-launch. D defaults
