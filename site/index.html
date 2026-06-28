@@ -156,7 +156,7 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .gh-stars:hover .lbl{background:var(--plum-700)}
 .gh-stars svg{width:17px;height:17px}
 .gh-stars .cnt{display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border-left:1px solid var(--hair);background:var(--plum-900);color:var(--text-2);font-variant-numeric:tabular-nums;min-width:30px}
-.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links{display:flex;align-items:center;gap:22px}
 .nav-links a{font-size:15px;color:var(--text-2);font-weight:500;transition:.15s}
 .nav-links a:hover{color:var(--rose-400)}
 .nav-cta{display:flex;align-items:center;gap:12px}
@@ -178,7 +178,7 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .mobile-menu .mm-cta .btn,.mobile-menu .mm-cta .gh-pill{width:100%;justify-content:center}
 .mobile-menu.open{display:block;animation:menuIn .18s ease}
 @keyframes menuIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-@media (max-width:980px){.nav-links,.nav-cta .gh-stars,.nav-cta .btn-primary{display:none}.nav-toggle{display:inline-flex}}
+@media (max-width:1024px){.nav-links,.nav-cta .gh-stars,.nav-cta .btn-primary{display:none}.nav-toggle{display:inline-flex}}
 
 /* ===================== ART CANVAS (data-landscape) ===================== */
 /* A painterly placeholder gradient; a dropped-in <img> overlays it 1:1.
@@ -356,6 +356,20 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
   .spine-inner{grid-template-columns:1fr;gap:0}
   .spine-rail{position:static;flex-direction:row;flex-wrap:wrap;gap:8px 16px;margin-bottom:36px;padding-bottom:18px;border-bottom:1px solid var(--hair)}
 }
+
+/* ===================== HOW IT WORKS (pipeline) ===================== */
+.how{background:var(--plum-1000);border-top:1px solid var(--hair)}
+.how .section-head{text-align:center;margin-left:auto;margin-right:auto}
+.how .section-head .eyebrow{justify-content:center}
+.how-steps{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden}
+.how-step{background:var(--plum-900);padding:30px 26px;display:flex;flex-direction:column}
+.how-step .hs-num{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.10);color:var(--rose-400);font-family:var(--font-mono);font-weight:600;font-size:15px;margin-bottom:16px}
+.how-step h4{font-family:var(--font-body);font-size:16.5px;font-weight:700;margin-bottom:9px;color:var(--text)}
+.how-step p{font-size:14.5px;color:var(--text-3);line-height:1.6}
+.how-step code{font-size:12.5px;background:rgba(0,0,0,.3);color:var(--text-2);padding:2px 6px;border-radius:5px}
+.how-foot{display:flex;justify-content:center;margin-top:30px}
+@media (max-width:880px){.how-steps{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.how-steps{grid-template-columns:1fr}}
 
 /* ===================== OFFLINE (deepest void) ===================== */
 .offline{position:relative;background:var(--plum-1100);color:var(--text);overflow:hidden}
@@ -566,6 +580,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <a href="#receipt">Receipt</a>
       <a href="#arbitrage">Plan vs usage</a>
       <a href="#cache">Cache</a>
+      <a href="#how-it-works">How it works</a>
       <a href="#offline">Offline</a>
       <a href="#open-source">Open source</a>
       <a href="#install">Install</a>
@@ -586,6 +601,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <a class="ml" href="#receipt">Receipt</a>
     <a class="ml" href="#arbitrage">Plan vs usage</a>
     <a class="ml" href="#cache">Cache</a>
+    <a class="ml" href="#how-it-works">How it works</a>
     <a class="ml" href="#offline">Offline</a>
     <a class="ml" href="#open-source">Open source</a>
     <a class="ml" href="#install">Install</a>
@@ -819,6 +835,42 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   </div>
 </section>
 
+<!-- ============================ HOW IT WORKS ============================ -->
+<section class="section how" id="how-it-works">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>From your local logs to an <em>explained dollar</em>.</h2>
+      <p>No keys, no upload, no setup. Point it at the session logs your agents already write, and AiSpend does the rest — every step leaves evidence you can open.</p>
+    </div>
+    <ol class="how-steps">
+      <li class="how-step">
+        <span class="hs-num">1</span>
+        <h4>Read your local logs</h4>
+        <p>It parses the Claude Code and Codex session transcripts already on disk (<code>~/.claude</code>, <code>~/.codex</code>). No API keys, no account, nothing uploaded.</p>
+      </li>
+      <li class="how-step">
+        <span class="hs-num">2</span>
+        <h4>Price every turn, cache-aware</h4>
+        <p>Each turn is split by token class and priced at published API rates — including the 5-minute vs 1-hour Anthropic cache tiers that simpler trackers get wrong.</p>
+      </li>
+      <li class="how-step">
+        <span class="hs-num">3</span>
+        <h4>Store an evidence ledger</h4>
+        <p>Every number is written to a local ledger under <code>~/.aispend</code> with its source — which parser, which rate, which method. Nothing is asserted without proof.</p>
+      </li>
+      <li class="how-step">
+        <span class="hs-num">4</span>
+        <h4>Drill, report, ship</h4>
+        <p>Drill a day down to a single turn, group spend by branch, commit, or file, set a budget — or write the cost straight into your git history as trailers.</p>
+      </li>
+    </ol>
+    <div class="how-foot">
+      <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#how-it-works" target="_blank" rel="noopener">Read the full pipeline <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ OFFLINE ============================ -->
 <section class="section offline" id="offline">
   <div class="canvas art-offline" style="position:absolute;inset:0;border-radius:0">
@@ -1000,6 +1052,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           <li><a href="#receipt">The receipt</a></li>
           <li><a href="#arbitrage">Plan vs usage</a></li>
           <li><a href="#cache">Cache pricing</a></li>
+          <li><a href="#how-it-works">How it works</a></li>
           <li><a href="#offline">Offline proof</a></li>
           <li><a href="#install">Install</a></li>
         </ul>
