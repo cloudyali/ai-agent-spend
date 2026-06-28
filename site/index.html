@@ -276,9 +276,10 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .sources-inner .sep{width:5px;height:5px;border-radius:50%;background:var(--rose-500)}
 
 /* ===================== HIDDEN METER (statement + meter visual) ===================== */
-.meter-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:60px;align-items:center}
+.meter-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:60px;align-items:center}
+.meter-card{order:-1}/* visual on the left, so it alternates with the receipt below (copy stays first in the DOM) */
 .meter-grid>*{min-width:0}
-@media (max-width:860px){.meter-grid{grid-template-columns:1fr;gap:40px}}
+@media (max-width:860px){.meter-grid{grid-template-columns:1fr;gap:40px}.meter-card{order:0}}
 .meter .eyebrow{margin-bottom:20px}
 .meter h2{font-size:clamp(28px,4vw,44px);font-weight:480;margin-bottom:20px;line-height:1.1}
 .meter p{font-size:17px;max-width:56ch}
