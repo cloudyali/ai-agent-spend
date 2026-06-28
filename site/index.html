@@ -36,13 +36,58 @@
   "@type": "SoftwareApplication",
   "name": "AiSpend",
   "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "FinOps / cost management",
   "operatingSystem": "macOS, Linux, Windows",
+  "softwareVersion": "0.0.8",
+  "dateModified": "2026-06-28",
   "description": "Local, explainable spend tracking for AI coding agents. Prices every Claude Code and Codex turn at published API rates and traces each dollar to its turn, file, and commit. Offline by default.",
+  "featureList": [
+    "Prices every Claude Code and Codex turn at published API rates, split by token class",
+    "Cache-aware pricing with the 5-minute and 1-hour Anthropic cache tiers handled correctly",
+    "Traces each dollar to the turn, file, and git commit that spent it",
+    "Plan vs usage: api-equivalent cost next to your flat plan, with an amortized view",
+    "Optional monthly budget with pace tracking",
+    "Offline by default, with no API keys, no account, and no telemetry",
+    "Single static Go binary with a CLI and an interactive TUI"
+  ],
+  "screenshot": [
+    "https://aispend.cloudyali.io/shots/explorer.jpg",
+    "https://aispend.cloudyali.io/shots/receipt.jpg"
+  ],
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://github.com/cloudyali/ai-agent-spend/blob/main/LICENSE",
   "url": "https://aispend.cloudyali.io/",
   "downloadUrl": "https://github.com/cloudyali/ai-agent-spend/releases",
   "author": { "@type": "Organization", "name": "CloudYali", "url": "https://cloudyali.io" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CloudYali",
+  "url": "https://cloudyali.io",
+  "logo": "https://aispend.cloudyali.io/cloudyali-logo.svg",
+  "sameAs": [
+    "https://github.com/cloudyali",
+    "https://github.com/cloudyali/ai-agent-spend",
+    "https://cloudyali.io"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"What is AiSpend?","acceptedAnswer":{"@type":"Answer","text":"AiSpend is a free, open-source CLI and TUI that tracks what your AI coding agents cost. It reads the session logs Claude Code and Codex already write, prices every turn at real API rates, and shows whether your flat subscription is paying off. One static Go binary, no API keys, offline by default."}},
+    {"@type":"Question","name":"What does AiSpend read, and from where?","acceptedAnswer":{"@type":"Answer","text":"The session transcripts your agents already write to disk, at ~/.claude/projects and ~/.codex/sessions. It parses each turn, prices it per token class, and stores an evidence ledger under ~/.aispend. No API keys, no credentials, and no config required."}},
+    {"@type":"Question","name":"Does anything leave my machine?","acceptedAnswer":{"@type":"Answer","text":"No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current, and it sends nothing about you. aispend doctor --network discloses it, and the offline build compiles every net/* import out entirely."}},
+    {"@type":"Question","name":"Which agents are supported?","acceptedAnswer":{"@type":"Answer","text":"Claude Code and Codex today, the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize."}},
+    {"@type":"Question","name":"How accurate is it versus my real invoice?","acceptedAnswer":{"@type":"Answer","text":"AiSpend reports the API-equivalent cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. It lines up closely with other tools once the time windows match. The small difference that is left comes from a streaming-dedup decision, and it shows up as a line in the receipt's evidence rather than hidden away."}},
+    {"@type":"Question","name":"Subscription or API: which does it price?","acceptedAnswer":{"@type":"Answer","text":"Both, side by side. You are on a flat plan, so AiSpend prices your actual usage at API rates and puts that next to the plan's daily cost. The gap is the whole point: it tells you whether the seat is under-used or paying for itself several times over."}},
+    {"@type":"Question","name":"Is it really free and open source?","acceptedAnswer":{"@type":"Answer","text":"Yes. MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, and fork it if you like."}}
+  ]
 }
 </script>
 
@@ -1088,6 +1133,10 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <h2>Questions &amp; answers.</h2>
     </div>
     <div class="faq-list">
+      <div class="qa">
+        <button class="q" aria-expanded="false" aria-controls="qa0"><span>What is AiSpend?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="panel" id="qa0"><p>AiSpend is a free, open-source CLI and TUI that tracks what your AI coding agents cost. It reads the session logs Claude Code and Codex already write, prices every turn at real API rates, and shows whether your flat subscription is paying off. One static Go binary, no API keys, offline by default.</p></div>
+      </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa1"><span>What does AiSpend read, and from where?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
         <div class="panel" id="qa1"><p>The session transcripts your agents already write to disk, at <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>. It parses each turn, prices it per token class, and stores an evidence ledger under <code>~/.aispend</code>. No API keys, no credentials, and no config required.</p></div>

@@ -1,0 +1,31 @@
+# AiSpend
+
+> AiSpend is a free, open-source CLI and TUI that tracks what AI coding agents cost. It reads the session logs Claude Code and Codex already write, prices every turn at real API rates, traces each dollar to the turn, file, and git commit that spent it, and shows whether a flat subscription is paying off. One static Go binary, no API keys, offline by default.
+
+## What it does
+- Prices every Claude Code and Codex turn at published API rates, split by token class (input, output, cache read, cache write).
+- Handles the subtle Anthropic cache tiers correctly: 5-minute (1.25x input) and 1-hour (2x input) cache writes, plus cache reads.
+- Traces each dollar to the turn, file, and git commit that spent it, so spend ties to shipped work (group by branch, commit, or file).
+- Plan vs usage: shows your metered api-equivalent cost next to your flat plan's daily rate, with an amortized view once you set a plan.
+- Optional monthly budget with pace tracking (informational, never enforced).
+- Two surfaces in one binary: a scriptable CLI and an interactive TUI that drills day to session to file to a single turn.
+
+## Key facts
+- License: MIT (fully open source, including the pricing table).
+- Platforms: macOS, Linux, Windows.
+- Privacy: reads local files only; the only optional network call is a refresh of public model prices, which `aispend doctor --network` discloses. The offline build compiles every `net/*` import out entirely.
+- No account, no API keys, no telemetry, no config required.
+- Maker: CloudYali.
+
+## Install
+- Homebrew: `brew install cloudyali/tap/aispend`
+- Install script: `curl -fsSL https://raw.githubusercontent.com/cloudyali/ai-agent-spend/main/install.sh | sh`
+- Go: `go install github.com/cloudyali/ai-agent-spend/cmd/aispend@latest`
+
+## Links
+- Website: https://aispend.cloudyali.io/
+- Source code (GitHub): https://github.com/cloudyali/ai-agent-spend
+- Documentation (README): https://github.com/cloudyali/ai-agent-spend#readme
+- Releases: https://github.com/cloudyali/ai-agent-spend/releases
+- License (MIT): https://github.com/cloudyali/ai-agent-spend/blob/main/LICENSE
+- Maker: CloudYali — https://cloudyali.io
