@@ -84,7 +84,7 @@
     {"@type":"Question","name":"What does AiSpend read, and from where?","acceptedAnswer":{"@type":"Answer","text":"The session transcripts your agents already write to disk, at ~/.claude/projects and ~/.codex/sessions. It parses each turn, prices it per token class, and stores an evidence ledger under ~/.aispend. No API keys, no credentials, and no config required."}},
     {"@type":"Question","name":"Does anything leave my machine?","acceptedAnswer":{"@type":"Answer","text":"No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current, and it sends nothing about you. aispend doctor --network discloses it, and the offline build compiles every net/* import out entirely."}},
     {"@type":"Question","name":"Which agents are supported?","acceptedAnswer":{"@type":"Answer","text":"Claude Code and Codex today, the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize."}},
-    {"@type":"Question","name":"How accurate is it versus my real invoice?","acceptedAnswer":{"@type":"Answer","text":"AiSpend reports the API-equivalent cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. It lines up closely with other tools once the time windows match. The small difference that is left comes from a streaming-dedup decision, and it shows up as a line in the receipt's evidence rather than hidden away."}},
+    {"@type":"Question","name":"How accurate is it versus my real invoice?","acceptedAnswer":{"@type":"Answer","text":"AiSpend reports the API-equivalent cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. The numbers line up once the time windows match, and the small difference that is left comes from a streaming-dedup decision, shown as a line in the receipt's evidence rather than hidden away."}},
     {"@type":"Question","name":"Subscription or API: which does it price?","acceptedAnswer":{"@type":"Answer","text":"Both, side by side. You are on a flat plan, so AiSpend prices your actual usage at API rates and puts that next to the plan's daily cost. The gap is the whole point: it tells you whether the seat is under-used or paying for itself several times over."}},
     {"@type":"Question","name":"Is it really free and open source?","acceptedAnswer":{"@type":"Answer","text":"Yes. MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, and fork it if you like."}}
   ]
@@ -903,8 +903,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           </div>
         </div>
         <div class="three-up">
-          <div class="it"><h4>5-min vs 1-hour</h4><p>Anthropic's two cache-write tiers are priced separately (1.25× vs 2× input), the subtle part that simpler trackers get wrong.</p></div>
-          <div class="it"><h4>Read vs miss</h4><p>Treat cache hit/miss as a filter: "show me only what I paid on cache misses." A FinOps question no other tool answers.</p></div>
+          <div class="it"><h4>5-min vs 1-hour</h4><p>Anthropic's two cache-write tiers are priced separately (1.25× vs 2× input), the subtle part that's easy to get wrong.</p></div>
+          <div class="it"><h4>Read vs miss</h4><p>Treat cache hit/miss as a filter: "show me only what I paid on cache misses." A FinOps question you can finally answer.</p></div>
           <div class="it"><h4>Without cache ≈ $X</h4><p>The savings line spells out what caching kept off the bill, and the percent it covered.</p></div>
         </div>
         <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend/blob/main/design-documents/05-llm-pricing.md" target="_blank" rel="noopener">How cache tiers are priced <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
@@ -957,7 +957,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <li class="how-step">
         <span class="hs-num">2</span>
         <h4>Price every turn, cache-aware</h4>
-        <p>Each turn is split by token class and priced at published API rates, including the 5-minute and 1-hour Anthropic cache tiers that simpler trackers get wrong.</p>
+        <p>Each turn is split by token class and priced at published API rates, including the 5-minute and 1-hour Anthropic cache tiers that are easy to get wrong.</p>
       </li>
       <li class="how-step">
         <span class="hs-num">3</span>
@@ -1151,7 +1151,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa4"><span>How accurate is it versus my real invoice?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa4"><p>AiSpend reports the <em>API-equivalent</em> cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. It lines up closely with other tools once the time windows match. The small difference that's left comes from a streaming-dedup decision, and it shows up as a line in the receipt's evidence rather than hidden away.</p></div>
+        <div class="panel" id="qa4"><p>AiSpend reports the <em>API-equivalent</em> cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. The numbers line up once the time windows match, and the small difference that's left comes from a streaming-dedup decision, shown as a line in the receipt's evidence rather than hidden away.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa5"><span>Subscription or API: which does it price?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
