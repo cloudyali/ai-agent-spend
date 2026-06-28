@@ -626,7 +626,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   <div class="wrap hero-grid">
     <div>
       <h1>Know what your coding agents <em>really</em> cost.</h1>
-      <p class="lead">AI coding tools charge a flat fee and hide the meter. <strong>AiSpend</strong> is for the developers and teams who live in Claude Code and Codex — it prices every turn at real API rates, proves whether the subscription pays off, and traces each dollar to the turn, file, and git commit that spent it. One static Go binary. No API keys. It all stays on your machine.</p>
+      <p class="lead">AI coding tools charge a flat fee and hide the meter. <strong>AiSpend</strong> is for the developers and teams who live in Claude Code and Codex. It prices every turn at real API rates, shows whether the subscription is paying off, and traces each dollar back to the turn, file, and git commit that spent it. One static Go binary, no API keys, and everything stays on your machine.</p>
       <div class="hero-cta">
         <div class="cmd-pill">
           <code><span class="dollar">$ </span>brew install cloudyali/tap/aispend</code>
@@ -685,8 +685,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   <div class="wrap">
     <span class="eyebrow">The hidden meter</span>
     <h2>Flat pricing is the hook. The bill underneath is still <em>tokens</em>.</h2>
-    <p>Coding agents bill a flat monthly subscription and don't expose a per-token meter. But the real cost is still tokens — input, output, and cache reads and writes. Price your actual usage at published API rates and the number is often nowhere near what you pay, and most setups can't even measure the gap. AiSpend is the meter.</p>
-    <p style="margin-top:14px">Flat per-seat pricing is the early-adopter deal, not the destination — as coding agents move to usage-based billing, the developers and teams who already know their true token cost are the ones who won't be blindsided by the first metered invoice.</p>
+    <p>Coding agents bill a flat monthly subscription and never show you a per-token meter. But the real cost is still tokens: input, output, and cache reads and writes. Price your actual usage at published API rates and the number is usually nowhere near what you pay, and most setups can't even measure the gap. AiSpend is that meter.</p>
+    <p style="margin-top:14px">Flat per-seat pricing is the early-adopter deal, not where this ends. As coding agents move to usage-based billing, the teams who already know their true token cost are the ones who won't be blindsided by the first metered invoice.</p>
   </div>
 </section>
 
@@ -696,7 +696,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <div>
       <span class="eyebrow">The itemized receipt</span>
       <h2>An explained dollar, <em>printed on paper</em>.</h2>
-      <p class="lead">Most tools give you one number — the credit-card total, take it or leave it. AiSpend hands you the itemized receipt: every turn split by token class, priced at the exact rate that produced it, with the evidence attached. Nothing is asserted without a source you can open.</p>
+      <p class="lead">Most tools give you one number: the credit-card total, take it or leave it. AiSpend gives you the itemized receipt. Every turn is split by token class and priced at the exact rate that produced it, with the evidence attached, so nothing is claimed without a source you can open.</p>
       <div class="legend">
         <span><i style="background:var(--tc-input)"></i> Input</span>
         <span><i style="background:var(--tc-output)"></i> Output</span>
@@ -731,7 +731,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <article class="pillar2" id="receipt">
         <div class="ph">
           <h3>From a day's total down to a <em>single turn</em>.</h3>
-          <p class="lead">Drill from a day down to a single turn's token-by-token cost. Open any number and see what it's made of — re-read live from your local session log, never asserted from a cache.</p>
+          <p class="lead">Drill from a day down to a single turn's token-by-token cost. Open any number to see what it's made of, re-read live from your local session log and never guessed from a cache.</p>
         </div>
         <div class="canvas art-receipt">
           <img class="art" src="art/receipt.jpg" alt="" aria-hidden="true" onerror="this.remove()" />
@@ -745,7 +745,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         </div>
         <div class="three-up">
           <div class="it"><h4>Open any number</h4><p>day → session → file → turn. Each <code>↵</code> goes one level deeper, down to the prompt.</p></div>
-          <div class="it"><h4>Token-by-token</h4><p>Input, output, cache-read, cache-write — priced separately, the way the API would bill it.</p></div>
+          <div class="it"><h4>Token-by-token</h4><p>Input, output, cache-read, and cache-write, each priced separately, the way the API would bill it.</p></div>
           <div class="it"><h4>Re-read live</h4><p>Evidence is pulled from your logs at view time, so the receipt is always the real thing.</p></div>
         </div>
         <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#how-it-works" target="_blank" rel="noopener">How the receipt is built <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
@@ -774,7 +774,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         </div>
         <div class="three-up">
           <div class="it"><h4>Amortized lens</h4><p>Pick each agent's plan and start date once; AiSpend spreads the flat fee across your real usage, so the daily rate you compare against is honest.</p></div>
-          <div class="it"><h4>Budget pace</h4><p>An optional monthly api-equivalent ceiling with a run-rate projection — informational, never enforced.</p></div>
+          <div class="it"><h4>Budget pace</h4><p>An optional monthly api-equivalent ceiling that projects where you'll land. It's informational and never enforced.</p></div>
           <div class="it"><h4>Opus or Codex?</h4><p><code>report --by model</code> shows what each agent actually costs on real work, so you reach for the right one.</p></div>
         </div>
         <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#use-cases" target="_blank" rel="noopener">Plan-vs-usage &amp; the amortized lens <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
@@ -797,7 +797,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           </div>
         </div>
         <div class="three-up">
-          <div class="it"><h4>5-min vs 1-hour</h4><p>Anthropic's two cache-write TTLs are priced distinctly (1.25× vs 2× input) — the subtle part, modeled right.</p></div>
+          <div class="it"><h4>5-min vs 1-hour</h4><p>Anthropic's two cache-write tiers are priced separately (1.25× vs 2× input), the subtle part that simpler trackers get wrong.</p></div>
           <div class="it"><h4>Read vs miss</h4><p>Treat cache hit/miss as a filter: "show me only what I paid on cache misses." A FinOps question no other tool answers.</p></div>
           <div class="it"><h4>Without cache ≈ $X</h4><p>The savings line spells out what caching kept off the bill, and the percent it covered.</p></div>
         </div>
@@ -808,7 +808,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <article class="pillar2" id="provenance">
         <div class="ph">
           <h3>Tie every dollar to the commit that <em>shipped it</em>.</h3>
-          <p class="lead">What did this feature actually cost? Group spend by branch, git commit, or file and the answer is one number — for a client invoice, a cost-per-feature readout, or settling "was that refactor worth it?" Optionally write the cost straight into your git history as trailers.</p>
+          <p class="lead">What did this feature actually cost? Group spend by branch, git commit, or file and the answer is one number. Use it for a client invoice, a cost-per-feature readout, or just to settle "was that refactor worth it?" You can also write the cost straight into your git history as a commit trailer.</p>
         </div>
         <div class="canvas art-provenance">
           <img class="art" src="art/provenance.jpg" alt="" aria-hidden="true" onerror="this.remove()" />
@@ -826,7 +826,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         <div class="three-up">
           <div class="it"><h4><code>--by branch</code></h4><p>Roll spend up to the branch, so a feature's true cost is one number.</p></div>
           <div class="it"><h4><code>--by commit</code></h4><p>1:1 with the work that shipped; reconciles back to the by-model total.</p></div>
-          <div class="it"><h4>Cost trailers</h4><p>Opt in to bake per-commit cost into git history — a cost record that travels with the code.</p></div>
+          <div class="it"><h4>Cost trailers</h4><p>Opt in to bake each commit's cost into your git history, so the record travels with the code.</p></div>
         </div>
         <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend/blob/main/design-documents/11-commit-cost-trailers.md" target="_blank" rel="noopener">Cost trailers, explained <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
       </article>
@@ -840,7 +840,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <div class="section-head">
       <span class="eyebrow">How it works</span>
       <h2>From your local logs to an <em>explained dollar</em>.</h2>
-      <p>No keys, no upload, no setup. Point it at the session logs your agents already write, and AiSpend does the rest — every step leaves evidence you can open.</p>
+      <p>No keys, no upload, no setup. Point it at the session logs your agents already write and AiSpend does the rest, leaving evidence you can open at every step.</p>
     </div>
     <ol class="how-steps">
       <li class="how-step">
@@ -851,17 +851,17 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <li class="how-step">
         <span class="hs-num">2</span>
         <h4>Price every turn, cache-aware</h4>
-        <p>Each turn is split by token class and priced at published API rates — including the 5-minute vs 1-hour Anthropic cache tiers that simpler trackers get wrong.</p>
+        <p>Each turn is split by token class and priced at published API rates, including the 5-minute and 1-hour Anthropic cache tiers that simpler trackers get wrong.</p>
       </li>
       <li class="how-step">
         <span class="hs-num">3</span>
         <h4>Store an evidence ledger</h4>
-        <p>Every number is written to a local ledger under <code>~/.aispend</code> with its source — which parser, which rate, which method. Nothing is asserted without proof.</p>
+        <p>Every number is written to a local ledger under <code>~/.aispend</code> with its source: which parser read it, which rate priced it, which method produced it. Nothing is claimed without proof.</p>
       </li>
       <li class="how-step">
         <span class="hs-num">4</span>
         <h4>Drill, report, ship</h4>
-        <p>Drill a day down to a single turn, group spend by branch, commit, or file, set a budget — or write the cost straight into your git history as trailers.</p>
+        <p>Drill a day down to a single turn, group spend by branch, commit, or file, or set a budget. You can even write the cost straight into your git history.</p>
       </li>
     </ol>
     <div class="how-foot">
@@ -911,7 +911,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <div>
       <span class="eyebrow">Open source</span>
       <h2>Open by <em>default</em>.</h2>
-      <p class="lead">AiSpend is MIT-licensed, end to end. The pricing engine, the evidence ledger, the offline proof — all in the open. Inspect it, fork it, run it right where your code already lives.</p>
+      <p class="lead">AiSpend is MIT-licensed, end to end. The pricing engine, the evidence ledger, the offline proof: all in the open. Inspect it, fork it, and run it right where your code already lives.</p>
       <div class="oss-cta">
         <a class="btn btn-primary" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">Star on GitHub</a>
         <a class="btn btn-secondary" href="https://github.com/cloudyali/ai-agent-spend#readme" target="_blank" rel="noopener">Read the docs</a>
@@ -926,7 +926,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <div class="oss-card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7v10l8 4 8-4V7z"/><path d="m4 7 8 4 8-4M12 11v10"/></svg></div>
         <h4>One binary, CLI &amp; TUI</h4>
-        <p>Pure Go, vendored — no Node, no Python, no database. A scriptable CLI and an interactive TUI explorer in the same binary, on macOS, Linux &amp; Windows.</p>
+        <p>Pure Go, with no Node, no Python, and no database. A scriptable CLI and an interactive TUI explorer in one binary, on macOS, Linux, and Windows.</p>
       </div>
       <div class="oss-card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
@@ -936,7 +936,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <div class="oss-card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
         <h4>No account, no telemetry</h4>
-        <p>Reads local files only. Nothing is uploaded, ever — no sign-up, no API keys, no phone-home.</p>
+        <p>Reads local files only. Nothing is ever uploaded: no sign-up, no API keys, no phone-home.</p>
       </div>
     </div>
   </div>
@@ -985,27 +985,27 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <div class="faq-list">
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa1"><span>What does AiSpend read, and from where?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa1"><p>The session transcripts your agents already write to disk — <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>. It parses each turn, prices it per token class, and stores an evidence ledger under <code>~/.aispend</code>. No API keys, no credentials, no config required.</p></div>
+        <div class="panel" id="qa1"><p>The session transcripts your agents already write to disk, at <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>. It parses each turn, prices it per token class, and stores an evidence ledger under <code>~/.aispend</code>. No API keys, no credentials, and no config required.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa2"><span>Does anything leave my machine?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa2"><p>No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current — it sends nothing about you. <code>aispend doctor --network</code> discloses it, and the <code>offline</code> build compiles every <code>net/*</code> import out entirely.</p></div>
+        <div class="panel" id="qa2"><p>No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current, and it sends nothing about you. <code>aispend doctor --network</code> discloses it, and the <code>offline</code> build compiles every <code>net/*</code> import out entirely.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa3"><span>Which agents are supported?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa3"><p>Claude Code and Codex today — the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize.</p></div>
+        <div class="panel" id="qa3"><p>Claude Code and Codex today, the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa4"><span>How accurate is it versus my real invoice?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa4"><p>AiSpend reports the <em>API-equivalent</em> cost of your work — what the same turns would have metered at published rates — next to your plan's daily cost. It reconciles closely with reference tools once windows are aligned; the small residual is a streaming-dedup decision, surfaced as a line in the receipt's evidence, not hidden.</p></div>
+        <div class="panel" id="qa4"><p>AiSpend reports the <em>API-equivalent</em> cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. It lines up closely with other tools once the time windows match. The small difference that's left comes from a streaming-dedup decision, and it shows up as a line in the receipt's evidence rather than hidden away.</p></div>
       </div>
       <div class="qa">
-        <button class="q" aria-expanded="false" aria-controls="qa5"><span>Subscription or API — which does it price?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <button class="q" aria-expanded="false" aria-controls="qa5"><span>Subscription or API: which does it price?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
         <div class="panel" id="qa5"><p>Both, side by side. You're on a flat plan, so AiSpend prices your actual usage at API rates and puts that next to the plan's daily cost. The gap is the whole point: it tells you whether the seat is under-used or paying for itself several times over.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa6"><span>Is it really free and open source?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa6"><p>Yes — MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, fork it if you like.</p></div>
+        <div class="panel" id="qa6"><p>Yes. MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, and fork it if you like.</p></div>
       </div>
     </div>
   </div>
