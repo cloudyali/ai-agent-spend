@@ -233,6 +233,10 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .microtrust svg{width:15px;height:15px;color:var(--gold-500)}
 .microtrust code{font-size:12.5px;background:var(--plum-800);padding:2px 6px;border-radius:5px;color:var(--text-2)}
 @media (max-width:940px){.hero-grid{grid-template-columns:1fr;gap:44px}.hero p.lead{max-width:none}}
+/* Grid/flex items default to min-width:auto (= intrinsic content width). The terminal's
+   white-space:pre rows are non-wrapping, so without this they force their track — and the
+   whole page — wider than a narrow viewport, which body's overflow-x:clip then crops. */
+.hero-grid>*,.offline-grid>*,.oss-grid>*,.receipt-grid>*,.spine-inner>*,.term-wrap,.term{min-width:0}
 
 /* copy-command pill */
 .cmd-pill{display:inline-flex;align-items:center;gap:0;border:1.5px solid var(--plum-600);border-radius:var(--r);background:var(--plum-900);overflow:hidden;box-shadow:var(--shadow)}
