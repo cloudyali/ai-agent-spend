@@ -36,13 +36,58 @@
   "@type": "SoftwareApplication",
   "name": "AiSpend",
   "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "FinOps / cost management",
   "operatingSystem": "macOS, Linux, Windows",
+  "softwareVersion": "0.0.8",
+  "dateModified": "2026-06-28",
   "description": "Local, explainable spend tracking for AI coding agents. Prices every Claude Code and Codex turn at published API rates and traces each dollar to its turn, file, and commit. Offline by default.",
+  "featureList": [
+    "Prices every Claude Code and Codex turn at published API rates, split by token class",
+    "Cache-aware pricing with the 5-minute and 1-hour Anthropic cache tiers handled correctly",
+    "Traces each dollar to the turn, file, and git commit that spent it",
+    "Plan vs usage: api-equivalent cost next to your flat plan, with an amortized view",
+    "Optional monthly budget with pace tracking",
+    "Offline by default, with no API keys, no account, and no telemetry",
+    "Single static Go binary with a CLI and an interactive TUI"
+  ],
+  "screenshot": [
+    "https://aispend.cloudyali.io/shots/explorer.jpg",
+    "https://aispend.cloudyali.io/shots/receipt.jpg"
+  ],
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://github.com/cloudyali/ai-agent-spend/blob/main/LICENSE",
   "url": "https://aispend.cloudyali.io/",
   "downloadUrl": "https://github.com/cloudyali/ai-agent-spend/releases",
   "author": { "@type": "Organization", "name": "CloudYali", "url": "https://cloudyali.io" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CloudYali",
+  "url": "https://cloudyali.io",
+  "logo": "https://aispend.cloudyali.io/cloudyali-logo.svg",
+  "sameAs": [
+    "https://github.com/cloudyali",
+    "https://github.com/cloudyali/ai-agent-spend",
+    "https://cloudyali.io"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"What is AiSpend?","acceptedAnswer":{"@type":"Answer","text":"AiSpend is a free, open-source CLI and TUI that tracks what your AI coding agents cost. It reads the session logs Claude Code and Codex already write, prices every turn at real API rates, and shows whether your flat subscription is paying off. One static Go binary, no API keys, offline by default."}},
+    {"@type":"Question","name":"What does AiSpend read, and from where?","acceptedAnswer":{"@type":"Answer","text":"The session transcripts your agents already write to disk, at ~/.claude/projects and ~/.codex/sessions. It parses each turn, prices it per token class, and stores an evidence ledger under ~/.aispend. No API keys, no credentials, and no config required."}},
+    {"@type":"Question","name":"Does anything leave my machine?","acceptedAnswer":{"@type":"Answer","text":"No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current, and it sends nothing about you. aispend doctor --network discloses it, and the offline build compiles every net/* import out entirely."}},
+    {"@type":"Question","name":"Which agents are supported?","acceptedAnswer":{"@type":"Answer","text":"Claude Code and Codex today, the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize."}},
+    {"@type":"Question","name":"How accurate is it versus my real invoice?","acceptedAnswer":{"@type":"Answer","text":"AiSpend reports the API-equivalent cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. The numbers line up once the time windows match, and the small difference that is left comes from a streaming-dedup decision, shown as a line in the receipt's evidence rather than hidden away."}},
+    {"@type":"Question","name":"Subscription or API: which does it price?","acceptedAnswer":{"@type":"Answer","text":"Both, side by side. You are on a flat plan, so AiSpend prices your actual usage at API rates and puts that next to the plan's daily cost. The gap is the whole point: it tells you whether the seat is under-used or paying for itself several times over."}},
+    {"@type":"Question","name":"Is it really free and open source?","acceptedAnswer":{"@type":"Answer","text":"Yes. MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, and fork it if you like."}}
+  ]
 }
 </script>
 
@@ -233,6 +278,10 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .microtrust svg{width:15px;height:15px;color:var(--gold-500)}
 .microtrust code{font-size:12.5px;background:var(--plum-800);padding:2px 6px;border-radius:5px;color:var(--text-2)}
 @media (max-width:940px){.hero-grid{grid-template-columns:1fr;gap:44px}.hero p.lead{max-width:none}}
+/* Grid/flex items default to min-width:auto (= intrinsic content width). The terminal's
+   white-space:pre rows are non-wrapping, so without this they force their track — and the
+   whole page — wider than a narrow viewport, which body's overflow-x:clip then crops. */
+.hero-grid>*,.offline-grid>*,.oss-grid>*,.receipt-grid>*,.spine-inner>*,.term-wrap,.term{min-width:0}
 
 /* copy-command pill */
 .cmd-pill{display:inline-flex;align-items:center;gap:0;border:1.5px solid var(--plum-600);border-radius:var(--r);background:var(--plum-900);overflow:hidden;box-shadow:var(--shadow)}
@@ -271,11 +320,25 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .sources-inner b{font-family:var(--font-display);font-weight:560;color:var(--text)}
 .sources-inner .sep{width:5px;height:5px;border-radius:50%;background:var(--rose-500)}
 
-/* ===================== HIDDEN METER (big serif statement) ===================== */
-.meter{text-align:center}
-.meter .eyebrow{justify-content:center;margin-bottom:22px}
-.meter h2{font-size:clamp(28px,4.4vw,48px);font-weight:450;max-width:18ch;margin:0 auto 22px;line-height:1.1}
-.meter p{font-size:18.5px;color:var(--text-3);max-width:62ch;margin:0 auto}
+/* ===================== HIDDEN METER (statement + meter visual) ===================== */
+.meter-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:60px;align-items:center}
+.meter-card{order:-1}/* visual on the left, so it alternates with the receipt below (copy stays first in the DOM) */
+.meter-grid>*{min-width:0}
+@media (max-width:860px){.meter-grid{grid-template-columns:1fr;gap:40px}.meter-card{order:0}}
+.meter .eyebrow{margin-bottom:20px}
+.meter h2{font-size:clamp(28px,4vw,44px);font-weight:480;margin-bottom:20px;line-height:1.1}
+.meter p{font-size:17px;max-width:56ch}
+.meter p+p{margin-top:14px}
+.meter-card{background:var(--paper-2);border:1px solid var(--paper-hair);border-radius:var(--r-lg);padding:30px 28px;box-shadow:0 30px 60px -34px rgba(10,10,15,.18)}
+.meter-card .mc-row{margin-bottom:24px}
+.meter-card .mc-cap{display:block;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--paper-ink-2);margin-bottom:11px}
+.meter-card .mc-bar{height:30px;border-radius:8px;overflow:hidden;display:flex}
+.meter-card .mc-hidden{align-items:center;justify-content:center;border:1px dashed rgba(9,9,11,.22);background:repeating-linear-gradient(45deg,#fff,#fff 9px,#f1f1f3 9px,#f1f1f3 18px)}
+.meter-card .mc-hidden span{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-ink-2)}
+.meter-card .mc-real i{display:block;height:100%}
+.meter-card .mc-legend{display:flex;flex-wrap:wrap;gap:9px 16px;font-size:12.5px;color:var(--paper-ink-2);margin-top:2px}
+.meter-card .mc-legend span{display:inline-flex;align-items:center;gap:7px}
+.meter-card .mc-legend i{width:11px;height:11px;border-radius:3px;flex:none}
 @media (max-width:760px){.meter{padding:64px 0}}
 
 /* ===================== RECEIPT (cream paper) ===================== */
@@ -335,6 +398,12 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .roi-line .api{font-size:24px;font-weight:600;color:var(--gold-500)}
 .roi-line .vs{font-size:13px;color:var(--text-3)}
 .roi-line .badge{margin-left:auto;font-size:13px;font-weight:600;color:#4be089;background:rgba(75,224,137,.12);padding:4px 10px;border-radius:var(--r-pill)}
+/* per-section "see the code" deep links */
+.src-link{display:inline-flex;align-items:center;gap:7px;margin-top:18px;font-family:var(--font-mono);font-size:12.5px;font-weight:500;letter-spacing:.02em;color:var(--rose-400);transition:.15s}
+.src-link:hover{color:var(--rose-300)}
+.src-link svg{width:14px;height:14px;flex:none}
+.s-light .src-link{color:var(--paper-ink-2)}
+.s-light .src-link:hover{color:var(--paper-ink)}
 .prov-mock{font-family:var(--font-mono);background:rgba(10,10,11,.82);border:1px solid var(--hair-2);border-radius:var(--r-md);padding:22px;box-shadow:var(--shadow-lg)}
 .prov-mock .pm-head{font-size:13px;color:var(--text-2);margin-bottom:18px}
 .prov-mock .pm-head .p{color:var(--rose-400)}
@@ -346,6 +415,51 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
   .spine-inner{grid-template-columns:1fr;gap:0}
   .spine-rail{position:static;flex-direction:row;flex-wrap:wrap;gap:8px 16px;margin-bottom:36px;padding-bottom:18px;border-bottom:1px solid var(--hair)}
 }
+
+/* ===================== HOW IT WORKS (pipeline) ===================== */
+.how{background:var(--plum-1000);border-top:1px solid var(--hair)}
+.how .section-head{text-align:center;margin-left:auto;margin-right:auto}
+.how .section-head .eyebrow{justify-content:center}
+.how-steps{list-style:none;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:var(--r-lg);overflow:hidden}
+.how-step{background:var(--plum-900);padding:30px 26px;display:flex;flex-direction:column}
+.how-step .hs-num{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.10);color:var(--rose-400);font-family:var(--font-mono);font-weight:600;font-size:15px;margin-bottom:16px}
+.how-step h4{font-family:var(--font-body);font-size:16.5px;font-weight:700;margin-bottom:9px;color:var(--text)}
+.how-step p{font-size:14.5px;color:var(--text-3);line-height:1.6}
+.how-step code{font-size:12.5px;background:rgba(0,0,0,.3);color:var(--text-2);padding:2px 6px;border-radius:5px}
+.how-foot{display:flex;justify-content:center;margin-top:30px}
+@media (max-width:880px){.how-steps{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.how-steps{grid-template-columns:1fr}}
+
+/* ===================== FIRST RUN (getting started) ===================== */
+.firstrun.s-light{background:var(--paper-2)}
+.firstrun .section-head{text-align:center;margin-left:auto;margin-right:auto}
+.firstrun .section-head .eyebrow{justify-content:center}
+.fr-steps{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
+.fr-steps>*{min-width:0}
+@media (max-width:760px){.fr-steps{grid-template-columns:1fr}}
+.fr-step{background:#fff;border:1px solid var(--paper-hair);border-radius:var(--r-md);padding:24px 22px;box-shadow:0 18px 40px -30px rgba(10,10,15,.20)}
+.fr-step .n{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--paper-2);border:1px solid var(--paper-hair);font-family:var(--font-mono);font-weight:600;font-size:14px;color:var(--paper-ink);margin-bottom:14px}
+.fr-step h4{font-family:var(--font-body);font-size:16px;font-weight:700;color:var(--paper-ink);margin-bottom:7px}
+.fr-step p{font-size:14.5px;color:var(--paper-ink-2);line-height:1.6}
+.firstrun code,.firstrun kbd{font-family:var(--font-mono);font-size:12.5px;background:var(--paper-2);border:1px solid var(--paper-hair);border-radius:5px;padding:1px 6px;color:var(--paper-ink)}
+.fr-panel{display:grid;grid-template-columns:1.08fr .92fr;background:#fff;border:1px solid var(--paper-hair);border-radius:var(--r-md);overflow:hidden;box-shadow:0 18px 40px -30px rgba(10,10,15,.20)}
+.fr-panel>*{min-width:0}
+@media (max-width:760px){.fr-panel{grid-template-columns:1fr}}
+.fr-keys{padding:26px 26px;border-right:1px solid var(--paper-hair)}
+@media (max-width:760px){.fr-keys{border-right:0;border-bottom:1px solid var(--paper-hair)}}
+.fr-cap{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--paper-ink-2);margin-bottom:16px}
+.fr-krow{display:flex;align-items:flex-start;gap:13px;margin-bottom:15px}
+.fr-krow:last-child{margin-bottom:0}
+.fr-krow .keys{display:flex;gap:5px;flex:none;padding-top:1px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 8px;border:1px solid var(--paper-hair);border-bottom-width:2px;border-radius:6px;background:var(--paper-2);font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--paper-ink)}
+.fr-krow .kdesc{font-size:14px;color:var(--paper-ink-2);line-height:1.5}
+.fr-krow .kdesc b{color:var(--paper-ink);font-weight:600}
+.fr-views{padding:26px 26px;background:var(--paper-2)}
+.fr-view{margin-bottom:14px}
+.fr-view:last-child{margin-bottom:0}
+.fr-view .vt{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--paper-ink);display:block;margin-bottom:3px}
+.fr-view .vd{font-size:13.5px;color:var(--paper-ink-2);line-height:1.55}
+.fr-foot{display:flex;justify-content:center;margin-top:26px}
 
 /* ===================== OFFLINE (deepest void) ===================== */
 .offline{position:relative;background:var(--plum-1100);color:var(--text);overflow:hidden}
@@ -439,6 +553,9 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
 @media (max-width:760px){.ft-grid{grid-template-columns:1fr 1fr;gap:32px}}
 .ft .brand{color:var(--text);margin-bottom:14px}
 .ft .blurb{font-size:14.5px;color:var(--text-4);max-width:300px;line-height:1.65}
+.ft .ft-cta{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-size:14px;font-weight:600;color:var(--text);border:1px solid var(--plum-600);border-radius:var(--r);padding:9px 14px;transition:.15s}
+.ft .ft-cta:hover{border-color:var(--rose-400);background:var(--plum-800)}
+.ft .ft-cta svg{width:17px;height:17px}
 .ft h4{font-family:var(--font-body);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-4);margin-bottom:16px;font-weight:600}
 .ft ul{list-style:none;display:grid;gap:11px}
 .ft ul a{font-size:14.5px;color:var(--text-3);transition:.15s}
@@ -553,12 +670,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <img class="brand-logo" src="ai-spend-logo.png" width="737" height="165" alt="AiSpend" />
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#receipt">Receipt</a>
-      <a href="#arbitrage">Arbitrage</a>
-      <a href="#cache">Cache</a>
-      <a href="#offline">Offline</a>
+      <a href="#how-it-works">How it works</a>
       <a href="#open-source">Open source</a>
-      <a href="#install">Install</a>
     </nav>
     <div class="nav-cta">
       <a class="gh-stars" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener" aria-label="Star AiSpend on GitHub">
@@ -573,12 +686,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     </div>
   </div>
   <div class="mobile-menu" id="mobile-menu">
-    <a class="ml" href="#receipt">Receipt</a>
-    <a class="ml" href="#arbitrage">Arbitrage</a>
-    <a class="ml" href="#cache">Cache</a>
-    <a class="ml" href="#offline">Offline</a>
+    <a class="ml" href="#how-it-works">How it works</a>
     <a class="ml" href="#open-source">Open source</a>
-    <a class="ml" href="#install">Install</a>
     <div class="mm-cta">
       <a class="gh-pill" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
@@ -599,9 +708,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   </div>
   <div class="wrap hero-grid">
     <div>
-      <span class="eyebrow">Local · Explainable · Offline by default</span>
       <h1>Know what your coding agents <em>really</em> cost.</h1>
-      <p class="lead">AI coding tools charge a flat fee and hide the meter. <strong>AiSpend</strong> prices every Claude Code and Codex turn at real API rates, proves whether the subscription pays off, and traces each dollar to the turn, file, and commit that spent it. One static Go binary. No API keys. It all stays on your machine.</p>
+      <p class="lead">AI coding tools charge a flat fee and hide the meter. <strong style="color:var(--gold-400);font-weight:700">AiSpend</strong> prices every Claude Code and Codex turn at real API rates, shows whether your subscription is paying off, and traces each dollar to the turn, file, and git commit that spent it. One static Go binary, no keys, all local.</p>
       <div class="hero-cta">
         <div class="cmd-pill">
           <code><span class="dollar">$ </span>brew install cloudyali/tap/aispend</code>
@@ -614,7 +722,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           View on GitHub
         </a>
       </div>
-      <p class="install-note">Installs in seconds. One command, one static binary. <b>No Node, no Python, no account.</b></p>
+      <p class="install-note">Installs in seconds. <b>No Node, no Python, no account.</b></p>
       <div class="microtrust">
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> MIT licensed</span>
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> One static binary, no runtime</span>
@@ -651,16 +759,40 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <span class="label">Prices the logs your agents already write:</span>
     <b>Claude Code</b><span class="sep" aria-hidden="true"></span><b>Codex</b>
     <span class="sep" aria-hidden="true"></span>
-    <span>per-token-class · caches included · grouped by branch, commit &amp; file</span>
+    <span>per-token-class · caches included · grouped by branch, commit &amp; file · any window from a day to a year</span>
   </div>
 </div>
 
 <!-- ============================ HIDDEN METER ============================ -->
 <section class="section meter s-light">
-  <div class="wrap">
-    <span class="eyebrow">The hidden meter</span>
-    <h2>Flat pricing is the hook. The bill underneath is still <em>tokens</em>.</h2>
-    <p>Coding agents bill a flat monthly subscription and don't expose a per-token meter. But the real cost is still tokens — input, output, and cache reads and writes. Price your actual usage at published API rates and the number is often nowhere near what you pay, and most setups can't even measure the gap. AiSpend is the meter.</p>
+  <div class="wrap meter-grid">
+    <div class="meter-copy">
+      <span class="eyebrow">The hidden meter</span>
+      <h2>Flat pricing is the hook. The bill underneath is still <em>tokens</em>.</h2>
+      <p>Coding agents bill a flat monthly subscription and never show you a per-token meter. But the real cost is still tokens: input, output, and cache reads and writes. Price your actual usage at published API rates and the number is usually nowhere near what you pay, and most setups can't even measure the gap. AiSpend is the meter your plan leaves out.</p>
+      <p>Flat per-seat pricing won't last. As coding agents shift to usage-based billing, the teams who already know their real token cost are the ones who won't be caught out by the first metered bill.</p>
+    </div>
+    <figure class="meter-card" role="img" aria-label="Your flat plan shows a hidden meter; the real spend is a bar split across token classes, with cache reads the largest share.">
+      <div class="mc-row">
+        <span class="mc-cap">What your plan shows you</span>
+        <div class="mc-bar mc-hidden"><span>meter hidden</span></div>
+      </div>
+      <div class="mc-row">
+        <span class="mc-cap">What you actually spend</span>
+        <div class="mc-bar mc-real">
+          <i style="width:62%;background:var(--tc-read)"></i>
+          <i style="width:18%;background:var(--tc-input)"></i>
+          <i style="width:12%;background:var(--tc-output)"></i>
+          <i style="width:8%;background:var(--tc-write)"></i>
+        </div>
+      </div>
+      <div class="mc-legend">
+        <span><i style="background:var(--tc-read)"></i>cache read</span>
+        <span><i style="background:var(--tc-input)"></i>input</span>
+        <span><i style="background:var(--tc-output)"></i>output</span>
+        <span><i style="background:var(--tc-write)"></i>cache write</span>
+      </div>
+    </figure>
   </div>
 </section>
 
@@ -670,7 +802,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <div>
       <span class="eyebrow">The itemized receipt</span>
       <h2>An explained dollar, <em>printed on paper</em>.</h2>
-      <p class="lead">ccusage hands you the credit-card total. CodeBurn draws a pretty dashboard. AiSpend hands you the itemized receipt: every turn split by token class, priced at the exact rate that produced it, with the evidence attached. Nothing is asserted without a source you can open.</p>
+      <p class="lead">Your subscription hits your card as one flat charge a month, with no breakdown and no idea which work cost what. AiSpend turns that single number into an itemized receipt: every turn split by token class and priced at the exact rate that produced it, with the evidence attached, so you can open the source behind any line.</p>
       <div class="legend">
         <span><i style="background:var(--tc-input)"></i> Input</span>
         <span><i style="background:var(--tc-output)"></i> Output</span>
@@ -685,7 +817,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <div class="li"><i style="background:var(--tc-output)"></i><span class="nm">output</span><span class="bar" style="width:38px;background:var(--tc-output)"></span></div>
       <div class="li"><i style="background:var(--tc-write)"></i><span class="nm">cache write</span><span class="bar" style="width:22px;background:var(--tc-write)"></span></div>
       <div class="tot"><span class="l">api-equivalent · 23 turns</span><span class="v">$11.71</span></div>
-      <div class="prov"><span class="k">how we know →</span> source turn re-read live from <code style="font-size:11px">~/.claude</code>, priced per token class against the pinned rate table; streaming duplicates dropped (keep-max).</div>
+      <div class="prov"><span class="k">how we know →</span> source turn re-read live from <code style="font-size:11px">~/.claude</code>, priced per token class against the pinned rate table; streaming duplicates dropped (keep-max). <em style="font-style:normal;color:var(--paper-ink-2)">Figures illustrative.</em></div>
     </div>
   </div>
 </section>
@@ -695,17 +827,17 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   <div class="wrap spine-inner">
     <nav class="spine-rail" aria-label="Capabilities">
       <a href="#receipt" data-spine="receipt"><span class="dotmark"></span>Receipt</a>
-      <a href="#arbitrage" data-spine="arbitrage"><span class="dotmark"></span>Arbitrage</a>
-      <a href="#cache" data-spine="cache"><span class="dotmark"></span>Cache</a>
-      <a href="#provenance" data-spine="provenance"><span class="dotmark"></span>Provenance</a>
+      <a href="#arbitrage" data-spine="arbitrage"><span class="dotmark"></span>Plan vs usage</a>
+      <a href="#cache" data-spine="cache"><span class="dotmark"></span>Cache savings</a>
+      <a href="#provenance" data-spine="provenance"><span class="dotmark"></span>Per-commit cost</a>
     </nav>
 
     <div class="spine-body">
       <!-- RECEIPT -->
       <article class="pillar2" id="receipt">
         <div class="ph">
-          <h3>Every number traces back to the turn that <em>spent it</em>.</h3>
-          <p class="lead">Drill from a day down to a single turn's token-by-token cost. Open any number and see what it's made of — re-read live from your local session log, never asserted from a cache.</p>
+          <h3>From a day's total down to a <em>single turn</em>.</h3>
+          <p class="lead">Drill from a day down to a single turn's token-by-token cost. Open any number to see what it's made of, re-read live from your local session log and never guessed from a cache.</p>
         </div>
         <div class="canvas art-receipt">
           <img class="art" src="art/receipt.jpg" alt="" aria-hidden="true" onerror="this.remove()" />
@@ -719,16 +851,17 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         </div>
         <div class="three-up">
           <div class="it"><h4>Open any number</h4><p>day → session → file → turn. Each <code>↵</code> goes one level deeper, down to the prompt.</p></div>
-          <div class="it"><h4>Token-by-token</h4><p>Input, output, cache-read, cache-write — priced separately, the way the API would bill it.</p></div>
-          <div class="it"><h4>Re-read live</h4><p>Evidence is pulled from your logs at view time, so the receipt is always the real thing.</p></div>
+          <div class="it"><h4>Token-by-token</h4><p>Input, output, cache-read, and cache-write, each priced separately, the way the API would bill it.</p></div>
+          <div class="it"><h4>Re-read live</h4><p>Evidence is pulled from your logs at view time, so the receipt is always live.</p></div>
         </div>
+        <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#how-it-works" target="_blank" rel="noopener">How the receipt is built <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
       </article>
 
       <!-- ARBITRAGE -->
       <article class="pillar2" id="arbitrage">
         <div class="ph">
           <h3>Is the seat <em>paying for itself</em>? Now you can prove it.</h3>
-          <p class="lead">Metered-equivalent cost sits right next to your plan's daily rate. The gap between them is your subscription arbitrage — are you under-using the seat, or squeezing 3× the value out of it?</p>
+          <p class="lead">What your usage would cost at metered API rates sits right next to what your plan charges per day. The gap between the two is your answer: are you under-using the seat, or squeezing 3× the value out of it?</p>
         </div>
         <div class="roi-line">
           <span class="api">$11.71</span>
@@ -746,10 +879,11 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           </div>
         </div>
         <div class="three-up">
-          <div class="it"><h4>Plan vs meter</h4><p>The flat seat is the lease; api-equivalent is the taxi fare. AiSpend shows the gap.</p></div>
-          <div class="it"><h4>Budget pace</h4><p>An optional monthly api-equivalent ceiling with a run-rate projection — informational, never enforced.</p></div>
-          <div class="it"><h4>Opus or Codex?</h4><p><code>report --by model</code> shows what each agent actually costs on real work, so you reach for the right one.</p></div>
+          <div class="it"><h4>Amortized lens</h4><p>Pick each agent's plan and start date once; AiSpend spreads the flat fee across your real usage, so the daily rate you compare against is honest.</p></div>
+          <div class="it"><h4>Budget pace</h4><p>An optional monthly api-equivalent ceiling that projects where you'll land. It's informational and never enforced.</p></div>
+          <div class="it"><h4>Opus or Codex?</h4><p><code>report --by model</code> shows what each agent costs on real work, so you reach for the right one.</p></div>
         </div>
+        <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#use-cases" target="_blank" rel="noopener">Plan-vs-usage &amp; the amortized lens <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
       </article>
 
       <!-- CACHE -->
@@ -764,22 +898,23 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           <div class="inner pad">
             <figure class="shotframe" style="margin:0">
               <div class="shotbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="ttl">aispend — receipt</span></div>
-              <img src="shots/receipt.jpg" width="1500" height="837" loading="lazy" alt="AiSpend session receipt: per-token-class split, cache arbitrage, and a cost-by-file heatmap" />
+              <img src="shots/receipt.jpg" width="1500" height="837" loading="lazy" alt="AiSpend session receipt: per-token-class split, cache savings, and a cost-by-file heatmap" />
             </figure>
           </div>
         </div>
         <div class="three-up">
-          <div class="it"><h4>5-min vs 1-hour</h4><p>Anthropic's two cache-write TTLs are priced distinctly (1.25× vs 2× input) — the subtle part, modeled right.</p></div>
-          <div class="it"><h4>Read vs miss</h4><p>Treat cache hit/miss as a filter: "show me only what I paid on cache misses." A FinOps question no other tool answers.</p></div>
+          <div class="it"><h4>Cache, per provider</h4><p>Anthropic's two cache-write tiers (1.25× vs 2× input) and Codex's cached-input discount are each priced their own way. The subtle part that's easy to get wrong.</p></div>
+          <div class="it"><h4>Read vs miss</h4><p>Treat cache hit/miss as a filter: "show me only what I paid on cache misses." A FinOps question you can finally answer.</p></div>
           <div class="it"><h4>Without cache ≈ $X</h4><p>The savings line spells out what caching kept off the bill, and the percent it covered.</p></div>
         </div>
+        <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend/blob/main/design-documents/05-llm-pricing.md" target="_blank" rel="noopener">How cache tiers are priced <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
       </article>
 
       <!-- PROVENANCE -->
       <article class="pillar2" id="provenance">
         <div class="ph">
           <h3>Tie every dollar to the commit that <em>shipped it</em>.</h3>
-          <p class="lead">Group spend by branch, commit, or file for cost per check-in — for a client invoice, a cost-per-feature readout, or just answering "was that refactor worth it?" Optionally write the number straight into your git history as trailers.</p>
+          <p class="lead">What did this feature actually cost? Group spend by branch, git commit, or file and the answer is one number. Use it for a client invoice, a cost-per-feature readout, or just to settle "was that refactor worth it?" You can also write the cost straight into your git history as a commit trailer.</p>
         </div>
         <div class="canvas art-provenance">
           <img class="art" src="art/provenance.jpg" alt="" aria-hidden="true" onerror="this.remove()" />
@@ -797,9 +932,90 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         <div class="three-up">
           <div class="it"><h4><code>--by branch</code></h4><p>Roll spend up to the branch, so a feature's true cost is one number.</p></div>
           <div class="it"><h4><code>--by commit</code></h4><p>1:1 with the work that shipped; reconciles back to the by-model total.</p></div>
-          <div class="it"><h4>Cost trailers</h4><p>Opt in to bake per-commit cost into git history — provenance that travels with the code.</p></div>
+          <div class="it"><h4>Cost trailers</h4><p>Opt in to bake each commit's cost into your git history, so the record travels with the code.</p></div>
         </div>
+        <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend/blob/main/design-documents/11-commit-cost-trailers.md" target="_blank" rel="noopener">Cost trailers, explained <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
       </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ HOW IT WORKS ============================ -->
+<section class="section how" id="how-it-works">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>From your local logs to an <em>explained dollar</em>.</h2>
+      <p>No keys, no upload, no setup. Just run it. AiSpend finds the session logs your agents already write, works out whether each came from Claude Code or Codex, and prices everything, leaving evidence you can open at every step.</p>
+    </div>
+    <ol class="how-steps">
+      <li class="how-step">
+        <span class="hs-num">1</span>
+        <h4>Read your local logs</h4>
+        <p>It parses the Claude Code and Codex session transcripts already on disk (<code>~/.claude</code>, <code>~/.codex</code>). No API keys, no account, nothing uploaded.</p>
+      </li>
+      <li class="how-step">
+        <span class="hs-num">2</span>
+        <h4>Price every turn, cache-aware</h4>
+        <p>Each turn is split by token class and priced at published API rates, including the 5-minute and 1-hour Anthropic cache tiers that are easy to get wrong.</p>
+      </li>
+      <li class="how-step">
+        <span class="hs-num">3</span>
+        <h4>Store an evidence ledger</h4>
+        <p>Every number is written to a local ledger under <code>~/.aispend</code> with its source: which parser read it, which rate priced it, which method produced it. Nothing is claimed without proof.</p>
+      </li>
+      <li class="how-step">
+        <span class="hs-num">4</span>
+        <h4>Drill, report, ship</h4>
+        <p>Drill a day down to a single turn, group spend by branch, commit, or file, or set a budget. You can even write the cost straight into your git history.</p>
+      </li>
+    </ol>
+    <div class="how-foot">
+      <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#how-it-works" target="_blank" rel="noopener">Read the full pipeline <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FIRST RUN ============================ -->
+<section class="section firstrun s-light" id="first-run">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Your first run</span>
+      <h2>Run it. <em>Read it.</em></h2>
+      <p>A bare <code>aispend</code> opens the interactive TUI with no config.</p>
+    </div>
+    <ol class="fr-steps">
+      <li class="fr-step">
+        <span class="n">1</span>
+        <h4>Run</h4>
+        <p>Type <code>aispend</code>. The interactive TUI opens, finds your logs, and starts.</p>
+      </li>
+      <li class="fr-step">
+        <span class="n">2</span>
+        <h4>Set up, if you want</h4>
+        <p>Press <kbd>b</kbd> to set a monthly budget and <kbd>p</kbd> to pick your plan. A budget adds pace tracking; a plan unlocks the amortized view.</p>
+      </li>
+      <li class="fr-step">
+        <span class="n">3</span>
+        <h4>Read</h4>
+        <p>Press <kbd>↵</kbd> to drill from a day into a session, a file, then a single turn. <kbd>esc</kbd> steps back out.</p>
+      </li>
+    </ol>
+    <div class="fr-panel">
+      <div class="fr-keys">
+        <div class="fr-cap">Keys worth knowing</div>
+        <div class="fr-krow"><span class="keys"><span class="kbd">←</span><span class="kbd">→</span></span><span class="kdesc"><b>Switch period.</b> Day, week, month, quarter, year.</span></div>
+        <div class="fr-krow"><span class="keys"><span class="kbd">v</span></span><span class="kdesc"><b>Switch cost view.</b> api-equivalent ⇄ amortized.</span></div>
+        <div class="fr-krow"><span class="keys"><span class="kbd">s</span></span><span class="kdesc"><b>Sync now.</b> It auto-syncs; the header shows "synced 2m ago".</span></div>
+      </div>
+      <div class="fr-views">
+        <div class="fr-cap">The two cost views</div>
+        <div class="fr-view"><span class="vt">api-equivalent</span><span class="vd">What your usage would cost at metered API rates.</span></div>
+        <div class="fr-view"><span class="vt">amortized</span><span class="vd">Your flat plan fee spread across that usage.</span></div>
+      </div>
+    </div>
+    <div class="fr-foot">
+      <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#commands--usage" target="_blank" rel="noopener">Full guide in the README <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
     </div>
   </div>
 </section>
@@ -811,8 +1027,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   </div>
   <div class="wrap offline-grid">
     <div>
-      <span class="eyebrow">Your data stays put</span>
-      <h2>Your code never leaves <em>your laptop</em>.</h2>
+      <span class="eyebrow">Private by default</span>
+      <h2>Your data never leaves <em>your laptop</em>.</h2>
       <p>No API keys, no credentials, and none of your session data leaves the machine. The only outbound request is a refresh of public model prices. It sends no user data, <code>doctor --network</code> discloses it, and the offline build removes even that.</p>
       <ul class="pts">
         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Reads local files only, and nothing is uploaded</li>
@@ -823,6 +1039,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         <div class="sr"><span class="sz">10 MB</span><span class="meter-bar"><i style="width:100%"></i></span><span>default build</span></div>
         <div class="sr"><span class="sz">4.5 MB</span><span class="meter-bar"><i style="width:45%"></i></span><span>offline build (net/* + TUI compiled out)</span></div>
       </div>
+      <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#prove-its-offline" target="_blank" rel="noopener">Prove it yourself <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
     </div>
     <div class="term" role="img" aria-label="Terminal showing aispend doctor --network output: no network-capable sink in import graph; result PASS — this binary cannot phone home.">
       <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="title">aispend doctor --network</span></div>
@@ -844,7 +1061,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     <div>
       <span class="eyebrow">Open source</span>
       <h2>Open by <em>default</em>.</h2>
-      <p class="lead">AiSpend is MIT-licensed, end to end. The pricing engine, the evidence ledger, the offline proof — all in the open. Inspect it, fork it, run it right where your code already lives.</p>
+      <p class="lead">AiSpend is MIT-licensed. The pricing engine, the evidence ledger, the offline proof: all in the open. Inspect it, fork it, and run it right where your code already lives.</p>
       <div class="oss-cta">
         <a class="btn btn-primary" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">Star on GitHub</a>
         <a class="btn btn-secondary" href="https://github.com/cloudyali/ai-agent-spend#readme" target="_blank" rel="noopener">Read the docs</a>
@@ -858,8 +1075,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       </div>
       <div class="oss-card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7 12 3 4 7v10l8 4 8-4V7z"/><path d="m4 7 8 4 8-4M12 11v10"/></svg></div>
-        <h4>One static binary</h4>
-        <p>Pure Go, vendored. No Node, no Python, no daemon, no database. Put it on your <code>PATH</code> and run.</p>
+        <h4>One binary, CLI &amp; TUI</h4>
+        <p>Pure Go, with no Node, no Python, and no database. A scriptable CLI and an interactive TUI explorer in one binary, on macOS, Linux, and Windows.</p>
       </div>
       <div class="oss-card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
@@ -869,7 +1086,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <div class="oss-card">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
         <h4>No account, no telemetry</h4>
-        <p>Reads local files only. Nothing is uploaded, ever — no sign-up, no API keys, no phone-home.</p>
+        <p>Reads local files only. Nothing is ever uploaded: no sign-up, no API keys, no phone-home.</p>
       </div>
     </div>
   </div>
@@ -880,8 +1097,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Install</span>
-      <h2>Pick whichever fits. Every path lands the <em>same binary</em>.</h2>
-      <p>Most people just run the one-liner and it's done in seconds. Every path lets you verify exactly what you ran.</p>
+      <h2>Install in <em>one command</em>.</h2>
+      <p>Done in seconds, with no multi-step setup and no config files scattered across your machine. Pick how you install it: Homebrew, an install script, or Go. They all land the exact same binary, and each lets you verify what you ran.</p>
     </div>
     <div class="install-card">
       <div class="tabs" role="tablist" aria-label="Install methods">
@@ -917,28 +1134,32 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     </div>
     <div class="faq-list">
       <div class="qa">
+        <button class="q" aria-expanded="false" aria-controls="qa0"><span>What is AiSpend?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <div class="panel" id="qa0"><p>AiSpend is a free, open-source CLI and TUI that tracks what your AI coding agents cost. It reads the session logs Claude Code and Codex already write, prices every turn at real API rates, and shows whether your flat subscription is paying off. One static Go binary, no API keys, offline by default.</p></div>
+      </div>
+      <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa1"><span>What does AiSpend read, and from where?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa1"><p>The session transcripts your agents already write to disk — <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>. It parses each turn, prices it per token class, and stores an evidence ledger under <code>~/.aispend</code>. No API keys, no credentials, no config required.</p></div>
+        <div class="panel" id="qa1"><p>The session transcripts your agents already write to disk, at <code>~/.claude/projects</code> and <code>~/.codex/sessions</code>. It parses each turn, prices it per token class, and stores an evidence ledger under <code>~/.aispend</code>. No API keys, no credentials, and no config required.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa2"><span>Does anything leave my machine?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa2"><p>No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current — it sends nothing about you. <code>aispend doctor --network</code> discloses it, and the <code>offline</code> build compiles every <code>net/*</code> import out entirely.</p></div>
+        <div class="panel" id="qa2"><p>No user data, ever. The only outbound request is an optional refresh of public model prices to keep rates current, and it sends nothing about you. <code>aispend doctor --network</code> discloses it, and the <code>offline</code> build compiles every <code>net/*</code> import out entirely.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa3"><span>Which agents are supported?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa3"><p>Claude Code and Codex today — the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize.</p></div>
+        <div class="panel" id="qa3"><p>Claude Code and Codex today, the two that write rich local session logs. Both are priced per token class with the prompt-cache tiers handled correctly. Other agents are on the roadmap as their local formats stabilize.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa4"><span>How accurate is it versus my real invoice?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa4"><p>AiSpend reports the <em>API-equivalent</em> cost of your work — what the same turns would have metered at published rates — next to your plan's daily cost. It reconciles closely with reference tools once windows are aligned; the small residual is a streaming-dedup decision, surfaced as a line in the receipt's evidence, not hidden.</p></div>
+        <div class="panel" id="qa4"><p>AiSpend reports the <em>API-equivalent</em> cost of your work, meaning what the same turns would have metered at published rates, next to your plan's daily cost. The numbers line up once the time windows match, and the small difference that's left comes from a streaming-dedup decision, shown as a line in the receipt's evidence rather than hidden away.</p></div>
       </div>
       <div class="qa">
-        <button class="q" aria-expanded="false" aria-controls="qa5"><span>Subscription or API — which does it price?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
+        <button class="q" aria-expanded="false" aria-controls="qa5"><span>Subscription or API: which does it price?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
         <div class="panel" id="qa5"><p>Both, side by side. You're on a flat plan, so AiSpend prices your actual usage at API rates and puts that next to the plan's daily cost. The gap is the whole point: it tells you whether the seat is under-used or paying for itself several times over.</p></div>
       </div>
       <div class="qa">
         <button class="q" aria-expanded="false" aria-controls="qa6"><span>Is it really free and open source?</span><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button>
-        <div class="panel" id="qa6"><p>Yes — MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, fork it if you like.</p></div>
+        <div class="panel" id="qa6"><p>Yes. MIT licensed, the whole thing, including the pricing table. One static Go binary, no account, no telemetry. Install it, read the source, and fork it if you like.</p></div>
       </div>
     </div>
   </div>
@@ -977,21 +1198,24 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           <img class="brand-logo" src="ai-spend-logo.png" width="737" height="165" alt="AiSpend" />
         </a>
         <p class="blurb">Local, explainable spend for AI coding agents. Prices every Claude Code &amp; Codex turn at real API rates. One static Go binary, offline by default.</p>
+        <a class="ft-cta" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener" aria-label="Star AiSpend on GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+          Star on GitHub
+        </a>
       </div>
       <div>
         <h4>Product</h4>
         <ul>
-          <li><a href="#receipt">The receipt</a></li>
-          <li><a href="#arbitrage">Arbitrage</a></li>
-          <li><a href="#cache">Cache pricing</a></li>
+          <li><a href="#how-it-works">How it works</a></li>
+          <li><a href="#first-run">Your first run</a></li>
           <li><a href="#offline">Offline proof</a></li>
           <li><a href="#install">Install</a></li>
         </ul>
       </div>
       <div>
-        <h4>Project</h4>
+        <h4>Open source</h4>
         <ul>
-          <li><a href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">GitHub repo</a></li>
           <li><a href="https://github.com/cloudyali/ai-agent-spend/releases" target="_blank" rel="noopener">Releases</a></li>
           <li><a href="https://github.com/cloudyali/ai-agent-spend/blob/main/LICENSE" target="_blank" rel="noopener">License (MIT)</a></li>
           <li><a href="https://github.com/cloudyali/ai-agent-spend/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a></li>
@@ -1002,6 +1226,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         <ul>
           <li><a href="https://github.com/cloudyali/ai-agent-spend#readme" target="_blank" rel="noopener">Documentation</a></li>
           <li><a href="https://github.com/cloudyali/ai-agent-spend/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
+          <li><a href="https://github.com/cloudyali/ai-agent-spend/issues" target="_blank" rel="noopener">Report an issue</a></li>
           <li><a href="https://cloudyali.io" target="_blank" rel="noopener">CloudYali</a></li>
         </ul>
       </div>
