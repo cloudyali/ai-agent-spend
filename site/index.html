@@ -275,11 +275,24 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .sources-inner b{font-family:var(--font-display);font-weight:560;color:var(--text)}
 .sources-inner .sep{width:5px;height:5px;border-radius:50%;background:var(--rose-500)}
 
-/* ===================== HIDDEN METER (big serif statement) ===================== */
-.meter{text-align:center}
-.meter .eyebrow{justify-content:center;margin-bottom:22px}
-.meter h2{font-size:clamp(28px,4.4vw,48px);font-weight:450;max-width:18ch;margin:0 auto 22px;line-height:1.1}
-.meter p{font-size:18.5px;color:var(--text-3);max-width:62ch;margin:0 auto}
+/* ===================== HIDDEN METER (statement + meter visual) ===================== */
+.meter-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:60px;align-items:center}
+.meter-grid>*{min-width:0}
+@media (max-width:860px){.meter-grid{grid-template-columns:1fr;gap:40px}}
+.meter .eyebrow{margin-bottom:20px}
+.meter h2{font-size:clamp(28px,4vw,44px);font-weight:480;margin-bottom:20px;line-height:1.1}
+.meter p{font-size:17px;max-width:56ch}
+.meter p+p{margin-top:14px}
+.meter-card{background:var(--paper-2);border:1px solid var(--paper-hair);border-radius:var(--r-lg);padding:30px 28px;box-shadow:0 30px 60px -34px rgba(10,10,15,.18)}
+.meter-card .mc-row{margin-bottom:24px}
+.meter-card .mc-cap{display:block;font-family:var(--font-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--paper-ink-2);margin-bottom:11px}
+.meter-card .mc-bar{height:30px;border-radius:8px;overflow:hidden;display:flex}
+.meter-card .mc-hidden{align-items:center;justify-content:center;border:1px dashed rgba(9,9,11,.22);background:repeating-linear-gradient(45deg,#fff,#fff 9px,#f1f1f3 9px,#f1f1f3 18px)}
+.meter-card .mc-hidden span{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-ink-2)}
+.meter-card .mc-real i{display:block;height:100%}
+.meter-card .mc-legend{display:flex;flex-wrap:wrap;gap:9px 16px;font-size:12.5px;color:var(--paper-ink-2);margin-top:2px}
+.meter-card .mc-legend span{display:inline-flex;align-items:center;gap:7px}
+.meter-card .mc-legend i{width:11px;height:11px;border-radius:3px;flex:none}
 @media (max-width:760px){.meter{padding:64px 0}}
 
 /* ===================== RECEIPT (cream paper) ===================== */
@@ -672,11 +685,34 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
 
 <!-- ============================ HIDDEN METER ============================ -->
 <section class="section meter s-light">
-  <div class="wrap">
-    <span class="eyebrow">The hidden meter</span>
-    <h2>Flat pricing is the hook. The bill underneath is still <em>tokens</em>.</h2>
-    <p>Coding agents bill a flat monthly subscription and never show you a per-token meter. But the real cost is still tokens: input, output, and cache reads and writes. Price your actual usage at published API rates and the number is usually nowhere near what you pay, and most setups can't even measure the gap. AiSpend is that meter.</p>
-    <p style="margin-top:14px">Flat per-seat pricing is the early-adopter deal, not where this ends. As coding agents move to usage-based billing, the teams who already know their true token cost are the ones who won't be blindsided by the first metered invoice.</p>
+  <div class="wrap meter-grid">
+    <div class="meter-copy">
+      <span class="eyebrow">The hidden meter</span>
+      <h2>Flat pricing is the hook. The bill underneath is still <em>tokens</em>.</h2>
+      <p>Coding agents bill a flat monthly subscription and never show you a per-token meter. But the real cost is still tokens: input, output, and cache reads and writes. Price your actual usage at published API rates and the number is usually nowhere near what you pay, and most setups can't even measure the gap. AiSpend is that meter.</p>
+      <p>Flat per-seat pricing is the early-adopter deal, not where this ends. As coding agents move to usage-based billing, the teams who already know their true token cost are the ones who won't be blindsided by the first metered invoice.</p>
+    </div>
+    <figure class="meter-card" role="img" aria-label="Your flat plan shows a hidden meter; the real spend is a bar split across token classes, with cache reads the largest share.">
+      <div class="mc-row">
+        <span class="mc-cap">What your plan shows you</span>
+        <div class="mc-bar mc-hidden"><span>meter hidden</span></div>
+      </div>
+      <div class="mc-row">
+        <span class="mc-cap">What you actually spend</span>
+        <div class="mc-bar mc-real">
+          <i style="width:62%;background:var(--tc-read)"></i>
+          <i style="width:18%;background:var(--tc-input)"></i>
+          <i style="width:12%;background:var(--tc-output)"></i>
+          <i style="width:8%;background:var(--tc-write)"></i>
+        </div>
+      </div>
+      <div class="mc-legend">
+        <span><i style="background:var(--tc-read)"></i>cache read</span>
+        <span><i style="background:var(--tc-input)"></i>input</span>
+        <span><i style="background:var(--tc-output)"></i>output</span>
+        <span><i style="background:var(--tc-write)"></i>cache write</span>
+      </div>
+    </figure>
   </div>
 </section>
 
