@@ -384,6 +384,37 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 @media (max-width:880px){.how-steps{grid-template-columns:1fr 1fr}}
 @media (max-width:520px){.how-steps{grid-template-columns:1fr}}
 
+/* ===================== FIRST RUN (getting started) ===================== */
+.firstrun.s-light{background:var(--paper-2)}
+.firstrun .section-head{text-align:center;margin-left:auto;margin-right:auto}
+.firstrun .section-head .eyebrow{justify-content:center}
+.fr-steps{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
+.fr-steps>*{min-width:0}
+@media (max-width:760px){.fr-steps{grid-template-columns:1fr}}
+.fr-step{background:#fff;border:1px solid var(--paper-hair);border-radius:var(--r-md);padding:24px 22px;box-shadow:0 18px 40px -30px rgba(10,10,15,.20)}
+.fr-step .n{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--paper-2);border:1px solid var(--paper-hair);font-family:var(--font-mono);font-weight:600;font-size:14px;color:var(--paper-ink);margin-bottom:14px}
+.fr-step h4{font-family:var(--font-body);font-size:16px;font-weight:700;color:var(--paper-ink);margin-bottom:7px}
+.fr-step p{font-size:14.5px;color:var(--paper-ink-2);line-height:1.6}
+.firstrun code,.firstrun kbd{font-family:var(--font-mono);font-size:12.5px;background:var(--paper-2);border:1px solid var(--paper-hair);border-radius:5px;padding:1px 6px;color:var(--paper-ink)}
+.fr-panel{display:grid;grid-template-columns:1.08fr .92fr;background:#fff;border:1px solid var(--paper-hair);border-radius:var(--r-md);overflow:hidden;box-shadow:0 18px 40px -30px rgba(10,10,15,.20)}
+.fr-panel>*{min-width:0}
+@media (max-width:760px){.fr-panel{grid-template-columns:1fr}}
+.fr-keys{padding:26px 26px;border-right:1px solid var(--paper-hair)}
+@media (max-width:760px){.fr-keys{border-right:0;border-bottom:1px solid var(--paper-hair)}}
+.fr-cap{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--paper-ink-2);margin-bottom:16px}
+.fr-krow{display:flex;align-items:flex-start;gap:13px;margin-bottom:15px}
+.fr-krow:last-child{margin-bottom:0}
+.fr-krow .keys{display:flex;gap:5px;flex:none;padding-top:1px}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;padding:0 8px;border:1px solid var(--paper-hair);border-bottom-width:2px;border-radius:6px;background:var(--paper-2);font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--paper-ink)}
+.fr-krow .kdesc{font-size:14px;color:var(--paper-ink-2);line-height:1.5}
+.fr-krow .kdesc b{color:var(--paper-ink);font-weight:600}
+.fr-views{padding:26px 26px;background:var(--paper-2)}
+.fr-view{margin-bottom:14px}
+.fr-view:last-child{margin-bottom:0}
+.fr-view .vt{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--paper-ink);display:block;margin-bottom:3px}
+.fr-view .vd{font-size:13.5px;color:var(--paper-ink-2);line-height:1.55}
+.fr-foot{display:flex;justify-content:center;margin-top:26px}
+
 /* ===================== OFFLINE (deepest void) ===================== */
 .offline{position:relative;background:var(--plum-1100);color:var(--text);overflow:hidden}
 .offline::before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(8,8,10,.66) 0%,rgba(8,8,10,.46) 36%,rgba(8,8,10,.18) 56%,transparent 74%)}
@@ -896,6 +927,50 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
   </div>
 </section>
 
+<!-- ============================ FIRST RUN ============================ -->
+<section class="section firstrun s-light" id="first-run">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Your first run</span>
+      <h2>Run it. <em>Read it.</em></h2>
+      <p>A bare <code>aispend</code> opens the interactive TUI with no config. Here's the 60-second version.</p>
+    </div>
+    <ol class="fr-steps">
+      <li class="fr-step">
+        <span class="n">1</span>
+        <h4>Run</h4>
+        <p>Type <code>aispend</code>. The interactive TUI opens, finds your logs, and starts. Nothing to configure.</p>
+      </li>
+      <li class="fr-step">
+        <span class="n">2</span>
+        <h4>Set up, if you want</h4>
+        <p>Press <kbd>b</kbd> to set a monthly budget and <kbd>p</kbd> to pick your plan. A budget adds pace tracking; a plan unlocks the amortized view.</p>
+      </li>
+      <li class="fr-step">
+        <span class="n">3</span>
+        <h4>Read</h4>
+        <p>Press <kbd>↵</kbd> to drill from a day into a session, a file, then a single turn. <kbd>esc</kbd> steps back out.</p>
+      </li>
+    </ol>
+    <div class="fr-panel">
+      <div class="fr-keys">
+        <div class="fr-cap">Keys worth knowing</div>
+        <div class="fr-krow"><span class="keys"><span class="kbd">←</span><span class="kbd">→</span></span><span class="kdesc"><b>Switch period.</b> Day, week, month, quarter, year.</span></div>
+        <div class="fr-krow"><span class="keys"><span class="kbd">v</span></span><span class="kdesc"><b>Switch cost view.</b> api-equivalent ⇄ amortized.</span></div>
+        <div class="fr-krow"><span class="keys"><span class="kbd">s</span></span><span class="kdesc"><b>Sync now.</b> It auto-syncs anyway; the header shows "synced 2m ago".</span></div>
+      </div>
+      <div class="fr-views">
+        <div class="fr-cap">The two cost views</div>
+        <div class="fr-view"><span class="vt">api-equivalent</span><span class="vd">What your usage would cost at metered API rates.</span></div>
+        <div class="fr-view"><span class="vt">amortized</span><span class="vd">Your flat plan fee spread across that usage.</span></div>
+      </div>
+    </div>
+    <div class="fr-foot">
+      <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend#commands--usage" target="_blank" rel="noopener">Full guide in the README <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ OFFLINE ============================ -->
 <section class="section offline" id="offline">
   <div class="canvas art-offline" style="position:absolute;inset:0;border-radius:0">
@@ -1078,6 +1153,7 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
           <li><a href="#arbitrage">Plan vs usage</a></li>
           <li><a href="#cache">Cache pricing</a></li>
           <li><a href="#how-it-works">How it works</a></li>
+          <li><a href="#first-run">Your first run</a></li>
           <li><a href="#offline">Offline proof</a></li>
           <li><a href="#install">Install</a></li>
         </ul>
