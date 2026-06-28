@@ -156,7 +156,7 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .gh-stars:hover .lbl{background:var(--plum-700)}
 .gh-stars svg{width:17px;height:17px}
 .gh-stars .cnt{display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border-left:1px solid var(--hair);background:var(--plum-900);color:var(--text-2);font-variant-numeric:tabular-nums;min-width:30px}
-.nav-links{display:flex;align-items:center;gap:22px}
+.nav-links{display:flex;align-items:center;gap:28px}
 .nav-links a{font-size:15px;color:var(--text-2);font-weight:500;transition:.15s}
 .nav-links a:hover{color:var(--rose-400)}
 .nav-cta{display:flex;align-items:center;gap:12px}
@@ -178,7 +178,7 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .mobile-menu .mm-cta .btn,.mobile-menu .mm-cta .gh-pill{width:100%;justify-content:center}
 .mobile-menu.open{display:block;animation:menuIn .18s ease}
 @keyframes menuIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-@media (max-width:1024px){.nav-links,.nav-cta .gh-stars,.nav-cta .btn-primary{display:none}.nav-toggle{display:inline-flex}}
+@media (max-width:980px){.nav-links,.nav-cta .gh-stars,.nav-cta .btn-primary{display:none}.nav-toggle{display:inline-flex}}
 
 /* ===================== ART CANVAS (data-landscape) ===================== */
 /* A painterly placeholder gradient; a dropped-in <img> overlays it 1:1.
@@ -577,13 +577,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <img class="brand-logo" src="ai-spend-logo.png" width="737" height="165" alt="AiSpend" />
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#receipt">Receipt</a>
-      <a href="#arbitrage">Plan vs usage</a>
-      <a href="#cache">Cache</a>
       <a href="#how-it-works">How it works</a>
-      <a href="#offline">Offline</a>
       <a href="#open-source">Open source</a>
-      <a href="#install">Install</a>
     </nav>
     <div class="nav-cta">
       <a class="gh-stars" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener" aria-label="Star AiSpend on GitHub">
@@ -598,13 +593,8 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
     </div>
   </div>
   <div class="mobile-menu" id="mobile-menu">
-    <a class="ml" href="#receipt">Receipt</a>
-    <a class="ml" href="#arbitrage">Plan vs usage</a>
-    <a class="ml" href="#cache">Cache</a>
     <a class="ml" href="#how-it-works">How it works</a>
-    <a class="ml" href="#offline">Offline</a>
     <a class="ml" href="#open-source">Open source</a>
-    <a class="ml" href="#install">Install</a>
     <div class="mm-cta">
       <a class="gh-pill" href="https://github.com/cloudyali/ai-agent-spend" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
