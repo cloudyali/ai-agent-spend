@@ -640,8 +640,6 @@ Two implementation details drive that:
 - **Keep-max dedup.** Claude Code emits streaming placeholder turns with tiny token counts that later resolve to the real totals. `aispend` dedupes on `(message.id, requestId)` and keeps the maximum, so a streamed turn is counted once at its true size — no double-count, no placeholder undercount.
 - **Reported cost is preserved.** When the agent wrote its own `costUSD`, the `reported` view surfaces it verbatim, so you can compare the agent's own number to the token-priced one side by side.
 
-The honest summary: the numbers reconcile to within a few percent of the providers' published rates, and wherever a number looks off, `aispend` will _show you the turn_ so you can decide for yourself. That's the whole point.
-
 > **Pre-release note:** rates are public list prices captured for June 2026 and are meant to be verified against the live price lists before you rely on them for anything billable. `aispend pricing refresh` overlays current LiteLLM rates.
 
 ---
