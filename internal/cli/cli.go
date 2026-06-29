@@ -49,7 +49,7 @@ var Version = "0.1.0-dev"
 // no network call.
 const (
 	Website = "https://aispend.cloudyali.io/"
-	Issues  = "https://github.com/agentspend/ai-agent-spend/issues"
+	Issues  = "https://github.com/cloudyali/ai-agent-spend/issues"
 )
 
 // App holds resolved dependencies; constructed from the environment, overridable
