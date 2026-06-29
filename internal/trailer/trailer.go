@@ -6,7 +6,7 @@
 // It is the engine the installed git hooks call (`aispend trailer` / `consume`);
 // the hooks themselves are fail-open, so any error here logs and the commit still
 // succeeds. Pure-local: no network — the offline build and `doctor --network`
-// promise are unaffected. See design-documents/11-commit-cost-trailers.md.
+// promise are unaffected. See design-documents/DESIGN.md.
 package trailer
 
 import (
@@ -74,7 +74,7 @@ func modeForSource(source string) (Mode, bool) {
 
 // oneLine strips CR/LF so a crafted value (e.g. a model name from the logs, or a
 // renamed trailer key) can't inject an extra line — or a forged trailer — into the
-// commit message. Per design-documents/11-commit-cost-trailers.md (sanitize the write).
+// commit message. Per design-documents/DESIGN.md (sanitize the write).
 func oneLine(s string) string {
 	return strings.NewReplacer("\r", "", "\n", "").Replace(s)
 }

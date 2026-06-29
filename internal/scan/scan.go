@@ -3,7 +3,7 @@
 // It is the seam the `aispend scan` command drives. Re-scanning is safe because
 // EventIDs are stable, so the idempotent Upsert collapses any re-read.
 //
-// See design-documents/phase-0A-trusted-explainable-ledger.md §Commands.
+// See design-documents/DESIGN.md
 package scan
 
 import (

@@ -4,7 +4,7 @@
 // current machine rather than hardcoding a path. The Resolver's inputs (GOOS,
 // home, env) are injectable, which makes per-OS logic unit-testable from any host.
 //
-// See design-documents/04-platform-and-paths.md.
+// See design-documents/DESIGN.md.
 package platform
 
 import (

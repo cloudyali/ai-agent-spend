@@ -13,7 +13,7 @@ import (
 
 // Trailers is the [trailers] config from a repo's .aispend.toml — which commit
 // cost-trailers attach and how they render. See
-// design-documents/11-commit-cost-trailers.md.
+// design-documents/DESIGN.md.
 type Trailers struct {
 	Enabled      bool   // repo-wide gate; false suppresses trailers even with hooks installed
 	Cost         bool   // AI-Cost line

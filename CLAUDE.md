@@ -6,9 +6,9 @@ provably offline (`aispend doctor --network`). Go + stdlib `flag` (no cobra).
 
 ## Design docs
 
-Full design record in `design-documents/` — start at `00-index.md`. For surface /
-UX work, read the concept captures on demand: `design-documents/07-ui-concept.md`
-(web) and `design-documents/08-cli-tui-concept.md` (CLI/TUI).
+Full design record in `design-documents/DESIGN.md` — the consolidated design
+document (functionality, architecture, module diagram, per-module design, and the
+data model).
 
 ## Build & test
 
@@ -129,7 +129,7 @@ or persistently with `scan_on_launch = false` in `~/.aispend/config.toml`. `aisp
 remains the explicit import. Shared seam: `App.scanOnLaunch` → `App.incrementalScan` (also
 the trailer hook's live refresh); offline-safe (local files only, no `net/*`). The opt-in
 session-end **hook** (the "milestone" trigger) is still pending — see
-`design-documents/12-surfaces-ingestion-roadmap.md` Item 7.
+`design-documents/DESIGN.md` Item 7.
 
 **Background daemon.** `aispend daemon` keeps the ledger current without any read
 command: a `time.Ticker` loop (`daemonLoop`/`App.runDaemon`) that scans once
@@ -152,7 +152,7 @@ degrade to plain ASCII off a TTY, under `NO_COLOR`, or with `TERM=dumb`, and nev
 bleed an escape code into a pipe. `today` + the TUI receipt share the web
 color language (cache-read blue, cache-write amber, output teal, input purple) and
 the `pricing.WithoutCache` primitive for the `without cache ≈ $X · saved Y%` line.
-The interactive TUI (`tui`/`watch`) stays deferred — see `08-cli-tui-concept.md`.
+The interactive TUI (`tui`/`watch`) stays deferred — see `design-documents/DESIGN.md`.
 
 Pricing is **offline-first**: `scan`/`report` price against a fresh
 (≤24h) LiteLLM cache at `~/.aispend/pricing/litellm.json` when present, else the
@@ -190,12 +190,12 @@ on this: `--by branch`, `--by commit` (1:1, reconcile to the by-model total), an
 file rows still sum to the total; fileless turns bucket as `(no files)`). The session
 receipt adds a `branch · SHA` line and a per-file **cost+churn heatmap** (cost-shaded
 bar + `+adds/-dels`), each row a real file that drills to evidence — not a vanity grid
-(09-session-view.md reverses the earlier streak-heatmap cut on those grounds).
+(design-documents/DESIGN.md reverses the earlier streak-heatmap cut on those grounds).
 
 ## Cache pricing (the subtle part)
 
 Costs are dominated by cache on high-cache-hit workloads, so the cache rates matter
-most. See `design-documents/05-llm-pricing.md`.
+most. See `design-documents/DESIGN.md`.
 
 - **Anthropic**: two cache-write TTLs — 5-minute (default) = **1.25× input**, 1-hour
   (extended) = **2× input**; cache-read = **0.10× input**. TTL refreshes on each read.
@@ -209,6 +209,5 @@ most. See `design-documents/05-llm-pricing.md`.
 - **Gemini** (not yet ingested): billed by cache *storage time* (per-token-hour),
   a different cost dimension — needs its own model when added.
 
-Reference tool for reconciliation: **CodeBurn** (TypeScript) splits the same TTL tiers
-(`calculateCost`, `ONE_HOUR_CACHE_WRITE_MULTIPLIER_FROM_FIVE_MINUTE_RATE = 1.6`, i.e.
-1.25 × 1.6 = 2.0× input) and pulls live rates from LiteLLM.
+The 1-hour cache-write tier is derived in code as 1.25 × 1.6 = 2.0× input (not a
+table column); live rates come from the LiteLLM price table.

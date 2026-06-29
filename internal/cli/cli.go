@@ -5,7 +5,7 @@
 //
 // Built on the standard library `flag` package (not cobra) to keep the binary a
 // pure-Go, dependency-free static artifact. See
-// design-documents/phase-0A-trusted-explainable-ledger.md §Commands.
+// design-documents/DESIGN.md
 package cli
 
 import (
@@ -49,7 +49,7 @@ var Version = "0.1.0-dev"
 // no network call.
 const (
 	Website = "https://aispend.cloudyali.io/"
-	Issues  = "https://github.com/agentspend/ai-agent-spend/issues"
+	Issues  = "https://github.com/cloudyali/ai-agent-spend/issues"
 )
 
 // App holds resolved dependencies; constructed from the environment, overridable
@@ -730,7 +730,7 @@ func (a *App) applyPricingTable(cache string, data []byte) (models, repriced int
 // lifting (core.hooksPath, refuse-to-clobber, manager detection) lives in
 // internal/githook; this stays a thin dispatch. The hooks themselves are fail-open
 // so a trailer problem never blocks a commit. See
-// design-documents/11-commit-cost-trailers.md.
+// design-documents/DESIGN.md.
 func (a *App) cmdGit(args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(a.Err, "aispend: git <install|uninstall|status> [dir]")

@@ -6,7 +6,7 @@
 // confidence) and estimated — and records full pricing provenance. Plan-aware
 // lenses that need period aggregation (amortized, marginal) are
 // computed at the aggregation step, not per event; the engine notes them as
-// known-missing here. See design-documents/phase-0A-trusted-explainable-ledger.md.
+// known-missing here. See design-documents/DESIGN.md.
 package pricing
 
 import (
@@ -75,8 +75,8 @@ func (e *Engine) Price(ev *event.AgentEvent, plan Plan) error {
 	ev.Evidence.Currency = e.t.Currency
 
 	// A cost the tool wrote to disk (Reported) is authoritative: prefer it over the
-	// computed number (ccusage's "Auto" = reported-else-computed), while still
-	// computing api-equivalent below for comparison when the model is known.
+	// computed number (reported-else-computed), while still computing
+	// api-equivalent below for comparison when the model is known.
 	reported := ev.CostViews.Reported != nil && ev.CostViews.Reported.Micros > 0
 
 	r, known := e.t.Models[ev.Model]

@@ -4,7 +4,7 @@ argument-hint: "[optional: a git ref to diff against, e.g. main — defaults to 
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(go vet:*), Bash(go test:*), Bash(gofmt:*), Read, Grep, Glob
 ---
 
-You are performing the **code-review gate** from `design-documents/03-engineering-process.md` §3.
+You are performing the **code-review gate** described in `docs/review-automation.md`.
 It must be clean (or carry a logged, accepted exception) before a change is "done".
 
 If the `technical-code-reviewing` skill is available in this session, use it — it is
