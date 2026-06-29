@@ -64,8 +64,8 @@ func canonicalizeModelID(id string) string {
 }
 
 // LiteLLM (github.com/BerriAI/litellm) publishes a community-maintained price
-// table — model_prices_and_context_window.json — as the live rate source CodeBurn
-// reconciles against. We parse the subset we price on and convert its per-token
+// table — model_prices_and_context_window.json — which aispend uses as its live
+// rate source. We parse the subset we price on and convert its per-token
 // USD costs into our micro-USD-per-1M-token rates, then overlay it on the embedded
 // table so unknown models still fall back to a shipped floor.
 

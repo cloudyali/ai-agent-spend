@@ -119,8 +119,9 @@ The design record is unusually complete and is the fastest way to understand why
 thing is the way it is. Start here:
 
 - [`CLAUDE.md`](CLAUDE.md) — working notes and the conventions in one page.
-- [`design-documents/00-index.md`](design-documents/00-index.md) — the full design
-  record. Pricing lives in `05-llm-pricing.md`; the data model in `02-data-model.md`.
+- [`design-documents/DESIGN.md`](design-documents/DESIGN.md) — the full design
+  record: functionality, architecture, the module diagram, per-module design, and
+  the data model (including pricing).
 
 ## Reporting bugs & proposing features
 

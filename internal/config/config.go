@@ -4,8 +4,8 @@
 // itself rather than pulling a full TOML library. Credentials are never read or
 // written here and never logged.
 //
-// See design-documents/02-data-model.md §5 and
-// design-documents/phase-0A-trusted-explainable-ledger.md §Attribution.
+// See design-documents/DESIGN.md and
+// design-documents/DESIGN.md
 package config
 
 import (

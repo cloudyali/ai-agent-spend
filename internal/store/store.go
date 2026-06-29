@@ -4,8 +4,8 @@
 // the SAME interface and the SAME contract test suite, so nothing above this package
 // knows which implementation it holds.
 //
-// See design-documents/02-data-model.md (storage) and
-// design-documents/phase-0A-trusted-explainable-ledger.md (interfaces).
+// See design-documents/DESIGN.md (storage) and
+// design-documents/DESIGN.md (interfaces).
 package store
 
 import (

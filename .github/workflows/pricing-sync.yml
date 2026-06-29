@@ -4,7 +4,7 @@ name: pricing-sync
 # aispendllm.cloudyali.io. The validation gate in cmd/pricing-sync is the circuit
 # breaker: if upstream ships a broken/thin table, the job FAILS and nothing is
 # published, so the last-good table keeps serving. A failed run shows in the Actions
-# tab (and emails the actor). See design-documents/05-llm-pricing.md.
+# tab (and emails the actor). See design-documents/DESIGN.md.
 
 on:
   schedule:

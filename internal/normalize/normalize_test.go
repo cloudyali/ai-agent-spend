@@ -165,7 +165,7 @@ func TestNormalize_AttributeStampsProjectAndCostTag(t *testing.T) {
 
 // TestNormalize_CapturesReportedCostUSD: when Claude Code writes a costUSD on the
 // line, we capture it as the Reported cost view (USD micros). This is the
-// reported-else-computed (ccusage "Auto") path's input.
+// reported-else-computed path's input.
 func TestNormalize_CapturesReportedCostUSD(t *testing.T) {
 	n := ClaudeCode{GOOS: "linux"}
 	raw := `{"type":"assistant","uuid":"a1","sessionId":"s","requestId":"r1","timestamp":"2026-06-14T10:00:05Z","costUSD":0.4325,"message":{"id":"m1","model":"claude-opus-4","content":[],"usage":{"input_tokens":12400,"output_tokens":3100}}}`

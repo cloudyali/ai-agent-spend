@@ -6,7 +6,7 @@
 // number opens to its source); a quota Sample is a reading lifted verbatim from a
 // provider's local logs/cache and is never priced, never summed into a cost. It is
 // rendered as its own gauge, always with its as-of, and degrades to "unknown" rather
-// than guessing. See design-documents/10-session-explorer-budgets-quota.md.
+// than guessing. See design-documents/DESIGN.md.
 //
 // Offline by design: parsing reads bytes we already opened during scan — no net/*.
 package quota

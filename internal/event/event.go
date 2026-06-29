@@ -2,7 +2,7 @@
 // versioned schema, and Money (integer micro-units, never a float). Nothing in
 // aispend reads a raw file directly — it reads AgentEvent.
 //
-// See design-documents/02-data-model.md. A change here is a versioned-contract
+// See design-documents/DESIGN.md. A change here is a versioned-contract
 // change: bump SchemaVersion and update the golden fixtures in the same change-set.
 package event
 
@@ -37,7 +37,7 @@ type AgentEvent struct {
 	// durable, stored as-is. GitSHA is the commit that was HEAD at the turn's
 	// timestamp, reconstructed best-effort at scan time from the repo's reflog (the
 	// log itself carries no SHA) — empty when unresolvable. Both are additive and do
-	// not bump SchemaVersion. See design-documents/02-data-model.md §1.
+	// not bump SchemaVersion. See design-documents/DESIGN.md
 	GitBranch  string    `json:"git_branch,omitempty"`
 	GitSHA     string    `json:"git_sha,omitempty"`
 	CostTag    string    `json:"cost_tag,omitempty"`
@@ -114,7 +114,7 @@ func (m Money) String() string {
 }
 
 // CostViews models spend through several lenses. A nil pointer means "not
-// computable from available evidence" — never zero. See design-documents/02-data-model.md.
+// computable from available evidence" — never zero. See design-documents/DESIGN.md.
 type CostViews struct {
 	Reported      *Money `json:"reported,omitempty"` // a cost the tool itself wrote to disk (e.g. Claude costUSD, OpenCode/Pi cost) — present & >0 only
 	Amortized     *Money `json:"amortized,omitempty"`

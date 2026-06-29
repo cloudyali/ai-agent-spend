@@ -2,7 +2,7 @@
 // event.AgentEvent with source provenance filled in. Pricing is applied
 // separately by internal/pricing, so a re-price never requires a re-read.
 //
-// See design-documents/phase-0A-trusted-explainable-ledger.md §Normalization.
+// See design-documents/DESIGN.md
 package normalize
 
 import (
@@ -203,8 +203,8 @@ func (n ClaudeCode) Normalize(rec provider.RawRecord) (event.AgentEvent, error) 
 	}
 
 	// A cost the tool itself wrote to disk is captured as the Reported view (the
-	// pricing engine then prefers it — ccusage's "Auto"). Only when present and
-	// positive: a nil/zero costUSD must never become a misleading $0.
+	// pricing engine then prefers it — reported-else-computed). Only when present
+	// and positive: a nil/zero costUSD must never become a misleading $0.
 	if line.CostUSD != nil && *line.CostUSD > 0 {
 		ev.CostViews.Reported = &event.Money{
 			Micros:   int64(math.Round(*line.CostUSD * 1e6)),
@@ -229,7 +229,7 @@ func canonicalModel(m string) string { return dateSuffix.ReplaceAllString(m, "")
 // from Claude's two representations: the legacy flat cache_creation_input_tokens
 // and the per-TTL split (ephemeral_5m + ephemeral_1h). A valid record reports the
 // two as equal; we keep the larger so a partial split never drops tokens, and
-// clamp the 1-hour count to the total. Mirrors CodeBurn's extractClaudeCacheCreation.
+// clamp the 1-hour count to the total.
 func cacheCreation(legacy, fiveMin, oneHour int64) (total, oneHourTotal int64) {
 	total = legacy
 	if split := fiveMin + oneHour; split > 0 {
@@ -382,8 +382,8 @@ func (ClaudeCode) Dedupe(events []event.AgentEvent) []event.AgentEvent {
 	return out
 }
 
-// tokenTotal is the keep-max yardstick: the same sum ccusage uses to pick the
-// winning entry (fresh input + output + cache read + cache write).
+// tokenTotal is the keep-max yardstick: the sum used to pick the winning entry
+// (fresh input + output + cache read + cache write).
 func tokenTotal(t event.Tokens) int64 {
 	return t.Input + t.Output + t.CacheRead + t.CacheWrite
 }

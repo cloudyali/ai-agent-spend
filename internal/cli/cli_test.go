@@ -426,7 +426,7 @@ func TestRenderReport(t *testing.T) {
 // A full window whose events simply have no cost in the REQUESTED view (e.g.
 // `--view reported` when no tool-written cost was captured) must say so — not
 // claim the window is empty and tell the user to widen it. This is the exact
-// confusion the CodeBurn comparison surfaced: 5,197 events present, `reported`
+// confusion a cross-tool reconciliation surfaced: 5,197 events present, `reported`
 // view empty, yet aispend said "no events … widen with --period all".
 func TestRenderReport_ViewEmptyButWindowHasEvents(t *testing.T) {
 	var buf bytes.Buffer
@@ -571,7 +571,7 @@ func TestRenderAllocated(t *testing.T) {
 }
 
 // report --by session: a new grouping dimension over event.SessionID. The
-// acceptance bar (09-session-view.md) is reconciliation — the by-session total
+// acceptance bar (design-documents/DESIGN.md) is reconciliation — the by-session total
 // must equal the by-model total for the same events, no double-count, no drop —
 // plus an honest "(no session)" bucket and a short, copy-pasteable id in the table.
 func TestReport_BySession(t *testing.T) {
@@ -682,7 +682,7 @@ func TestShortSHA(t *testing.T) {
 
 // `today` is the arbitrage-first daily glance (the founder's primary view): the
 // api-equivalent total, the plan $/day + ROI, the cache-savings headline, the
-// turns/sessions/top-model strip, and an hourly spike bar (09-session-view.md).
+// turns/sessions/top-model strip, and an hourly spike bar (design-documents/DESIGN.md).
 func TestRenderToday_ArbitrageFirst(t *testing.T) {
 	defer func(l *time.Location) { time.Local = l }(time.Local)
 	time.Local = time.UTC // pin: the hourly bar is now local-tz, so make it deterministic
@@ -799,7 +799,7 @@ func TestRenderToday_UncoveredProviderNoted(t *testing.T) {
 
 // `aispend top` is the bridge from "my spend is high" to "explain why": the
 // priciest turns (default) or sessions in a window, each printed with its id so
-// the next step is a copy-paste `explain` (08-cli-tui-concept.md).
+// the next step is a copy-paste `explain` (design-documents/DESIGN.md).
 func TestRenderTop_Turns(t *testing.T) {
 	big := event.USD(5_000_000)
 	mid := event.USD(1_000_000)
