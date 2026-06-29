@@ -405,7 +405,7 @@ func (m Model) WithWatch(interval time.Duration, nowFn func() time.Time, reload 
 // repaints — no re-scan, no store I/O — so relative ages (the "synced …" freshness stamp) grow
 // and "live" badges decay between the costly reload ticks. nowFn (from WithWatch) supplies the
 // clock; a zero interval disables it. Kept separate from the reload tick so the log re-scan stays
-// gentle (the 15m sync cadence) while the on-screen age stays live. No-op without nowFn.
+// gentle (the 5m sync cadence) while the on-screen age stays live. No-op without nowFn.
 func (m Model) WithClockTick(interval time.Duration) Model {
 	m.clockInt = interval
 	return m

@@ -38,11 +38,11 @@ func TestLastSyncTime(t *testing.T) {
 }
 
 // The in-process sync is ON by default: without --watch the explorer still re-scans on
-// the daemon cadence (15m); --watch opts into the 3s live tick.
+// the daemon cadence (5m); --watch opts into the 3s live tick.
 func TestTuiSyncInterval(t *testing.T) {
 	a := appWithHome(t.TempDir(), &strings.Builder{}, time.Now())
 	if d := a.tuiSyncInterval(false); d != config.DefaultScanInterval {
-		t.Errorf("default (no --watch) should sync on the 15m daemon cadence, got %s", d)
+		t.Errorf("default (no --watch) should sync on the 5m daemon cadence, got %s", d)
 	}
 	if d := a.tuiSyncInterval(true); d != 3*time.Second {
 		t.Errorf("--watch should use the 3s live cadence, got %s", d)

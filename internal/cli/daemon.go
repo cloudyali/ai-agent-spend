@@ -31,7 +31,7 @@ import (
 func (a *App) cmdDaemon(args []string) int {
 	fs := flag.NewFlagSet("daemon", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
-	interval := fs.Duration("interval", 0, "scan cadence, e.g. 15m or 1h (default: scan_interval in config.toml, else 15m)")
+	interval := fs.Duration("interval", 0, "scan cadence, e.g. 15m or 1h (default: scan_interval in config.toml, else 5m)")
 	once := fs.Bool("once", false, "run a single scan cycle and exit (for cron/launchd-style external schedulers)")
 	verbose := fs.Bool("verbose", false, "log every cycle, including cycles that imported nothing")
 	if err := fs.Parse(args); err != nil {
@@ -66,7 +66,7 @@ func (a *App) cmdDaemon(args []string) int {
 
 // resolveScanInterval picks the daemon cadence: an explicit positive --interval flag
 // wins; a negative flag is rejected (a non-positive ticker would panic); otherwise
-// (flag unset / zero) the config scan_interval, else the 15m default. On any error it
+// (flag unset / zero) the config scan_interval, else the 5m default. On any error it
 // returns the safe default alongside the error so the caller can warn and still run.
 func (a *App) resolveScanInterval(flagVal time.Duration) (time.Duration, error) {
 	switch {

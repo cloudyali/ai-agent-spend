@@ -168,7 +168,7 @@ func TestRunDaemon_CatchUpScanImportsAndCheckpoints(t *testing.T) {
 }
 
 // Interval resolution precedence: an explicit --interval flag wins; otherwise the
-// config scan_interval; otherwise the 15m default. A negative flag is rejected (the
+// config scan_interval; otherwise the 5m default. A negative flag is rejected (the
 // daemon would panic on a non-positive ticker) and falls back to the default + error.
 func TestResolveScanInterval(t *testing.T) {
 	newApp := func(t *testing.T, config string) *App {
@@ -268,7 +268,7 @@ func TestDaemon_InvalidIntervalExits2(t *testing.T) {
 func TestDaemon_RunsLoopThenStopsOnSIGTERM(t *testing.T) {
 	home := setupHome(t)
 	t.Setenv("AISPEND_NO_REFRESH", "1")
-	writeAppConfig(t, home, "scan_interval = nonsense\n") // → warn + fall back to 15m default
+	writeAppConfig(t, home, "scan_interval = nonsense\n") // → warn + fall back to 5m default
 	errb := &lockedBuffer{}
 	a := &App{Resolver: platform.Detect(), Now: nowUTC, Out: io.Discard, Err: errb}
 
@@ -276,7 +276,7 @@ func TestDaemon_RunsLoopThenStopsOnSIGTERM(t *testing.T) {
 	go func() { done <- a.cmdDaemon(nil) }() // no --interval → config → default
 
 	// Banner ⟹ the signal handler is registered; catch-up scan ⟹ a cycle actually ran.
-	waitFor(t, func() bool { return strings.Contains(errb.String(), "scanning every 15m") }, 3*time.Second)
+	waitFor(t, func() bool { return strings.Contains(errb.String(), "scanning every 5m") }, 3*time.Second)
 	waitFor(t, func() bool { return storedCount(t, home) == 2 }, 3*time.Second)
 
 	if err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM); err != nil {
@@ -291,7 +291,7 @@ func TestDaemon_RunsLoopThenStopsOnSIGTERM(t *testing.T) {
 		t.Fatal("daemon did not stop within 3s of SIGTERM")
 	}
 	out := errb.String()
-	if !strings.Contains(out, "scan_interval") || !strings.Contains(out, "using 15m") {
+	if !strings.Contains(out, "scan_interval") || !strings.Contains(out, "using 5m") {
 		t.Errorf("expected a warn + fallback notice for the bad interval:\n%s", out)
 	}
 	if !strings.Contains(out, "stopped") {

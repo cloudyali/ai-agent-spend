@@ -1350,7 +1350,7 @@ Usage: aispend <command>   (no command opens the interactive TUI; off a TTY it s
 
   scan [--verbose] [--full]     import & price new sessions (no network); --full re-reads all & resets the checkpoint
   sync [--no-refresh]           on-demand sync now: refresh prices (if stale) + import new sessions; no-op if a sync is already running
-  daemon [--interval D] [--once] background scan loop: every D (default 15m) import from the last checkpoint; --once = one cycle
+  daemon [--interval D] [--once] background scan loop: every D (default 5m) import from the last checkpoint; --once = one cycle
   report [--period P] [flags]   spend over a calendar window (default: this week)
   today                         arbitrage-first daily glance: ROI, cache savings, hourly spikes
   budget [set <amt>|clear]      monthly spend ceiling: bare shows pace; set/clear manage it (--json, --strict)

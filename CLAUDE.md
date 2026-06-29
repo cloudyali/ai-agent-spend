@@ -68,7 +68,7 @@ One spend command, calendar-only windows (no rolling window):
 
 ```
 aispend                        # DEFAULT CHANNEL → interactive TUI; falls back to `today` off a TTY / in the offline build
-aispend tui [--period P] [--watch]   # interactive explorer: day-grouped session list (live badge + legend) → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them). In-process periodic sync is ON by default (re-scan + clock advance on the daemon cadence — config scan_interval, else 15m — via App.tuiSyncInterval); --watch opts into the 3s live tick. The header carries a `synced Nm ago` stamp (App.lastSyncTime → tui.WithSyncStatus) — the in-process sync, no separate process owned (it dies with the TUI); it ages between syncs via a cheap 30s clock heartbeat (tui.WithClockTick / clockMsg — advances the clock + repaints, no re-scan, wired only when not --watch) so it isn't frozen at "just now". Press `s` for an on-demand sync without waiting out the cadence (Model.syncCmd → syncDoneMsg, the same reload off the UI loop; syncDoneMsg folds the result back WITHOUT re-arming the watch tick). The keypress gets immediate feedback: the header's freshness segment swaps to an in-progress `syncing…` the next frame (Model.syncing, set only by the manual `s` — a background watch tick stays silent) and resumes the stamp (`synced just now`) when the result lands. It's single-flight via the Model.reloading guard: an `s` (or a watch tick) while a sync is in flight is a no-op, so it never stacks a second store writer — the in-process twin of the CLI `sync` lock. Legend advertises `s sync` when a reload is wired. Visual times render in LOCAL tz; the backend/ledger stays UTC.
+aispend tui [--period P] [--watch]   # interactive explorer: day-grouped session list (live badge + legend) → ↵ receipt (branch·SHA + cost+churn heatmap) → ↵ file → ↵ turn evidence; one ↑/↓ cursor flows files → top turns (tab jumps between them). In-process periodic sync is ON by default (re-scan + clock advance on the daemon cadence — config scan_interval, else 5m — via App.tuiSyncInterval); --watch opts into the 3s live tick. The header carries a `synced Nm ago` stamp (App.lastSyncTime → tui.WithSyncStatus) — the in-process sync, no separate process owned (it dies with the TUI); it ages between syncs via a cheap 30s clock heartbeat (tui.WithClockTick / clockMsg — advances the clock + repaints, no re-scan, wired only when not --watch) so it isn't frozen at "just now". Press `s` for an on-demand sync without waiting out the cadence (Model.syncCmd → syncDoneMsg, the same reload off the UI loop; syncDoneMsg folds the result back WITHOUT re-arming the watch tick). The keypress gets immediate feedback: the header's freshness segment swaps to an in-progress `syncing…` the next frame (Model.syncing, set only by the manual `s` — a background watch tick stays silent) and resumes the stamp (`synced just now`) when the result lands. It's single-flight via the Model.reloading guard: an `s` (or a watch tick) while a sync is in flight is a no-op, so it never stacks a second store writer — the in-process twin of the CLI `sync` lock. Legend advertises `s sync` when a reload is wired. Visual times render in LOCAL tz; the backend/ledger stays UTC.
 aispend report --period <today|yesterday|week|month|"last week"|"last month"|
                          quarter|"this year"|"N days"|"since YYYY-MM-DD"|
                          YYYY-MM-DD..YYYY-MM-DD|all> [--by G] [--view V] [--json]
@@ -98,7 +98,7 @@ aispend sync [--no-refresh]     # on-demand "bring me current now": a bounded pr
 aispend daemon [--interval D] [--once] [--verbose]
                                 # background scan loop: scans once immediately (catch-up), then every
                                 # D from the same per-provider checkpoint as scan-on-launch. D defaults
-                                # to `scan_interval` in config.toml, else 15m; --interval overrides.
+                                # to `scan_interval` in config.toml, else 5m; --interval overrides.
                                 # --once runs a single cycle and exits (cron / launchd / systemd-timer
                                 # entrypoint). Stops cleanly on Ctrl-C / SIGTERM. Offline-safe: local
                                 # reads only, no price refresh. All output on stderr.
@@ -134,12 +134,12 @@ session-end **hook** (the "milestone" trigger) is still pending — see
 **Background daemon.** `aispend daemon` keeps the ledger current without any read
 command: a `time.Ticker` loop (`daemonLoop`/`App.runDaemon`) that scans once
 immediately, then every `scan_interval` (config.toml, default
-`config.DefaultScanInterval` = 15m; `--interval` overrides; `--once` runs a single
+`config.DefaultScanInterval` = 5m; `--interval` overrides; `--once` runs a single
 cycle for an external scheduler). It reuses the **same** `App.incrementalScan` and the
 **same** per-provider watermark as scan-on-launch — no separate checkpoint — so the
 daemon, a manual `scan`, and a read-command launch all advance one pointer (idempotent
 upserts collapse any overlap). Cadence resolves via `App.resolveScanInterval` (positive
-`--interval` > `scan_interval` > 15m; non-positive rejected so `NewTicker` never panics).
+`--interval` > `scan_interval` > 5m; non-positive rejected so `NewTicker` never panics).
 It shuts down on the first Ctrl-C / SIGTERM (`signal.NotifyContext`) and is offline-safe
 — local reads only, **no** price refresh (unlike the read-command launch). All output is
 on **stderr** (startup banner, `[hh:mm:ss] scanned N new turn(s)` per non-empty cycle,

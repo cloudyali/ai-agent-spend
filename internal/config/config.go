@@ -192,9 +192,9 @@ func LoadRefreshOnLaunch(appHome string) (bool, error) {
 }
 
 // DefaultScanInterval is the cadence of the background `aispend daemon` scan loop
-// when `scan_interval` is unset (or invalid). Fifteen minutes keeps the ledger
+// when `scan_interval` is unset (or invalid). Five minutes keeps the ledger
 // near-current without busy-reading the session logs.
-const DefaultScanInterval = 15 * time.Minute
+const DefaultScanInterval = 5 * time.Minute
 
 // LoadScanInterval reads the optional `scan_interval` cadence from
 // ~/.aispend/config.toml, used by the background `aispend daemon` loop. The value is

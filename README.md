@@ -296,11 +296,11 @@ Use `--full` after upgrading to re-read everything (it ignores the watermark, th
 
 ### `daemon` — keep the ledger current in the background
 
-If you'd rather not rely on a read command to trigger the scan, `aispend daemon` runs the same incremental import on a timer: once immediately (catch-up), then every interval — default **15 minutes** — picking up only sessions newer than the last checkpoint. It shares the watermark `scan` uses, so nothing is scanned twice.
+If you'd rather not rely on a read command to trigger the scan, `aispend daemon` runs the same incremental import on a timer: once immediately (catch-up), then every interval — default **5 minutes** — picking up only sessions newer than the last checkpoint. It shares the watermark `scan` uses, so nothing is scanned twice.
 
 ```text
 $ aispend daemon
-aispend daemon: scanning every 15m0s · incremental from the last checkpoint · press Ctrl-C to stop
+aispend daemon: scanning every 5m0s · incremental from the last checkpoint · press Ctrl-C to stop
 [09:15:02] scanned 6 new turns
 [09:30:01] scanned 2 new turns
 ^C
