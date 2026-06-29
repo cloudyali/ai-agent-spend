@@ -2,7 +2,7 @@
 // conversation replayed turn-by-turn with a cumulative-cost gutter, grouped by the
 // user prompt (PromptID) that triggered each run of turns.
 //
-// It is the data layer for the receipt's chain view (design-documents/10). Rendering
+// It is the data layer for the receipt's chain view (design-documents/DESIGN.md). Rendering
 // (cursor, tab, color) lives in the surface layers; this package is pure and depends
 // only on package event, so it is cheap to test and reuse from both the static ANSI
 // surface and the deferred interactive TUI.

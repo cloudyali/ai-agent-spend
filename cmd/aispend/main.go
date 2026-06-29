@@ -1,7 +1,7 @@
 // Command aispend is the aispend CLI: a trusted, explainable, local-by-default
 // ledger for AI-coding spend. The command tree lives in internal/cli; this
 // entrypoint intentionally pulls in no network imports — see
-// design-documents/phase-0A-trusted-explainable-ledger.md (Trust requirements).
+// design-documents/DESIGN.md (Trust requirements).
 package main
 
 import (

@@ -6,7 +6,7 @@
 // incremental state (offset/mtime) is tracked by the store's scan_state in the
 // scan pipeline; Read here applies a coarse mtime filter against `since`.
 //
-// See design-documents/phase-0A-trusted-explainable-ledger.md §Claude Code provider.
+// See design-documents/DESIGN.md Code provider.
 package claudecode
 
 import (

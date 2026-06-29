@@ -8,7 +8,7 @@
 // (opt-out). Resolution precedence is cache → endpoint → embedded; pricing never
 // blocks on the network. The one outbound is a single GET of the public,
 // aispend-hosted price table — host-pinned and size-capped, sending no identity,
-// its result only overlaying the embedded floor. See design-documents/05-llm-pricing.md §4.
+// its result only overlaying the embedded floor. See design-documents/DESIGN.md
 package refresh
 
 import "context"

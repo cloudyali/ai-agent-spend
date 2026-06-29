@@ -4,7 +4,7 @@ argument-hint: "[optional: a git ref to diff against, e.g. main]"
 allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(go list:*), Bash(go build:*), Read, Grep, Glob
 ---
 
-You are performing the **security-review gate** from `design-documents/03-engineering-process.md` §3.
+You are performing the **security-review gate** described in `docs/review-automation.md`.
 The product's entire promise is trust, so this checklist is stricter than a generic pass.
 
 ## Tooling (layered)

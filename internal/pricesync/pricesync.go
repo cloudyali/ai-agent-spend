@@ -3,7 +3,7 @@
 // tooling, NOT part of the aispend binary: it imports no net/* (the workflow performs
 // the single download) and reuses pricing.ParseLiteLLM so the gate matches exactly the
 // map the client will price against. The published file mirrors the upstream LiteLLM
-// JSON schema. See design-documents/05-llm-pricing.md.
+// JSON schema. See design-documents/DESIGN.md.
 package pricesync
 
 import (

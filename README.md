@@ -633,14 +633,14 @@ Getting the 1-hour Anthropic tier right is exactly where simpler trackers drift.
 
 ## How accurate is it?
 
-`aispend` is reconciled against the two best-known community tools, **ccusage** and **CodeBurn**, which split the same Anthropic cache TTL tiers. On the same sessions, the token-level pricing matches; the small residual that remains traces to **event counting** (how streaming placeholder turns are de-duplicated), not to the pricing math.
+`aispend` prices every turn at the providers' published API rates, splitting the Anthropic cache TTL tiers (5-minute vs 1-hour) explicitly, and the math is verifiable turn-by-turn through the receipt drill. Across repeated runs the small residual you'll see traces to **event counting** (how streaming placeholder turns are de-duplicated), not to the pricing math.
 
 Two implementation details drive that:
 
 - **Keep-max dedup.** Claude Code emits streaming placeholder turns with tiny token counts that later resolve to the real totals. `aispend` dedupes on `(message.id, requestId)` and keeps the maximum, so a streamed turn is counted once at its true size — no double-count, no placeholder undercount.
 - **Reported cost is preserved.** When the agent wrote its own `costUSD`, the `reported` view surfaces it verbatim, so you can compare the agent's own number to the token-priced one side by side.
 
-The honest summary: the numbers reconcile to within a few percent of the reference tools, and where they differ, `aispend` will _show you the turn_ so you can decide who's right. That's the whole point.
+The honest summary: the numbers reconcile to within a few percent of the providers' published rates, and wherever a number looks off, `aispend` will _show you the turn_ so you can decide for yourself. That's the whole point.
 
 > **Pre-release note:** rates are public list prices captured for June 2026 and are meant to be verified against the live price lists before you rely on them for anything billable. `aispend pricing refresh` overlays current LiteLLM rates.
 
@@ -733,7 +733,7 @@ go test ./internal/... -cover  # 85–90% min per package
 gofmt -l internal/ && go vet ./...
 ```
 
-Have a look at [`CLAUDE.md`](CLAUDE.md) and the `design-documents/` folder (start at [`00-index.md`](design-documents/00-index.md)) — the design record is unusually complete and is the fastest way to understand _why_ a thing is the way it is.
+Have a look at [`CLAUDE.md`](CLAUDE.md) and the `design-documents/` folder (start at [`design-documents/DESIGN.md`](design-documents/DESIGN.md)) — the design record is unusually complete and is the fastest way to understand _why_ a thing is the way it is.
 
 ---
 
@@ -747,7 +747,7 @@ Have a look at [`CLAUDE.md`](CLAUDE.md) and the `design-documents/` folder (star
 
 **It says my cost is "not computable" for a turn — is that a bug?** No — it's the honesty rule. When a view genuinely can't be computed (e.g. no plan set for `amortized`), `aispend` says so rather than printing a misleading `$0`.
 
-**How is this different from `ccusage` / CodeBurn?** Same lineage, different emphasis: `aispend` is built around _drilling into the evidence_ for any number, models multiple cost views (not one), prices the Anthropic 1-hour cache tier explicitly, ties spend to branches/commits/files, and is provably offline by construction. See [How accurate is it?](#how-accurate-is-it).
+**What makes `aispend` different?** It's built around _drilling into the evidence_ for any number, models multiple cost views (not one), prices the Anthropic 1-hour cache tier explicitly, ties spend to branches/commits/files, and is provably offline by construction. See [How accurate is it?](#how-accurate-is-it).
 
 ---
 

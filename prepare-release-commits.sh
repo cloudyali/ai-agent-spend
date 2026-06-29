@@ -66,9 +66,9 @@ commit_group "docs: expand release checklist (Homebrew tap, signing, PAT steps)"
 # to commit it; these are your own pre-existing edits, not the OSS-prep pass.
 # ===========================================================================
 
-echo "==> CLAUDE.md + design-documents/12 (scan-on-launch notes)"
-add_if_exists CLAUDE.md "design-documents/12-surfaces-ingestion-roadmap.md"
-commit_group "docs: note scan-on-launch and ingestion roadmap"
+echo "==> CLAUDE.md + design-documents/DESIGN.md (design record)"
+add_if_exists CLAUDE.md "design-documents/DESIGN.md"
+commit_group "docs: update design record"
 
 echo "==> .aispend.toml (repo trailer config — optional to track)"
 add_if_exists .aispend.toml

@@ -10,7 +10,7 @@
 // daemon's concurrency note points to — opt in once a background scanner shares the
 // ledger with manual invocations.
 //
-// See design-documents/02-data-model.md §6.
+// See design-documents/DESIGN.md
 package store
 
 import (

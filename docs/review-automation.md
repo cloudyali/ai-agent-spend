@@ -116,7 +116,7 @@ hard-blocks. If `claude` isn't on `PATH`, the AI step is skipped and the rest st
 
 `scripts/coverage-gate.sh` fails if **any** package with statements is below **85%**. Packages with
 no test files / no statements are surfaced as warnings (pure scaffolding is exempt "until it gains
-logic", per `03-engineering-process.md` §2) — never silently passed.
+logic", per [`CONTRIBUTING.md`](../CONTRIBUTING.md)) — never silently passed.
 
 > **Heads-up:** per the project's own working notes, `internal/cli` sits around **83–84%**
 > (TTY/network-bound entrypoints). With *no exemptions*, this gate will fail CI until that package

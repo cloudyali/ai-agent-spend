@@ -5,7 +5,7 @@
 // Unlike Claude Code, a Codex turn's token usage lives in a separate TokenCount
 // line from the TurnContext line that carries the model/cwd, so normalization is
 // stateful per session — see internal/normalize (Codex). Format reference:
-// openai/codex rollout docs and the ccusage/CodeBurn Codex parsers.
+// the openai/codex rollout docs.
 package codex
 
 import (

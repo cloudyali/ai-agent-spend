@@ -27,7 +27,7 @@ jobs:
 
       - name: test + coverage floor (85%, no exemptions)
         # Runs the suite once with -cover and enforces the per-package 85% floor.
-        # Policy lives in design-documents/03-engineering-process.md §2.
+        # Policy lives in CONTRIBUTING.md
         run: bash scripts/coverage-gate.sh
 
       - name: build both SKUs (default + offline)

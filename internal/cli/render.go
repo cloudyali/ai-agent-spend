@@ -3,7 +3,7 @@
 // x/term — so the binary stays the pure-Go, provably-offline artifact `doctor
 // --network` asserts. Everything degrades to plain ASCII off a TTY, under
 // NO_COLOR, or with TERM=dumb, and never bleeds an escape code into a pipe.
-// See design-documents/08-cli-tui-concept.md (craft) and 09-session-view.md.
+// See design-documents/DESIGN.md.
 package cli
 
 import (
@@ -44,7 +44,7 @@ func useColor(w io.Writer) bool {
 }
 
 // ANSI SGR codes for the token-class color language shared with the web UI
-// (08-cli-tui-concept.md): cache-read blue, cache-write amber, output teal,
+// (design-documents/DESIGN.md): cache-read blue, cache-write amber, output teal,
 // input purple. Applied only when color is enabled.
 const (
 	cInput      = "35" // purple
@@ -70,7 +70,7 @@ var blockRamp = []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '�
 
 // sparkline renders one cell per value as a block glyph scaled to the series max,
 // so the hour that burned 10× the rest towers over them — the spike-finder from
-// 09-session-view.md. An all-zero series is blank cells (never a misleading flat
+// design-documents/DESIGN.md. An all-zero series is blank cells (never a misleading flat
 // ridge); any nonzero value shows at least the lowest block so a small-but-real
 // hour isn't invisible.
 func sparkline(vals []int64) string {

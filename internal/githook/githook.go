@@ -1,6 +1,6 @@
 // Package githook installs, removes, and reports aispend's per-commit cost-trailer
 // git hooks (prepare-commit-msg + post-commit). It is the write-path setup for the
-// commit-trailer feature — see design-documents/11-commit-cost-trailers.md.
+// commit-trailer feature — see design-documents/DESIGN.md.
 //
 // Two safety rules dominate the design, both aimed at the same failure mode — a
 // hook that silently never runs:

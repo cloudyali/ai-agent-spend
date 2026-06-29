@@ -2,7 +2,7 @@
 // (07/08-*-concept.md). It leads with value, not a bare total: the api-equivalent
 // spend, the subscription ROI (plan $/day vs metered), what prompt caching saved,
 // a turns/sessions/top-model strip, and an hourly spike bar that surfaces the
-// 2am session that looped (09-session-view.md). Hand-rolled, zero-dependency,
+// 2am session that looped (design-documents/DESIGN.md). Hand-rolled, zero-dependency,
 // degrades to plain ASCII off a TTY.
 package cli
 

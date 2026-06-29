@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # coverage-gate.sh — enforce a per-package statement-coverage floor.
 #
-# Policy (design-documents/03-engineering-process.md §2): every package with logic
+# Policy (CONTRIBUTING.md): every package with logic
 # carries >= 85% statement coverage. This gate is BLOCK, NO per-package exemptions
 # for logic packages. Scaffolding Go itself reports without an `ok` test status — the
 # thin mains and generated code (`[no test files]`, bare `coverage: 0.0%`) — is surfaced
-# as a warning ("exempt until it gains logic", §2), never silently passed and never failed.
+# as a warning ("exempt until it gains logic"), never silently passed and never failed.
 #
 # Usage:
 #   scripts/coverage-gate.sh            # runs `go test ./... -cover` and gates it

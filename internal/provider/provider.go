@@ -6,7 +6,7 @@
 // (e.g. a Cursor Admin API poller) is just another implementation feeding the
 // same AgentEvent schema — the seam, not a rewrite.
 //
-// See design-documents/phase-0A-trusted-explainable-ledger.md §Interfaces.
+// See design-documents/DESIGN.md
 package provider
 
 import (

@@ -1,7 +1,7 @@
 // `aispend top` — the bridge from "my spend is high" to "where did it go". It ranks
 // the priciest turns (default) or sessions in a calendar window and prints each with
 // its id; to open a turn or session to its full evidence, launch the interactive
-// explorer (`aispend`) and drill in. See design-documents/08-cli-tui-concept.md.
+// explorer (`aispend`) and drill in. See design-documents/DESIGN.md.
 package cli
 
 import (

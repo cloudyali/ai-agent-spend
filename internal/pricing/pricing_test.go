@@ -170,7 +170,7 @@ func TestPrice_CacheReadIsCheaperThanInput(t *testing.T) {
 }
 
 // TestPrice_PrefersReportedCost: when the tool wrote its own cost to disk, that
-// number is authoritative (ccusage "Auto") — cost_method=reported, high
+// number is authoritative (reported-else-computed) — cost_method=reported, high
 // confidence — while the computed api-equivalent is still filled for comparison.
 func TestPrice_PrefersReportedCost(t *testing.T) {
 	e := fixedClock()
