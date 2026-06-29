@@ -91,11 +91,11 @@ homebrew_casks:
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/aispend"]
           end
-    # Brew is OFF during the private-repo preview: GoReleaser still generates the
-    # cask into dist/ but does NOT push it to the tap. Private release assets can't
-    # be installed via brew without a per-user token, so we skip it for now.
-    # Flip back to `auto` when the repo goes public — nothing else here changes.
-    skip_upload: true
+    # Public repo: push the generated cask to the tap on every real release.
+    # `auto` uploads tagged releases but skips snapshots and prereleases
+    # (e.g. v1.2.3-rc1). Requires HOMEBREW_TAP_TOKEN (a PAT with contents:write
+    # on cloudyali/homebrew-tap) in the release workflow's env.
+    skip_upload: "auto"
     repository:
       owner: cloudyali
       name: homebrew-tap # → users run: brew install cloudyali/tap/aispend
