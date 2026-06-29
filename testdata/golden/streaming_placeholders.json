@@ -1,0 +1,53 @@
+[
+  {
+    "schema_version": 1,
+    "event_id": "evt_14f7890692ded353",
+    "session_id": "sess_stream_01",
+    "prompt_id": "msg_1",
+    "provider": "claude_code",
+    "surface": "coding_agent",
+    "identity_hash": "id_demo",
+    "project": "payments",
+    "repo": "payments",
+    "cwd_hash": "1b215c62825d4698c4170aa07cfbdee626823aafb4ee2be21a65e6b8ad56c514",
+    "model": "claude-opus-4",
+    "mode": "agent",
+    "tokens": {
+      "input": 12400,
+      "output": 3100,
+      "cache_read": 8900,
+      "cache_write": 0
+    },
+    "cost_views": {
+      "api_equivalent": {
+        "micros": 431850,
+        "currency": "USD"
+      },
+      "estimated": {
+        "micros": 431850,
+        "currency": "USD"
+      }
+    },
+    "evidence": {
+      "source_type": "local_file",
+      "source_record_id": "a3",
+      "source_path_hash": "a6ff9ffdec48aa41a7c7c028799cd676f7a1e7ff25f5e33efb7e28b578c751a2",
+      "source_line": 4,
+      "parser_name": "claude_code",
+      "parser_version": "v1",
+      "pricing_table_version": "pricing-2026-06",
+      "priced_at": "2026-06-14T00:00:00Z",
+      "currency": "USD",
+      "cost_method": "token_priced",
+      "confidence_score": 0.95,
+      "confidence_reason": "tokens × public API rate (cache-read at reduced rate)",
+      "dedupe_key": "msg_1|req_1",
+      "reconciliation_status": "local_only"
+    },
+    "tools": [
+      "Edit"
+    ],
+    "ts_start": "2026-06-14T10:00:06Z",
+    "ts_end": "2026-06-14T10:00:06Z"
+  }
+]

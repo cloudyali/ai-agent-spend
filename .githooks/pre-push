@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# pre-push — the FULL checkin gate, run before code leaves the machine.
+#
+#   Deterministic (always blocks):  gofmt · vet · tests+coverage floor · both SKUs build · offline net-free
+#   AI review (advisory by default): /checkin-review = code + security + YAGNI, via LOCAL Claude Code
+#
+# No API key lives in CI — the AI review runs on each contributor's own Claude Code login.
+# Escape hatches:
+#   AISPEND_SKIP_HOOKS=1          skip the whole hook
+#   AISPEND_SKIP_AI_REVIEW=1      run deterministic gate only
+#   AISPEND_AI_REVIEW_BLOCKING=1  make a BLOCK verdict actually fail the push (default: advisory)
+set -eu
+[ "${AISPEND_SKIP_HOOKS:-}" = "1" ] && { echo "pre-push: skipped (AISPEND_SKIP_HOOKS=1)"; exit 0; }
+cd "$(git rev-parse --show-toplevel)"
+
+echo "==> gofmt"
+unformatted="$(gofmt -l internal/ cmd/)"
+if [ -n "$unformatted" ]; then
+  echo "gofmt needed:"
+  # shellcheck disable=SC2086
+  printf '  %s\n' $unformatted
+  exit 1
+fi
+
+echo "==> go vet"
+go vet ./...
+
+echo "==> go test + coverage floor (85%, no exemptions)"
+bash scripts/coverage-gate.sh
+
+echo "==> build both SKUs (default + offline)"
+go build -o /dev/null ./cmd/aispend
+go build -tags offline -o /dev/null ./cmd/aispend
+
+echo "==> offline build is net-free"
+if go list -deps -tags offline ./cmd/aispend | grep -Eq '^net(/|$)'; then
+  echo "FAIL: the offline build imports a net/* package (egress in a 'provably offline' build)"; exit 1
+fi
+
+# ----- AI checkin review: code + security + YAGNI, via local Claude Code -----
+[ "${AISPEND_SKIP_AI_REVIEW:-}" = "1" ] && { echo "==> AI review: skipped (AISPEND_SKIP_AI_REVIEW=1)"; exit 0; }
+if ! command -v claude >/dev/null 2>&1; then
+  echo "==> AI review: 'claude' CLI not found — skipping (deterministic gate already passed)."
+  echo "    Install Claude Code to run /checkin-review at push: https://docs.anthropic.com/en/docs/claude-code"
+  exit 0
+fi
+
+echo "==> AI checkin review (/checkin-review)"
+report=".git/aispend-checkin-review.md"
+# Read-only, headless. plan mode forbids edits; stdin from /dev/null so it never eats git's ref list.
+# (Flag names track the Claude Code CLI; adjust here if your version differs.)
+set +e
+claude -p "/checkin-review" \
+  --permission-mode plan \
+  --allowedTools "Read" "Grep" "Glob" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git status:*)" "Bash(go vet:*)" "Bash(go test:*)" "Bash(go list:*)" \
+  < /dev/null | tee "$report"
+set -e
+
+if grep -q '^CHECKIN_VERDICT: BLOCK' "$report" 2>/dev/null; then
+  echo
+  echo "pre-push: checkin review found BLOCKERS — see $report"
+  if [ "${AISPEND_AI_REVIEW_BLOCKING:-}" = "1" ]; then
+    echo "Blocking push. Address them, or override once with: AISPEND_SKIP_AI_REVIEW=1 git push"
+    exit 1
+  fi
+  echo "(advisory — set AISPEND_AI_REVIEW_BLOCKING=1 to make this block). Continuing."
+fi
+echo "pre-push: OK"
+exit 0

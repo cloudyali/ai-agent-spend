@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a new view, facet, provider, or capability.
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For larger changes, this issue is the right place to agree on the shape
+        before any code is written. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: The question you can't answer today, not the solution yet.
+      placeholder: "I want to know how much a specific PR cost me, end to end."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like aispend to do?
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface does this touch?
+      options:
+        - today (daily glance)
+        - report (windows / facets)
+        - top (priciest turns/sessions)
+        - tui (interactive explorer)
+        - git trailers
+        - pricing / providers
+        - new agent/provider support
+        - other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you've considered
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true

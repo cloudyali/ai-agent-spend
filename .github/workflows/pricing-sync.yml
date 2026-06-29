@@ -1,0 +1,58 @@
+name: pricing-sync
+
+# Daily curate + validate + publish of the LiteLLM price mirror served at
+# aispendllm.cloudyali.io. The validation gate in cmd/pricing-sync is the circuit
+# breaker: if upstream ships a broken/thin table, the job FAILS and nothing is
+# published, so the last-good table keeps serving. A failed run shows in the Actions
+# tab (and emails the actor). See design-documents/DESIGN.md.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC
+  workflow_dispatch: {} # manual trigger (e.g. a day-0 model launch)
+
+permissions:
+  contents: write # push the published files to the gh-pages branch
+
+concurrency:
+  group: pricing-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fetch upstream LiteLLM table
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json \
+            -o upstream.json
+
+      - name: Fetch currently published table (for the safety diff)
+        run: |
+          mkdir -p prev
+          # First run (or DNS not live yet) → no prev; the drop/swing checks are skipped.
+          curl -fsSL https://aispendllm.cloudyali.io/litellm.json -o prev/litellm.json \
+            || echo "no previously published table — prev-relative checks will be skipped"
+
+      - name: Curate + validate (circuit breaker) → dist/
+        run: go run ./cmd/pricing-sync -in upstream.json -prev prev/litellm.json -out dist
+
+      - name: Pin the custom domain
+        run: echo "aispendllm.cloudyali.io" > dist/CNAME
+
+      - name: Publish to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0 (SHA-pinned: third-party action runs with contents:write + token)
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          commit_message: "pricing: daily sync"

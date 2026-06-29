@@ -1,0 +1,75 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l internal/ cmd/)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test + coverage floor (85%, no exemptions)
+        # Runs the suite once with -cover and enforces the per-package 85% floor.
+        # Policy lives in CONTRIBUTING.md
+        run: bash scripts/coverage-gate.sh
+
+      - name: build both SKUs (default + offline)
+        run: |
+          go build -o /dev/null ./cmd/aispend
+          go build -tags offline -o /dev/null ./cmd/aispend
+
+      - name: offline build is net-free (no egress)
+        # §4: the //go:build offline artifact must import no net/* at all.
+        run: |
+          if go list -deps -tags offline ./cmd/aispend | grep -Eq '^net(/|$)'; then
+            echo "::error::offline build imports a net/* package (egress in a provably-offline build)"; exit 1
+          fi
+          echo "offline build imports no net/* — egress-free"
+
+      # Re-run the suite under non-UTC zones so timezone-dependent tests (e.g. the
+      # period-window label) can't pass merely because the runner is UTC. The build
+      # cache from the step above keeps this fast.
+      - name: test under non-UTC timezones
+        run: |
+          for tz in Asia/Kolkata America/Los_Angeles; do
+            echo "::group::TZ=$tz"
+            TZ="$tz" go test ./...
+            echo "::endgroup::"
+          done
+
+      # t-wada RED guard for the const→var fix: -ldflags -X is silently ignored on a
+      # const, so on the old code this step fails. It proves version stamping works.
+      - name: version stamping is wired
+        run: |
+          go build -ldflags "-X github.com/cloudyali/ai-agent-spend/internal/cli.Version=ci-smoke-9.9.9" -o /tmp/aispend ./cmd/aispend
+          out="$(/tmp/aispend version)"
+          echo "$out"
+          echo "$out" | grep -q "ci-smoke-9.9.9" || {
+            echo "FAIL: version not stamped via -ldflags (is internal/cli.Version a const again?)"; exit 1; }
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # shellcheck is preinstalled on ubuntu-latest runners.
+      - name: shellcheck
+        run: shellcheck -x install.sh install_test.sh scripts/*.sh .githooks/pre-commit .githooks/pre-push
+      - name: install.sh unit tests
+        run: sh install_test.sh

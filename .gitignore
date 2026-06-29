@@ -1,0 +1,34 @@
+# --- Go build artifacts ---
+/bin/
+/dist/
+# compiled CLI at repo root (anchored: keeps cmd/aispend/ source)
+/aispend
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+# --- Toolchain / reference archives (do NOT commit; ~90MB total) ---
+*.tar.gz
+*.zip
+
+# --- Local app data (never commit user spend data) ---
+.aispend/
+*.db
+*.db-wal
+*.db-shm
+
+# --- OS / editor noise ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
+/vendor
+
+# vendored deps - kept local, not committed (use go mod download)
+/vendor/
+
+# stray editor/bridge temp copies (e.g. foo.go.1543530090915827819)
+*.go.[0-9]*
+*-go-tmp-*
