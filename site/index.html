@@ -425,6 +425,12 @@ header.nav{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.72);backdr
 .prov-mock .pm-br{flex:none;width:128px;font-size:12.5px;color:var(--text-3)}
 .prov-mock .pm-bar{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--rose-500),var(--gold-500))}
 .prov-mock .pm-foot{margin-top:18px;font-size:11.5px;color:var(--text-4)}
+/* commit-message snippet showing an auto-appended cost trailer */
+.trailer-snip{margin-top:26px;max-width:440px;background:#0E0E10;border:1px solid var(--hair);border-radius:var(--r);padding:16px 18px;font-family:var(--font-mono);font-size:13px;line-height:1.75;color:var(--text-2);overflow-x:auto}
+.trailer-snip .subj{color:var(--text)}
+.trailer-snip .cost{color:var(--gold-400);font-weight:600}
+.trailer-snip .note{color:var(--text-4)}
+.trailer-cap{margin-top:10px;font-size:13px;color:var(--paper-ink-2);max-width:440px}
 @media (max-width:880px){
   .spine-inner{grid-template-columns:1fr;gap:0}
   .spine-rail{position:static;flex-direction:row;flex-wrap:wrap;gap:8px 16px;margin-bottom:36px;padding-bottom:18px;border-bottom:1px solid var(--hair)}
@@ -946,8 +952,14 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
         <div class="three-up">
           <div class="it"><h4><code>--by branch</code></h4><p>Roll spend up to the branch, so a feature's true cost is one number.</p></div>
           <div class="it"><h4><code>--by commit</code></h4><p>1:1 with the work that shipped; reconciles back to the by-model total.</p></div>
-          <div class="it"><h4>Cost trailers</h4><p>Opt in to bake each commit's cost into your git history, so the record travels with the code.</p></div>
+          <div class="it"><h4>Cost trailers</h4><p>Opt in and AiSpend appends a line like <code>AI-Cost: 0.42</code> to each commit, so the spend ships with the code in your git history.</p></div>
         </div>
+        <div class="trailer-snip" role="img" aria-label="A git commit message with an automatically appended AI-Cost: 0.42 trailer line.">
+          <div class="subj">fix: dedup streaming turns</div>
+          <div>&nbsp;</div>
+          <div><span class="cost">AI-Cost: 0.42</span>  <span class="note">← added at commit</span></div>
+        </div>
+        <p class="trailer-cap">Turn it on and the cost rides along in git history, no extra step.</p>
         <a class="src-link" href="https://github.com/cloudyali/ai-agent-spend/blob/main/design-documents/11-commit-cost-trailers.md" target="_blank" rel="noopener">Cost trailers, explained <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg></a>
       </article>
     </div>
