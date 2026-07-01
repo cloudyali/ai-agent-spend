@@ -105,6 +105,14 @@ aispend daemon [--interval D] [--once] [--verbose]
 aispend pricing [refresh]       # show the active rate source; `refresh` pulls live LiteLLM rates
 ```
 
+A companion binary **`cmd/aispend-bar`** is a **self-contained** macOS menu-bar client: it
+links the engine (`cli.App.RefreshSnapshots` → `[]lines.Snapshot`) and scans + reads the ledger
+directly — no server, no port — painting the worst gauge into the title with today's $ · ROI ·
+cache-saved in the dropdown. Render logic is the pure, tested `internal/menubar`; the macOS-only
+menuet glue is `//go:build darwin` (with a non-darwin stub), and `caseymrm/menuet` is kept out of
+`cmd/aispend`'s dep graph so the main tool stays cross-platform + offline-clean. Build:
+`cmd/aispend-bar/build-app.sh` (needs `go get caseymrm/menuet` + `go mod vendor` on macOS first).
+
 The **TUI is the default channel**: a bare `aispend` opens the interactive explorer
 (`cmdDefault`); off a TTY or in the `offline` build (where the TUI is compiled out,
 `tuiBuilt=false`) it falls back to the static `today` glance, which carries the same
