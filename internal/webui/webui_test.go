@@ -108,3 +108,26 @@ func TestRender_BodyPaddingClearsRoundedCorners(t *testing.T) {
 		t.Error("body should carry vertical padding so content clears the popover's rounded corners")
 	}
 }
+
+// Each provider card leads with its brand mark, keyed by provider id; an unknown provider
+// falls back to a neutral mark. (aria-label doubles as the accessible name and the test hook.)
+func TestRender_ProviderLogos(t *testing.T) {
+	for id, label := range map[string]string{
+		"claude": "Anthropic", "codex": "OpenAI", "gemini": "Gemini", "grok": "AI",
+	} {
+		out := Render([]lines.Snapshot{{ProviderID: id, DisplayName: id,
+			Lines: []lines.Line{{Type: "text", Label: "Today", Value: "$1"}}}}, time.Now())
+		if !strings.Contains(out, `aria-label="`+label+`"`) {
+			t.Errorf("provider %q should render the %q brand mark", id, label)
+		}
+	}
+}
+
+// The idle one-liner also carries the provider's mark.
+func TestRender_IdleShowsLogo(t *testing.T) {
+	out := Render([]lines.Snapshot{{ProviderID: "codex", DisplayName: "Codex", Idle: true,
+		Lines: []lines.Line{{Type: "progress", Label: "Weekly", Used: pf(0), Limit: pf(100)}}}}, time.Now())
+	if !strings.Contains(out, "idle today") || !strings.Contains(out, `aria-label="OpenAI"`) {
+		t.Errorf("idle row should carry the provider mark: %s", out)
+	}
+}

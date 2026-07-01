@@ -26,6 +26,7 @@ type gaugeVM struct {
 
 type providerVM struct {
 	Name, Plan string
+	Logo       template.HTML
 	ROI        string
 	CacheSaved string
 	Today      string
@@ -45,7 +46,7 @@ type pageVM struct {
 func Render(snaps []lines.Snapshot, now time.Time) string {
 	vm := pageVM{Empty: len(snaps) == 0}
 	for _, s := range snaps {
-		p := providerVM{Name: s.DisplayName, Plan: s.Plan, Idle: s.Idle, Spark: spark(s.Trend)}
+		p := providerVM{Name: s.DisplayName, Plan: s.Plan, Idle: s.Idle, Spark: spark(s.Trend), Logo: providerLogo(s.ProviderID)}
 		for i := range s.Lines {
 			ln := s.Lines[i]
 			switch {
@@ -73,6 +74,50 @@ func Render(snaps []lines.Snapshot, now time.Time) string {
 		return "<!doctype html><body>render error</body>"
 	}
 	return b.String()
+}
+
+// providerLogo returns a small inline brand mark for a provider id (canonicalized upstream:
+// claude, codex, gemini, …), used to identify the service at a glance. The SVGs are original,
+// static renditions — no user data flows in, so template.HTML is safe here. Unknown providers
+// get a neutral dot. To swap in an official path later, replace the matching builder's body.
+func providerLogo(id string) template.HTML {
+	switch strings.ToLower(strings.TrimSpace(id)) {
+	case "claude", "claude_code", "anthropic":
+		return template.HTML(sunburstMark("Anthropic", "#D97757")) // Claude "clay"
+	case "codex", "openai":
+		return template.HTML(blossomMark("OpenAI"))
+	case "gemini", "google":
+		return template.HTML(sparkMark("Gemini", "#4285F4"))
+	default:
+		return template.HTML(`<svg viewBox="0 0 24 24" role="img" aria-label="AI"><circle cx="12" cy="12" r="5" fill="#8a8a8e"/></svg>`)
+	}
+}
+
+// sunburstMark renders the Anthropic-style radiating burst (12 rounded rays) in a brand color.
+func sunburstMark(label, color string) string {
+	var rays strings.Builder
+	for a := 0; a < 360; a += 30 {
+		fmt.Fprintf(&rays, `<line x1="12" y1="2.6" x2="12" y2="8" transform="rotate(%d 12 12)"/>`, a)
+	}
+	return `<svg viewBox="0 0 24 24" role="img" aria-label="` + label + `" stroke="` + color +
+		`" stroke-width="1.7" stroke-linecap="round">` + rays.String() + `</svg>`
+}
+
+// blossomMark renders an OpenAI-style six-petal mark in the current text color (OpenAI's mark
+// is monochrome, so it adapts to light/dark).
+func blossomMark(label string) string {
+	var petals strings.Builder
+	for a := 0; a < 360; a += 60 {
+		fmt.Fprintf(&petals, `<ellipse cx="12" cy="7.4" rx="3" ry="4.6" transform="rotate(%d 12 12)"/>`, a)
+	}
+	return `<svg viewBox="0 0 24 24" role="img" aria-label="` + label +
+		`" fill="none" stroke="currentColor" stroke-width="1.4">` + petals.String() + `</svg>`
+}
+
+// sparkMark renders a four-point Gemini-style spark (concave star) in a brand color.
+func sparkMark(label, color string) string {
+	return `<svg viewBox="0 0 24 24" role="img" aria-label="` + label + `"><path fill="` + color +
+		`" d="M12 2c.6 5.2 4.8 9.4 10 10-5.2.6-9.4 4.8-10 10-.6-5.2-4.8-9.4-10-10 5.2-.6 9.4-4.8 10-10Z"/></svg>`
 }
 
 // clampPct rounds a 0..100 usage value to an int, clamped at both ends.
@@ -175,7 +220,9 @@ var tmpl = template.Must(template.New("popover").Parse(`<!doctype html><html><he
 body{margin:0;padding:6px 0;width:320px;background:var(--bg);color:var(--fg);font:13px/1.35 -apple-system,system-ui,sans-serif}
 .prov{padding:10px 12px}
 .head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.name{font-weight:600}
+.name{display:flex;align-items:center;gap:6px;font-weight:600;min-width:0}
+.logo{width:15px;height:15px;flex:none;display:inline-flex}
+.logo svg{width:100%;height:100%;display:block}
 .roi{font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--roi-bg);color:var(--roi-fg);white-space:nowrap}
 .sub{font-size:12px;color:var(--dim);margin-top:2px}
 .hr{height:1px;background:var(--line);margin:8px 0}
@@ -188,13 +235,13 @@ body{margin:0;padding:6px 0;width:320px;background:var(--bg);color:var(--fg);fon
 .today{font-size:12px;color:var(--dim);margin-top:7px}
 .trend{display:flex;justify-content:space-between;align-items:center;margin-top:7px}
 .spark{font-family:ui-monospace,monospace;letter-spacing:1px;color:var(--fg)}
-.idle{padding:10px 12px;color:var(--dim);font-weight:600}
+.idle{display:flex;align-items:center;gap:6px;padding:10px 12px;color:var(--dim);font-weight:600}
 .sep{border-top:1px solid var(--line)}
 .foot{display:flex;gap:16px;padding:9px 12px;border-top:1px solid var(--line);font-size:12px}
 .foot a{color:var(--fg);text-decoration:none}
 </style></head><body>
-{{if .Empty}}<div class="prov"><div class="sub">No AI-coding spend today yet.</div></div>{{else}}{{range $i, $p := .Providers}}{{if $i}}<div class="sep"></div>{{end}}{{if $p.Idle}}<div class="idle">{{$p.Name}}{{if $p.Plan}} · {{$p.Plan}}{{end}} — idle today</div>{{else}}<div class="prov">
-<div class="head"><span class="name">{{$p.Name}}{{if $p.Plan}} · {{$p.Plan}}{{end}}</span>{{if $p.ROI}}<span class="roi">{{$p.ROI}}</span>{{end}}</div>
+{{if .Empty}}<div class="prov"><div class="sub">No AI-coding spend today yet.</div></div>{{else}}{{range $i, $p := .Providers}}{{if $i}}<div class="sep"></div>{{end}}{{if $p.Idle}}<div class="idle"><span class="logo">{{$p.Logo}}</span><span>{{$p.Name}}{{if $p.Plan}} · {{$p.Plan}}{{end}} — idle today</span></div>{{else}}<div class="prov">
+<div class="head"><span class="name"><span class="logo">{{$p.Logo}}</span><span>{{$p.Name}}{{if $p.Plan}} · {{$p.Plan}}{{end}}</span></span>{{if $p.ROI}}<span class="roi">{{$p.ROI}}</span>{{end}}</div>
 {{if $p.CacheSaved}}<div class="sub">Cache saved · {{$p.CacheSaved}}</div>{{end}}
 {{if $p.Gauges}}<div class="hr"></div>{{end}}{{range $p.Gauges}}<div class="gauge">
 <div class="grow"><span>{{.Label}}</span><span class="meta">{{.Pct}}% · {{.Reset}}</span></div>
