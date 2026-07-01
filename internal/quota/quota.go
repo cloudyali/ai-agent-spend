@@ -17,6 +17,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/cloudyali/ai-agent-spend/internal/lines"
 )
 
 // Window names the limit window a Sample describes.
@@ -42,6 +44,10 @@ type Sample struct {
 	ResetsAt      time.Time
 	ObservedAt    time.Time
 	Source        string // provenance, e.g. "codex:rate_limits.secondary"
+	// PlanType is the account's subscription tier as the provider reports it (Codex
+	// `rate_limits.plan_type`, e.g. "pro"); empty when unknown. It lets a caller
+	// auto-detect the plan for ROI without config. Not part of the ledger.
+	PlanType string
 }
 
 // --- Codex parsing -------------------------------------------------------------
@@ -66,6 +72,7 @@ type cxLine struct {
 		RateLimits *struct {
 			Primary   *cxWindow `json:"primary"`
 			Secondary *cxWindow `json:"secondary"`
+			PlanType  *string   `json:"plan_type"`
 		} `json:"rate_limits"`
 	} `json:"payload"`
 }
@@ -88,6 +95,10 @@ func ParseCodex(raw []byte) []Sample {
 	if l.Type != "event_msg" || l.Payload.Type != "token_count" || l.Payload.RateLimits == nil {
 		return nil
 	}
+	planType := ""
+	if pt := l.Payload.RateLimits.PlanType; pt != nil {
+		planType = *pt
+	}
 	var out []Sample
 	add := func(w *cxWindow, slot string) {
 		if w == nil {
@@ -105,6 +116,7 @@ func ParseCodex(raw []byte) []Sample {
 			ResetsAt:      reset,
 			ObservedAt:    l.Timestamp,
 			Source:        "codex:rate_limits." + slot,
+			PlanType:      planType,
 		})
 	}
 	add(l.Payload.RateLimits.Primary, "primary")
@@ -346,4 +358,66 @@ func (s Sample) Line(now time.Time) string {
 // masquerades as live.
 func (s Sample) Freshness(now time.Time) string {
 	return "as of " + HumanDuration(now.Sub(s.ObservedAt)) + " ago"
+}
+
+// --- Projection (pace / forecast) ----------------------------------------------
+
+// windowDuration is the length of the window this Sample describes: the reported
+// window_minutes when present (Codex), else the nominal length implied by the window
+// kind (Claude reports no minutes). Zero when the kind is unrecognized — the caller
+// then declines to extrapolate rather than guess.
+func (s Sample) windowDuration() time.Duration {
+	if s.WindowMinutes > 0 {
+		return time.Duration(s.WindowMinutes) * time.Minute
+	}
+	switch s.Window {
+	case Window5h:
+		return 5 * time.Hour
+	case WindowWeekly, WindowWeeklyOpus:
+		return 7 * 24 * time.Hour
+	}
+	return 0
+}
+
+// WindowStart is the instant this window opened — its reset minus the window's
+// length. ok is false when the length is unknown, so a caller won't query a bogus
+// range to "dollarize" the wall.
+func (s Sample) WindowStart() (time.Time, bool) {
+	w := s.windowDuration()
+	if w <= 0 {
+		return time.Time{}, false
+	}
+	return s.ResetsAt.Add(-w), true
+}
+
+// Project extrapolates this reading to the window's reset at the rate implied by how
+// much of the window has elapsed. It is the "pace, not level" forecast; the math
+// lives in package lines so every surface shares one definition.
+func (s Sample) Project(now time.Time) lines.Projection {
+	w := s.windowDuration()
+	elapsed := w - s.ResetsAt.Sub(now)
+	return lines.Project(s.UsedPercent, 100, elapsed, w)
+}
+
+// PaceNote is the glanceable forecast clause for a gauge: "limit reached" once the
+// window is spent, "on pace to run out in 3h" when the current rate crosses the wall
+// before reset, or "on pace: ~84% by reset" when it lands under. Empty when the
+// window can't be extrapolated (unknown kind, or no time elapsed yet) — a forecast
+// we can't stand behind is omitted, never guessed.
+func (s Sample) PaceNote(now time.Time) string {
+	if s.UsedPercent >= 100 {
+		return "limit reached"
+	}
+	w := s.windowDuration()
+	if w <= 0 || w <= s.ResetsAt.Sub(now) { // unknown window, or no elapsed time
+		return ""
+	}
+	p := s.Project(now)
+	if p.Breaches {
+		return "on pace to run out in " + HumanDuration(time.Duration(p.ETASeconds)*time.Second)
+	}
+	if p.ProjectedUsed <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("on pace: ~%.0f%% by reset", p.ProjectedUsed)
 }
