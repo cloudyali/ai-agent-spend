@@ -13,31 +13,59 @@ import (
 // stalls a glance; on timeout the caller falls back to local sources.
 const onlineQuotaTimeout = 3 * time.Second
 
-// onlineSamples returns a provider's live plan-limit samples: the injected test hook when
-// set (so unit tests stay hermetic), else the real credential-loading fetch. The reading
-// passes through the last-good cache (rememberQuota) so a single empty fetch can't blank a
-// gauge the menu bar just showed.
+// quotaRefreshInterval throttles the usage-API fetch. The menu bar repaints every ~30s, but
+// plan windows move slowly (5-hour / weekly), so hitting the API that often is wasteful and
+// risks rate limits. We fetch at most this often per provider and serve the last-good
+// reading in between (see rememberQuota); the countdown + ledger still refresh every repaint.
+// 5–10m is plenty fresh for a weekly wall — tune here.
+const quotaRefreshInterval = 5 * time.Minute
+
+// onlineSamples returns a provider's live plan-limit samples. It is throttled: within
+// quotaRefreshInterval of the last fetch it serves the cached reading and skips the network
+// entirely (the menu bar repaints far faster than plan windows move); otherwise it fetches
+// — the injected test hook when set (so unit tests stay hermetic), else the real
+// credential-loading fetch — and remembers the result. rememberQuota keeps the last-good, so
+// an empty or throttled fetch can't blank a gauge the menu bar just showed.
 func (a *App) onlineSamples(provider string, now time.Time) []quota.Sample {
-	var fresh []quota.Sample
-	if a.fetchQuota != nil {
-		fresh = a.fetchQuota(provider, now)
-	} else {
-		fresh = a.liveQuotaSamples(provider, now)
+	if cached, fresh := a.cachedQuota(provider, now); !fresh {
+		return cached
 	}
-	return a.rememberQuota(provider, fresh)
+	var got []quota.Sample
+	if a.fetchQuota != nil {
+		got = a.fetchQuota(provider, now)
+	} else {
+		got = a.liveQuotaSamples(provider, now)
+	}
+	return a.rememberQuota(provider, got, now)
 }
 
-// rememberQuota smooths a transient empty fetch: a non-empty reading becomes the provider's
-// last-good and is returned as-is; an empty reading (a per-refresh network hiccup) falls
-// back to the last-good, so one dropped fetch can't blank a live gauge — which would also
-// reorder the provider under an idle peer. Staleness isn't re-checked here: quota.Tracker
-// .Active already drops any window past its reset at render, so a cached window that expires
-// mid-outage falls off there (one source of truth). The cache is bounded — one entry per
-// provider, overwritten on success. Locked because the menu bar can refresh concurrently
-// (the interval ticker plus a manual Refresh).
-func (a *App) rememberQuota(provider string, fresh []quota.Sample) []quota.Sample {
+// cachedQuota reports whether a fresh fetch is due for a provider. When the last fetch was
+// within quotaRefreshInterval it returns (last-good, false) — serve this, don't hit the
+// network; otherwise (nil, true) — a fetch is due. Locked for the menu bar's concurrent
+// ticker+manual refreshes.
+func (a *App) cachedQuota(provider string, now time.Time) (samples []quota.Sample, fetchDue bool) {
 	a.quotaCacheMu.Lock()
 	defer a.quotaCacheMu.Unlock()
+	if at, ok := a.quotaFetchedAt[provider]; ok && now.Sub(at) < quotaRefreshInterval {
+		return a.quotaCache[provider], false
+	}
+	return nil, true
+}
+
+// rememberQuota records the fetch time (throttling the next one, whether this fetch
+// succeeded or came back empty) and caches a non-empty reading as the provider's last-good.
+// On an empty reading it returns the prior last-good, so a dropped fetch can't blank a live
+// gauge — which would also reorder the provider under an idle peer. Staleness isn't
+// re-checked here: quota.Tracker.Active already drops any window past its reset at render, so
+// a cached window that expires mid-outage falls off there (one source of truth). The cache
+// is bounded — one entry per provider. Locked for the menu bar's concurrent refreshes.
+func (a *App) rememberQuota(provider string, fresh []quota.Sample, now time.Time) []quota.Sample {
+	a.quotaCacheMu.Lock()
+	defer a.quotaCacheMu.Unlock()
+	if a.quotaFetchedAt == nil {
+		a.quotaFetchedAt = map[string]time.Time{}
+	}
+	a.quotaFetchedAt[provider] = now
 	if len(fresh) > 0 {
 		if a.quotaCache == nil {
 			a.quotaCache = map[string][]quota.Sample{}

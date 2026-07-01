@@ -71,13 +71,16 @@ type App struct {
 	// (liveQuotaSamples); tests set a stub so unit tests never read the Keychain or hit
 	// the network.
 	fetchQuota func(provider string, now time.Time) []quota.Sample
-	// quotaCache holds the last non-empty quota reading per provider so a transient empty
-	// fetch (a per-refresh network hiccup) can't blank a live gauge — the menu bar re-scans
-	// every ~30s, and Claude has no on-disk fallback, so one dropped fetch would otherwise
-	// flick its bars off and reorder it. Guarded because the menu bar can refresh
-	// concurrently (the interval ticker plus a manual Refresh). See onlineSamples.
-	quotaCacheMu sync.Mutex
-	quotaCache   map[string][]quota.Sample
+	// quotaCache holds the last non-empty quota reading per provider, and quotaFetchedAt
+	// when each was last fetched. Together they (1) throttle the usage-API fetch to
+	// quotaRefreshInterval — the menu bar repaints every ~30s but plan windows move slowly —
+	// and (2) serve the last-good reading in between, so a dropped or throttled fetch can't
+	// blank a live gauge (which would also reorder the provider). Guarded because the menu
+	// bar can refresh concurrently (the interval ticker plus a manual Refresh). See
+	// onlineSamples.
+	quotaCacheMu   sync.Mutex
+	quotaCache     map[string][]quota.Sample
+	quotaFetchedAt map[string]time.Time
 }
 
 // Run is the entry point: dispatch args, write to out/err, return an exit code.

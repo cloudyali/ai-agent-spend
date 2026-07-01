@@ -441,12 +441,46 @@ func TestUsageSnapshots_QuotaCacheSurvivesTransientEmptyFetch(t *testing.T) {
 		t.Fatalf("precondition: active Claude should lead idle Codex: %+v", first)
 	}
 
-	// Second refresh: Claude's fetch is empty, but the gauge and its lead position must hold.
-	second := a.UsageSnapshots(now.Add(time.Minute))
+	// A later refresh past the throttle window: Claude's fetch fires again but comes back
+	// empty, yet the gauge and its lead position must hold (served from last-good).
+	second := a.UsageSnapshots(now.Add(quotaRefreshInterval + time.Minute))
+	if claudeCalls < 2 {
+		t.Fatalf("precondition: the fetch should re-fire past the throttle window, calls=%d", claudeCalls)
+	}
 	if !hasGauge(claudeSnap(second)) {
 		t.Errorf("transient empty fetch blanked Claude's gauge (should reuse last-good): %+v", second)
 	}
 	if second[0].ProviderID != "claude" {
 		t.Errorf("transient empty fetch reordered Claude below idle Codex: %+v", second)
+	}
+}
+
+// The usage API is throttled: the popover repaints every ~30s, but the network is hit at
+// most once per quotaRefreshInterval per provider — the cached reading is served in between.
+// Without this the app hammered the usage API every 30s (and risked rate limits).
+func TestUsageSnapshots_ThrottlesUsageAPIFetch(t *testing.T) {
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	a := appWithHome(t.TempDir(), &strings.Builder{}, now)
+
+	var claudeFetches int
+	a.fetchQuota = func(provider string, _ time.Time) []quota.Sample {
+		if provider != "claude" {
+			return nil
+		}
+		claudeFetches++
+		return []quota.Sample{{Provider: "claude", Window: quota.Window5h, UsedPercent: 10,
+			WindowMinutes: 300, ResetsAt: now.Add(2 * time.Hour), ObservedAt: now}}
+	}
+
+	a.UsageSnapshots(now)                       // fetch is due → hit #1
+	a.UsageSnapshots(now.Add(30 * time.Second)) // within interval → cached, no network
+	a.UsageSnapshots(now.Add(2 * time.Minute))  // within interval → cached, no network
+	if claudeFetches != 1 {
+		t.Fatalf("within %s the usage API should be hit once, got %d", quotaRefreshInterval, claudeFetches)
+	}
+
+	a.UsageSnapshots(now.Add(quotaRefreshInterval + time.Minute)) // interval elapsed → hit #2
+	if claudeFetches != 2 {
+		t.Errorf("after %s the usage API should be hit again, got %d", quotaRefreshInterval, claudeFetches)
 	}
 }
