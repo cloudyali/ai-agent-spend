@@ -112,8 +112,15 @@ func Render(snaps []lines.Snapshot, now time.Time) State {
 			continue
 		}
 		items = append(items, Item{Text: head, Header: true})
+		prevLead := false
 		for i := range s.Lines {
-			items = append(items, renderLineItem(s.Lines[i], now))
+			ln := s.Lines[i]
+			lead := ln.Type == "text" && (ln.Label == "ROI" || ln.Label == "Cache saved")
+			if prevLead && !lead {
+				items = append(items, Item{Separator: true}) // set the wedge apart from the gauges
+			}
+			items = append(items, renderLineItem(ln, now))
+			prevLead = lead
 		}
 		if len(s.Trend) >= 2 && sumInt64(s.Trend) > 0 {
 			items = append(items, Item{Text: "Trend", Children: []Item{

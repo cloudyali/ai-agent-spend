@@ -136,6 +136,34 @@ func TestRender_CollapsesIdleProvider(t *testing.T) {
 	}
 }
 
+func TestRender_SeparatesWedgeFromGauges(t *testing.T) {
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	s := lines.Snapshot{ProviderID: "claude", DisplayName: "Claude", Plan: "Max 20x", Lines: []lines.Line{
+		{Type: "text", Label: "ROI", Value: "31× vs plan ($6.67/day)"},
+		{Type: "text", Label: "Cache saved", Value: "≈ $707 (77%)"},
+		{Type: "progress", Label: "Session", Used: pf(23), Limit: pf(100), Format: &lines.Format{Kind: lines.Percent},
+			ResetsAt: tp(now.Add(25 * time.Minute))},
+		{Type: "text", Label: "Today", Value: "≈ $209 · 180M tokens"},
+	}}
+	st := Render([]lines.Snapshot{s}, now)
+	sep := -1
+	for i := range st.Items {
+		if st.Items[i].Separator {
+			sep = i
+			break
+		}
+	}
+	if sep <= 0 || sep >= len(st.Items)-1 {
+		t.Fatalf("want a separator between the wedge and the gauges: %+v", st.Items)
+	}
+	if !st.Items[sep-1].Dim || !strings.Contains(st.Items[sep-1].Text, "Cache saved") {
+		t.Errorf("separator should follow the wedge (Cache saved), got %q", st.Items[sep-1].Text)
+	}
+	if !strings.Contains(st.Items[sep+1].Text, "▓") {
+		t.Errorf("separator should precede the quota gauge bar, got %q", st.Items[sep+1].Text)
+	}
+}
+
 func TestRender_ProgressPaceAndBar(t *testing.T) {
 	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
 	snaps := []lines.Snapshot{
