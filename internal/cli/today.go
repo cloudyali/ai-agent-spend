@@ -290,6 +290,12 @@ func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config
 // guess. observedAt falls back to now when the file's mtime can't be read. Reading a
 // local file only — no network, so the offline promise holds.
 func (a *App) claudeQuotaSamples(now time.Time) []quota.Sample {
+	// Live windows from the usage API win when available — Claude Code doesn't persist
+	// them to disk, so this is the only path that surfaces Claude's headroom. Falls back
+	// to the local snapshot (if any) on any error.
+	if s := a.onlineSamples("claude", now); len(s) > 0 {
+		return s
+	}
 	path := a.Resolver.ClaudeUsagePath()
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -312,6 +318,11 @@ const maxQuotaScanFiles = 8
 // best-effort: no Codex data, or only exec-mode nulls, yields no samples (the gauge
 // degrades to nothing). Local read-only — no network, no new persistence.
 func (a *App) codexQuotaSamples(now time.Time) []quota.Sample {
+	// Live windows from the usage API win when available; otherwise fall back to the
+	// rate_limits block in the rollout logs.
+	if s := a.onlineSamples("codex", now); len(s) > 0 {
+		return s
+	}
 	srcs, err := codex.New(a.Resolver).Sources()
 	if err != nil || len(srcs) == 0 {
 		return nil

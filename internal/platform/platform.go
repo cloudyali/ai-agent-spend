@@ -64,6 +64,31 @@ func (r Resolver) ClaudeUsagePath() string {
 	return filepath.Join(base, "usage-exact.json")
 }
 
+// ClaudeCredentialsPath is where Claude Code stores its OAuth credential blob on disk —
+// honoring CLAUDE_CONFIG_DIR, else ~/.claude/.credentials.json. The opt-in online quota
+// fetch reads the bearer token from here (the cross-platform fallback; on macOS the token
+// usually lives in the Keychain instead).
+func (r Resolver) ClaudeCredentialsPath() string {
+	base := r.env("CLAUDE_CONFIG_DIR")
+	if base == "" {
+		base = filepath.Join(r.Home, ".claude")
+	}
+	return filepath.Join(base, ".credentials.json")
+}
+
+// CodexAuthPaths lists the candidate locations of Codex's auth.json (bearer token +
+// account id), in order: $CODEX_HOME/auth.json, else ~/.config/codex/auth.json then
+// ~/.codex/auth.json. Used only by the online quota fetch.
+func (r Resolver) CodexAuthPaths() []string {
+	if h := r.env("CODEX_HOME"); h != "" {
+		return []string{filepath.Join(h, "auth.json")}
+	}
+	return []string{
+		filepath.Join(r.Home, ".config", "codex", "auth.json"),
+		filepath.Join(r.Home, ".codex", "auth.json"),
+	}
+}
+
 // ProviderRoots returns the ordered candidate root directories for an agent's
 // local data on this OS. Env overrides rank first. The list is candidates, not
 // guarantees — callers use ExistingRoots to filter to what is actually present.

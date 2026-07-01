@@ -32,6 +32,9 @@ const (
 	WindowWeekly Window = "weekly"
 	// WindowWeeklyOpus is Claude's separate 7-day Opus cap ("seven_day_opus").
 	WindowWeeklyOpus Window = "weekly-opus"
+	// WindowWeeklySonnet is Claude's separate 7-day Sonnet cap ("seven_day_sonnet"),
+	// the newer model-specific weekly window the OAuth usage API reports.
+	WindowWeeklySonnet Window = "weekly-sonnet"
 )
 
 // Sample is a point-in-time plan-limit reading. It is NOT part of the ledger and

@@ -290,6 +290,8 @@ func windowLabel(w quota.Window) string {
 		return "Weekly"
 	case quota.WindowWeeklyOpus:
 		return "Weekly (Opus)"
+	case quota.WindowWeeklySonnet:
+		return "Weekly (Sonnet)"
 	default:
 		return string(w)
 	}

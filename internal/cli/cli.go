@@ -31,6 +31,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/provider"
 	"github.com/cloudyali/ai-agent-spend/internal/provider/claudecode"
 	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
 	"github.com/cloudyali/ai-agent-spend/internal/scan"
 	"github.com/cloudyali/ai-agent-spend/internal/store"
 	"github.com/cloudyali/ai-agent-spend/internal/termtext"
@@ -63,6 +64,12 @@ type App struct {
 	// nil in production → refresh.FetchContext (the single disclosed inbound GET);
 	// injected in tests so they never touch the network.
 	fetchPrices func(context.Context, string) ([]byte, error)
+	// fetchQuota returns live plan-limit samples for a provider ("claude"/"codex") from
+	// its usage API — the only source for Claude's windows, which Claude Code doesn't
+	// persist to disk. nil in production → the real credential-loading fetch
+	// (liveQuotaSamples); tests set a stub so unit tests never read the Keychain or hit
+	// the network.
+	fetchQuota func(provider string, now time.Time) []quota.Sample
 }
 
 // Run is the entry point: dispatch args, write to out/err, return an exit code.
@@ -1078,20 +1085,21 @@ func (a *App) cmdDoctor(args []string) int {
 		}
 	}
 	if *network {
-		fmt.Fprintln(a.Out, "default build: no network-capable sink in import graph  ✓")
-		// Honest disclosure: the only outbound is an INBOUND price fetch (a public
-		// file; no spend, identity, or telemetry leaves the machine). It fires on the
-		// explicit `pricing refresh` AND automatically on launch when the cache is
-		// >24h old — the latter is on by default but opt-out.
 		if refresh.NetworkEnabled {
-			fmt.Fprintf(a.Out, "inbound only: GET %s (a public price file; no data sent)\n", refresh.LiteLLMURL)
-			fmt.Fprintln(a.Out, "  · on `aispend pricing refresh`, and automatically when the cache is >24h old")
-			fmt.Fprintln(a.Out, "  · auto top-up runs in the background in the TUI, and bounded (≤2.5s) on other commands")
-			fmt.Fprintln(a.Out, "  · disable the auto top-up: --no-refresh, AISPEND_NO_REFRESH=1, or refresh_on_launch=false")
+			// Honest disclosure: the default build has exactly two outbounds, both
+			// best-effort and to no third party.
+			fmt.Fprintln(a.Out, "default build — outbound network is limited to these:")
+			fmt.Fprintf(a.Out, "  · GET %s\n", refresh.LiteLLMURL)
+			fmt.Fprintln(a.Out, "     a public price file; no spend, identity, or telemetry sent. On `pricing refresh`")
+			fmt.Fprintln(a.Out, "     and when the cache is >24h old; disable with --no-refresh / AISPEND_NO_REFRESH=1 / refresh_on_launch=false")
+			fmt.Fprintln(a.Out, "  · GET api.anthropic.com/api/oauth/usage + chatgpt.com/backend-api/wham/usage")
+			fmt.Fprintln(a.Out, "     live plan-limit windows; sends your own Claude/Codex OAuth token to that provider's")
+			fmt.Fprintln(a.Out, "     official endpoint (nowhere else), best-effort. Use the offline build to compile it out.")
+			fmt.Fprintln(a.Out, "RESULT: PASS — the only outbounds are the two above; no telemetry, no third parties")
 		} else {
-			fmt.Fprintln(a.Out, "offline build: price refresh disabled (no net/* compiled in)")
+			fmt.Fprintln(a.Out, "offline build: no net/* compiled in — price refresh and online quota are disabled")
+			fmt.Fprintln(a.Out, "RESULT: PASS — this binary cannot phone home")
 		}
-		fmt.Fprintln(a.Out, "RESULT: PASS — this binary cannot phone home")
 	}
 	return 0
 }

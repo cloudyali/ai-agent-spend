@@ -12,6 +12,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 	"github.com/cloudyali/ai-agent-spend/internal/platform"
 	"github.com/cloudyali/ai-agent-spend/internal/pricing"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
 )
 
 func writeUsage(t *testing.T, home, raw string) {
@@ -30,6 +31,9 @@ func appWithHome(home string, out *strings.Builder, now time.Time) *App {
 		Resolver: platform.Resolver{GOOS: "linux", Home: home, Env: func(string) string { return "" }},
 		Out:      out,
 		Now:      func() time.Time { return now },
+		// Hermetic by default: unit tests never read the Keychain or hit a usage API.
+		// A test opts in by overriding fetchQuota.
+		fetchQuota: func(string, time.Time) []quota.Sample { return nil },
 	}
 }
 
