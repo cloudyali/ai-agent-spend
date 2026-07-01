@@ -70,7 +70,7 @@ func menuChildren(refresh func()) func() []menuet.MenuItem {
 		var out []menuet.MenuItem
 		if st := current.Load(); st != nil {
 			for _, it := range st.Items {
-				out = append(out, menuet.MenuItem{Text: it.Text})
+				out = append(out, toMenuItem(it))
 			}
 		}
 		out = append(out,
@@ -79,4 +79,31 @@ func menuChildren(refresh func()) func() []menuet.MenuItem {
 		)
 		return out
 	}
+}
+
+// toMenuItem paints one menubar.Item with the After hierarchy: the provider Header is
+// bold, the ROI Hero is semibold, Dim (secondary) rows shrink, a Separator is a divider,
+// and Children become a submenu (a collapsed idle provider's detail, or the Trend spark).
+func toMenuItem(it menubar.Item) menuet.MenuItem {
+	if it.Separator {
+		return menuet.MenuItem{Type: menuet.Separator}
+	}
+	mi := menuet.MenuItem{Text: it.Text}
+	switch {
+	case it.Header:
+		mi.FontWeight = menuet.WeightBold
+		mi.FontSize = 15
+	case it.Hero:
+		mi.FontWeight = menuet.WeightSemibold
+	case it.Dim:
+		mi.FontSize = 12
+	}
+	if len(it.Children) > 0 {
+		kids := make([]menuet.MenuItem, len(it.Children))
+		for i, c := range it.Children {
+			kids[i] = toMenuItem(c)
+		}
+		mi.Children = func() []menuet.MenuItem { return kids }
+	}
+	return mi
 }

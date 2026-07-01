@@ -13,13 +13,13 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/store"
 )
 
-// usageSnapshots assembles the shared presentation model (lines.Snapshot) from the
-// providers' local plan-limit readings — the payload the local HTTP API serves and
-// the same numbers the TUI/`today` gauges show. Each active window becomes a progress
-// line (level + reset + projection + severity color); when the window's ledger value
-// is known it's followed by a "dollarized wall" text line. Reported windows only;
-// money is composed beside the gauge, never folded into it (package quota stays
-// money-free). Local reads only — no network.
+// UsageSnapshots assembles the shared presentation model (lines.Snapshot) the menu-bar
+// app renders. Each active quota window becomes a progress line (level + reset +
+// projection + severity color). From the ledger it leads each provider with the wedge —
+// ROI then cache-saved — demotes today's raw spend below the gauges, marks a provider
+// with a window but no spend today as Idle, and attaches a 7-day spend Trend series.
+// Reported windows only; money is composed beside the gauge, never folded into it
+// (package quota stays money-free). Local reads only — no network.
 func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 	qt := quota.NewTracker()
 	for _, s := range a.claudeQuotaSamples(now) {
@@ -58,13 +58,6 @@ func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 			ln.PeriodMs = int64(reset.Sub(start) / time.Millisecond)
 		}
 		snap.Lines = append(snap.Lines, ln)
-		if v, ok := a.wallSpend(s, now); ok { // dollarize the wall, beside the gauge
-			snap.Lines = append(snap.Lines, lines.Line{
-				Type:  "text",
-				Label: windowLabel(s.Window) + " value",
-				Value: "≈ " + usd(v, "USD") + " at API rates",
-			})
-		}
 		if s.ObservedAt.After(snap.FetchedAt) {
 			snap.FetchedAt = s.ObservedAt
 		}
@@ -75,10 +68,17 @@ func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 	// quota gauge can't). Computed here (off the render path) so the API and the menu
 	// bar share them, and always present once you've coded, quota window or not.
 	if st, err := a.openStore(); err == nil {
-		if evs, err := st.Query(store.Filter{Since: startOfDay(now), Until: now}); err == nil {
+		// Widen to a 7-day window so the menu bar's Trend sparkline has history; today's
+		// figures (spend/ROI/cache) still come from today's bucket only.
+		since := startOfDay(now).AddDate(0, 0, -6)
+		todayStart := startOfDay(now)
+		if evs, err := st.Query(store.Filter{Since: since, Until: now}); err == nil {
 			eng := a.pricingEngine()
 			plans := a.planSet()
-			type agg struct{ spend, without, tokens int64 }
+			type agg struct {
+				spend, without, tokens int64
+				trend                  [7]int64
+			}
 			byLedger := map[string]*agg{}
 			var ledgerOrder []string
 			for _, e := range evs {
@@ -91,14 +91,27 @@ func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 					byLedger[e.Provider] = g
 					ledgerOrder = append(ledgerOrder, e.Provider)
 				}
+				di := int(startOfDay(e.TSStart).Sub(since) / (24 * time.Hour))
+				if di < 0 {
+					di = 0
+				}
+				if di > 6 {
+					di = 6
+				}
+				today := !e.TSStart.Before(todayStart)
 				if m := e.CostViews.APIEquivalent; m != nil {
-					g.spend += m.Micros
+					g.trend[di] += m.Micros
+					if today {
+						g.spend += m.Micros
+					}
 				}
-				if w, ok := eng.WithoutCache(e.Model, e.Tokens); ok {
-					g.without += w.Micros
+				if today {
+					if w, ok := eng.WithoutCache(e.Model, e.Tokens); ok {
+						g.without += w.Micros
+					}
+					// CacheWrite1h is a subset of CacheWrite, so it isn't added again.
+					g.tokens += e.Tokens.Input + e.Tokens.Output + e.Tokens.CacheRead + e.Tokens.CacheWrite
 				}
-				// CacheWrite1h is a subset of CacheWrite, so it isn't added again.
-				g.tokens += e.Tokens.Input + e.Tokens.Output + e.Tokens.CacheRead + e.Tokens.CacheWrite
 			}
 			sort.Strings(ledgerOrder) // deterministic provider order
 			for _, lp := range ledgerOrder {
@@ -117,13 +130,11 @@ func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 				if snap.Plan == "" && plan.Kind == "subscription" && plan.Name != "" {
 					snap.Plan = tidyPlanLabel(plan.Name, snap.DisplayName) // context for the ROI
 				}
-				snap.Lines = append(snap.Lines, lines.Line{
-					Type:  "text",
-					Label: "Today",
-					Value: "≈ " + usd(g.spend, "USD") + " · " + humanTokens(g.tokens),
-				})
+				// The wedge leads: ROI then Cache saved, prepended ahead of the quota
+				// gauges; today's raw spend is demoted below them.
+				var lead []lines.Line
 				if fee, ok := pricing.ProratedFee(toPricingPlan(plan), 1); ok && fee.Micros > 0 {
-					snap.Lines = append(snap.Lines, lines.Line{
+					lead = append(lead, lines.Line{
 						Type:  "text",
 						Label: "ROI",
 						Value: roiStr(float64(g.spend)/float64(fee.Micros)) + " vs plan (" + usd(fee.Micros, "USD") + "/day)",
@@ -132,12 +143,19 @@ func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 				if g.without > g.spend {
 					saved := g.without - g.spend
 					pct := float64(saved) / float64(g.without) * 100
-					snap.Lines = append(snap.Lines, lines.Line{
+					lead = append(lead, lines.Line{
 						Type:  "text",
 						Label: "Cache saved",
 						Value: fmt.Sprintf("≈ %s (%.0f%%)", usd(saved, "USD"), pct),
 					})
 				}
+				snap.Lines = append(lead, snap.Lines...)
+				snap.Lines = append(snap.Lines, lines.Line{
+					Type:  "text",
+					Label: "Today",
+					Value: "≈ " + usd(g.spend, "USD") + " · " + humanTokens(g.tokens),
+				})
+				snap.Trend = append([]int64(nil), g.trend[:]...)
 			}
 		}
 	}
@@ -148,6 +166,17 @@ func (a *App) UsageSnapshots(now time.Time) []lines.Snapshot {
 		if snap.FetchedAt.IsZero() {
 			snap.FetchedAt = now
 		}
+		// Idle: a quota window but nothing spent today → the menu bar collapses it.
+		hasProgress, hasToday := false, false
+		for _, ln := range snap.Lines {
+			switch {
+			case ln.Type == "progress":
+				hasProgress = true
+			case ln.Type == "text" && ln.Label == "Today":
+				hasToday = true
+			}
+		}
+		snap.Idle = hasProgress && !hasToday
 		out = append(out, *snap)
 	}
 	return out

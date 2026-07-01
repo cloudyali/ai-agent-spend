@@ -72,6 +72,12 @@ type Snapshot struct {
 	Plan        string    `json:"plan,omitempty"`
 	Lines       []Line    `json:"lines"`
 	FetchedAt   time.Time `json:"fetchedAt"`
+	// Idle marks a provider with quota windows but no ledger spend today: the menu bar
+	// collapses it to a single expandable row instead of a wall of zeros.
+	Idle bool `json:"idle,omitempty"`
+	// Trend is per-day api-equivalent spend in micros, oldest→newest (up to 7 days),
+	// for the menu bar's Trend sparkline. Absent when there's no ledger spend.
+	Trend []int64 `json:"trend,omitempty"`
 }
 
 // Project extrapolates current usage to the window's reset at the run rate observed
