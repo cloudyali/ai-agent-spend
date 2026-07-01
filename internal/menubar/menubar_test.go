@@ -13,7 +13,7 @@ func tp(t time.Time) *time.Time { return &t }
 
 func TestRender_EmptyState(t *testing.T) {
 	st := Render(nil, time.Now())
-	if !strings.Contains(st.Title, "aispend") {
+	if !strings.Contains(st.Title, "AiSpend") {
 		t.Errorf("title = %q", st.Title)
 	}
 	if len(st.Items) == 0 || !strings.Contains(st.Items[0].Text, "spend today") {

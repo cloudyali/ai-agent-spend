@@ -34,7 +34,7 @@ type Item struct {
 func Render(snaps []lines.Snapshot, now time.Time) State {
 	if len(snaps) == 0 {
 		return State{
-			Title: "aispend —",
+			Title: "AiSpend —",
 			Items: []Item{{Text: "No AI-coding spend today yet."}},
 		}
 	}
@@ -70,7 +70,7 @@ func Render(snaps []lines.Snapshot, now time.Time) State {
 	}
 	// Prefer the worst gauge (headroom is the sharper signal); fall back to today's
 	// spend when there's no quota window; else a bare label.
-	title := "aispend"
+	title := "AiSpend"
 	switch {
 	case worstTitle != "":
 		title = worstTitle

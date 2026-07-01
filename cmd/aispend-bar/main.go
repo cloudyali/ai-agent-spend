@@ -57,7 +57,7 @@ func main() {
 	}()
 
 	a := menuet.App()
-	a.Name = "aispend"
+	a.Name = "AiSpend"
 	a.Label = "io.cloudyali.aispend-bar"
 	a.Children = menuChildren(refresh)
 	a.RunApplication()

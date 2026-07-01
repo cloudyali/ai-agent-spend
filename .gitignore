@@ -5,6 +5,7 @@
 /aispend
 /aispend-bar
 /aispend-bar.app/
+/AiSpend.app/
 *.exe
 *.test
 *.out

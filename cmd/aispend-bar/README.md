@@ -1,4 +1,4 @@
-# aispend-bar — macOS menu-bar client
+# AiSpend — macOS menu-bar app (cmd/aispend-bar)
 
 A lean menu-bar app that shows your AI-coding spend at a glance. It is **self-contained**: it
 links the aispend engine, brings the ledger current (a bounded, offline scan), and reads it
@@ -44,10 +44,10 @@ which *crashes* a loose executable (`NSInternalInconsistencyException: bundlePro
 is nil`). Use the bundler:
 
 ```bash
-cmd/aispend-bar/build-app.sh    # → ./aispend-bar.app (ad-hoc signed, menu-bar agent)
-open ./aispend-bar.app          # appears in your menu bar
+cmd/aispend-bar/build-app.sh    # → ./AiSpend.app (ad-hoc signed, menu-bar agent)
+open ./AiSpend.app          # appears in your menu bar
 # …or run the inner binary to watch logs (it still resolves the bundle from its path):
-./aispend-bar.app/Contents/MacOS/aispend-bar
+./AiSpend.app/Contents/MacOS/AiSpend
 ```
 
 **No `aispend serve` needed** — the bar reads the ledger itself.

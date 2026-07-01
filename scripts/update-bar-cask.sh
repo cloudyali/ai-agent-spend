@@ -32,12 +32,12 @@ cask "aispend-bar" do
   homepage "https://github.com/cloudyali/ai-agent-spend"
 
   depends_on macos: ">= :monterey"
-  app "aispend-bar.app"
+  app "AiSpend.app"
 
   # Phase 1 (unsigned): strip the quarantine bit so Gatekeeper opens it. Remove once the
   # app is Developer-ID-signed + notarized.
   postflight do
-    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/aispend-bar.app"]
+    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/AiSpend.app"]
   end
 end
 CASK
