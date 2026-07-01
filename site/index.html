@@ -29,8 +29,11 @@
 <meta name="twitter:description" content="Price every Claude Code & Codex turn at real API rates. Trace each dollar to its turn, file, and commit. One static binary, offline by default." />
 <meta name="twitter:image" content="https://aispend.cloudyali.io/og.jpg" />
 
-<!-- Favicon: receipt mark, near-black -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230A0A0B'/%3E%3Cpath d='M9 8h14v17l-3-2-2 2-2-2-2 2-2-2-3 2V8Z' fill='%23F4F4F5'/%3E%3Cpath d='M12 13h8M12 17h6' stroke='%23FFFFFF' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+<!-- Favicon: AiSpend gauge -->
+<link rel="icon" type="image/x-icon" href="favicon.ico" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
 
 <!-- Fonts: Fraunces (display serif), Inter (body), Roboto Mono (code) -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -58,7 +61,8 @@
     "Plan vs usage: api-equivalent cost next to your flat plan, with an amortized view",
     "Optional monthly budget with pace tracking",
     "Offline by default, with no API keys, no account, and no telemetry",
-    "Single static Go binary with a CLI and an interactive TUI"
+    "Single static Go binary with a CLI and an interactive TUI",
+    "Optional macOS menu-bar app showing today's spend, plan ROI, and cache savings at a glance"
   ],
   "screenshot": [
     "https://aispend.cloudyali.io/shots/explorer.jpg",
@@ -1242,6 +1246,18 @@ footer.ft{background:var(--plum-1100);color:var(--text-3);padding:64px 0 36px;ma
       <div class="tab-panel" id="panel-go" role="tabpanel" aria-labelledby="tab-go" hidden>
         <p>If you have a Go toolchain:</p>
         <div class="codeblock"><button class="copy" data-copy="go install github.com/cloudyali/ai-agent-spend/cmd/aispend@latest" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="p">$ </span>go install github.com/cloudyali/ai-agent-spend/cmd/aispend@latest</div>
+      </div>
+    </div>
+
+    <!-- Menu-bar app (macOS) -->
+    <div class="install-card" style="margin-top:22px;display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px">
+      <img src="app-icon-256.png" alt="AiSpend app icon" width="88" height="88" style="flex:none" />
+      <div style="flex:1;min-width:250px">
+        <h3 style="font-size:21px;margin-bottom:6px">AiSpend in your menu bar <span style="font-size:13px;color:var(--paper-ink-2);font-weight:500">· macOS</span></h3>
+        <p style="font-size:14.5px;color:var(--paper-ink-2);margin:0 0 14px;max-width:56ch">Today's spend, plan ROI, and what caching saved — one glance in the menu bar. Self-contained: no server, no port.</p>
+        <div class="codeblock" style="margin-bottom:14px"><button class="copy" data-copy="brew install --cask cloudyali/tap/aispend-bar" aria-label="Copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="p">$ </span>brew install --cask cloudyali/tap/aispend-bar</div>
+        <a href="https://github.com/cloudyali/ai-agent-spend/releases/latest" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:8px;background:var(--paper-ink);color:#fff;font-weight:600;font-size:14.5px;padding:12px 18px;border-radius:var(--r)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></svg>Download .dmg</a>
+        <p style="font-size:12.5px;color:var(--paper-ink-2);margin-top:13px">First launch of the unsigned build: right-click → Open, or <code>xattr -dr com.apple.quarantine /Applications/AiSpend.app</code>. (The cask does this for you.)</p>
       </div>
     </div>
   </div>
