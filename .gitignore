@@ -1,8 +1,10 @@
 # --- Go build artifacts ---
 /bin/
 /dist/
-# compiled CLI at repo root (anchored: keeps cmd/aispend/ source)
+# compiled CLI + menu-bar app at repo root (anchored: keeps cmd/ source)
 /aispend
+/aispend-bar
+/aispend-bar.app/
 *.exe
 *.test
 *.out
