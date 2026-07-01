@@ -78,7 +78,23 @@ else
   codesign --force --deep --sign - "$APP"
 fi
 
-# 5. Package a drag-to-Applications .dmg.
+# 5. Notarize + staple the .APP (Phase 2) so the copied app carries its own ticket —
+#    this is what the Homebrew cask installs, so it must launch clean offline. Runs only
+#    when the notary credentials are present.
+notarized=0
+if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+  echo "release-bar: notarizing the app ..."
+  ZIP="$DIST/AiSpend-notarize.zip"
+  ditto -c -k --keepParent "$APP" "$ZIP"
+  xcrun notarytool submit "$ZIP" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+  xcrun stapler staple "$APP"
+  rm -f "$ZIP"
+  notarized=1
+else
+  echo "release-bar: APPLE_* not set — shipping unsigned/un-notarized (Phase 1)." >&2
+fi
+
+# 6. Package a drag-to-Applications .dmg from the (now-stapled) app.
 STAGE="$DIST/dmg-root"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
@@ -86,16 +102,14 @@ ln -sf /Applications "$STAGE/Applications"
 hdiutil create -volname "AiSpend" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 rm -rf "$STAGE"
 
-# 6. Notarize + staple (Phase 2) — only when the notary credentials are present.
-if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
-  echo "release-bar: notarizing $DMG ..."
+# 7. Notarize + staple the .dmg too, so the direct download opens cleanly.
+if [ "$notarized" = 1 ]; then
+  echo "release-bar: notarizing the dmg ..."
   xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
   xcrun stapler staple "$DMG"
-else
-  echo "release-bar: APPLE_* not set — shipping unsigned/un-notarized (Phase 1)." >&2
 fi
 
-# 7. Checksum for the Homebrew cask.
+# 8. Checksum for the Homebrew cask.
 shasum -a 256 "$DMG" | awk '{print $1}' > "$DMG.sha256"
 echo "Built $DMG"
 echo "sha256: $(cat "$DMG.sha256")"

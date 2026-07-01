@@ -43,6 +43,9 @@ jobs:
     needs: goreleaser # the Release for this tag exists; we attach the .dmg to it
     permissions:
       contents: write
+    env:
+      # Present only when Phase 2 signing is configured; guards the cert-import + sign steps.
+      HAS_CERT: ${{ secrets.APPLE_CERTIFICATE }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -58,12 +61,30 @@ jobs:
       - name: Add the macOS-only menuet dependency
         run: go get github.com/caseymrm/menuet
 
-      - name: Build the .dmg (universal → .app → dmg)
+      # Phase 2 — import the Developer ID cert into a temporary keychain. Skipped entirely
+      # when the APPLE_CERTIFICATE secret is absent (Phase 1 → unsigned build).
+      - name: Import Developer ID certificate
+        if: ${{ env.HAS_CERT != '' }}
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      # Read the imported identity's name back out of the keychain into GITHUB_ENV, so the
+      # build step signs against it without anyone hand-copying the identity string.
+      - name: Resolve signing identity
+        if: ${{ env.HAS_CERT != '' }}
+        run: |
+          IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')"
+          [ -n "$IDENTITY" ] || { echo "no Developer ID Application identity in the imported cert" >&2; exit 1; }
+          echo "APPLE_SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Build the .dmg (universal → .app → dmg; signs + notarizes when Phase 2 secrets are set)
         env:
           VERSION: ${{ github.ref_name }}
-          # Phase 2 (optional): set these repo secrets to Developer-ID-sign + notarize.
-          # Unset → Phase 1 unsigned build (the cask clears quarantine on install).
-          APPLE_SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+          # APPLE_SIGN_IDENTITY is injected via GITHUB_ENV by "Resolve signing identity" when
+          # Phase 2 is on; unset → release-bar.sh ad-hoc-signs (Phase 1). The notary creds
+          # below drive notarize + staple (ignored in Phase 1).
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -78,4 +99,6 @@ jobs:
       - name: Publish the Homebrew cask
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # Notarized (Phase 2) → the cask omits the quarantine-strip postflight.
+          NOTARIZED: ${{ env.HAS_CERT != '' && 'yes' || '' }}
         run: bash scripts/update-bar-cask.sh "${GITHUB_REF_NAME}"
