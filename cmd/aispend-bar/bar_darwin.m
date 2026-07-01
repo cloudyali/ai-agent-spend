@@ -35,6 +35,24 @@
     decisionHandler(WKNavigationActionPolicyAllow);
 }
 
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    // Shrink-wrap the popover to the rendered content so a short (idle-heavy) view never shows
+    // an empty gap below it. Runs on every load, so the height re-fits on each refresh.
+    NSPopover *popover = self.popover; // self is the delegate instance; captured by the block
+    [webView evaluateJavaScript:@"document.body.scrollHeight" completionHandler:^(id result, NSError *error) {
+        if (![result isKindOfClass:[NSNumber class]]) {
+            return; // measurement failed — leave the current size be
+        }
+        CGFloat h = [result doubleValue];
+        if (h < 1) {
+            return;
+        }
+        // evaluateJavaScript delivers its completion handler on the main thread, so touching
+        // AppKit here is safe. Width stays 320 to match the body.
+        popover.contentSize = NSMakeSize(320, h);
+    }];
+}
+
 @end
 
 static AISBar *gBar;

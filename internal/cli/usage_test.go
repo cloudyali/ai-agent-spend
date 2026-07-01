@@ -472,7 +472,10 @@ func TestUsageSnapshots_ThrottlesUsageAPIFetch(t *testing.T) {
 			WindowMinutes: 300, ResetsAt: now.Add(2 * time.Hour), ObservedAt: now}}
 	}
 
-	a.UsageSnapshots(now)                       // fetch is due → hit #1
+	a.UsageSnapshots(now) // startup → fetch is due immediately → hit #1
+	if claudeFetches != 1 {
+		t.Fatalf("the first refresh at startup must fetch immediately (not wait out the interval), got %d", claudeFetches)
+	}
 	a.UsageSnapshots(now.Add(30 * time.Second)) // within interval → cached, no network
 	a.UsageSnapshots(now.Add(2 * time.Minute))  // within interval → cached, no network
 	if claudeFetches != 1 {

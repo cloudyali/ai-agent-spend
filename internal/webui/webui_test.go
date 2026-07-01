@@ -100,3 +100,11 @@ func TestRender_EscapesUntrustedText(t *testing.T) {
 		t.Error("provider-derived text must be HTML-escaped (no raw <script>)")
 	}
 }
+
+// The body carries a little vertical padding so the first and last rows clear the
+// NSPopover's rounded corners (the web view fills the popover edge-to-edge).
+func TestRender_BodyPaddingClearsRoundedCorners(t *testing.T) {
+	if out := Render(nil, time.Now()); !strings.Contains(out, "padding:6px 0") {
+		t.Error("body should carry vertical padding so content clears the popover's rounded corners")
+	}
+}

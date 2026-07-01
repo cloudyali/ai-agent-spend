@@ -172,7 +172,7 @@ var tmpl = template.Must(template.New("popover").Parse(`<!doctype html><html><he
 :root{--bg:#fff;--fg:#1d1d1f;--dim:#8a8a8e;--line:#e5e5ea;--track:#e9e9ec;--roi-bg:#e1f5ee;--roi-fg:#0f6e56}
 @media (prefers-color-scheme:dark){:root{--bg:#1e1e1e;--fg:#f2f2f7;--dim:#98989d;--line:#3a3a3c;--track:#3a3a3c;--roi-bg:#0f3b30;--roi-fg:#5dcaa5}}
 *{box-sizing:border-box}
-body{margin:0;width:320px;background:var(--bg);color:var(--fg);font:13px/1.35 -apple-system,system-ui,sans-serif}
+body{margin:0;padding:6px 0;width:320px;background:var(--bg);color:var(--fg);font:13px/1.35 -apple-system,system-ui,sans-serif}
 .prov{padding:10px 12px}
 .head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .name{font-weight:600}
