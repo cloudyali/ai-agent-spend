@@ -41,8 +41,8 @@ func TestRender_LeadsWithWedgeHierarchy(t *testing.T) {
 	}
 	st := Render([]lines.Snapshot{claude}, now)
 
-	if !strings.Contains(st.Title, "Claude") || !strings.Contains(st.Title, "23%") {
-		t.Errorf("title should surface the worst gauge, got %q", st.Title)
+	if !strings.Contains(st.Title, "Claude") || !strings.Contains(st.Title, "23%") || !strings.Contains(st.Title, "×") {
+		t.Errorf("title should surface the worst gauge plus the ROI, got %q", st.Title)
 	}
 
 	var header, hero, dimCache, dimToday, barRow, trend *Item
@@ -160,6 +160,23 @@ func TestRender_ProgressPaceAndBar(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("items missing %q:\n%s", want, joined)
 		}
+	}
+}
+
+func TestRender_TitleLeadsWithROIWhenNoGauge(t *testing.T) {
+	// No quota window, but there is an ROI → the title flexes the ROI, not raw spend.
+	snaps := []lines.Snapshot{
+		{ProviderID: "claude", DisplayName: "Claude", Plan: "Max 20x", Lines: []lines.Line{
+			{Type: "text", Label: "ROI", Value: "31× vs plan ($6.67/day)"},
+			{Type: "text", Label: "Today", Value: "≈ $209.29 · 180.8M tokens"},
+		}},
+	}
+	st := Render(snaps, time.Now())
+	if !strings.Contains(st.Title, "Claude") || !strings.Contains(st.Title, "31×") {
+		t.Errorf("with no gauge but an ROI, the title should lead with ROI, got %q", st.Title)
+	}
+	if strings.Contains(st.Title, "$") {
+		t.Errorf("title should prefer ROI over raw spend, got %q", st.Title)
 	}
 }
 

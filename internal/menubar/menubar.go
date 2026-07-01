@@ -48,8 +48,10 @@ func Render(snaps []lines.Snapshot, now time.Time) State {
 
 	worstSev := lines.SevOK
 	worstUsed := -1.0
-	worstTitle := ""
+	worstName, worstLabel := "", ""
 	spendTitle := ""
+	roiFirst, roiFirstName := "", ""
+	roiByProv := map[string]string{}
 	for _, s := range snaps {
 		for i := range s.Lines {
 			ln := s.Lines[i]
@@ -59,7 +61,17 @@ func Render(snaps []lines.Snapshot, now time.Time) State {
 				sev := lines.Classify(*ln.Used, *ln.Limit, breaches)
 				if sev > worstSev || (sev == worstSev && *ln.Used > worstUsed) {
 					worstSev, worstUsed = sev, *ln.Used
-					worstTitle = fmt.Sprintf("%s %.0f%%", s.DisplayName, *ln.Used)
+					worstName = s.DisplayName
+					worstLabel = fmt.Sprintf("%s %.0f%%", s.DisplayName, *ln.Used)
+				}
+			case ln.Type == "text" && ln.Label == "ROI":
+				if tok := roiToken(ln.Value); tok != "" {
+					if _, seen := roiByProv[s.DisplayName]; !seen {
+						roiByProv[s.DisplayName] = tok
+					}
+					if roiFirst == "" {
+						roiFirst, roiFirstName = tok, s.DisplayName
+					}
 				}
 			case ln.Type == "text" && ln.Label == "Today" && spendTitle == "":
 				if d := dollarToken(ln.Value); d != "" {
@@ -68,12 +80,18 @@ func Render(snaps []lines.Snapshot, now time.Time) State {
 			}
 		}
 	}
-	// Prefer the worst gauge (headroom is the sharper signal); fall back to today's
-	// spend when there's no quota window; else a bare label.
+	// Title priority: warn on the worst gauge first (flexing the ROI beside it when
+	// known); with no live gauge, lead with the ROI rather than raw spend (the wedge,
+	// not a bill); fall back to today's spend, else a bare label.
 	title := "AiSpend"
 	switch {
-	case worstTitle != "":
-		title = worstTitle
+	case worstLabel != "":
+		title = worstLabel
+		if roi := roiByProv[worstName]; roi != "" {
+			title += " · " + roi
+		}
+	case roiFirst != "":
+		title = roiFirstName + " " + roiFirst
 	case spendTitle != "":
 		title = spendTitle
 	}
@@ -203,6 +221,15 @@ func sumInt64(vals []int64) int64 {
 		s += v
 	}
 	return s
+}
+
+// roiToken returns the leading token of an ROI line's value ("31×" from
+// "31× vs plan (...)") for the menu-bar title.
+func roiToken(s string) string {
+	if f := strings.Fields(s); len(f) > 0 {
+		return f[0]
+	}
+	return ""
 }
 
 // dollarToken returns the first whitespace-delimited token that looks like a dollar
