@@ -14,12 +14,37 @@ import (
 const onlineQuotaTimeout = 3 * time.Second
 
 // onlineSamples returns a provider's live plan-limit samples: the injected test hook when
-// set (so unit tests stay hermetic), else the real credential-loading fetch.
+// set (so unit tests stay hermetic), else the real credential-loading fetch. The reading
+// passes through the last-good cache (rememberQuota) so a single empty fetch can't blank a
+// gauge the menu bar just showed.
 func (a *App) onlineSamples(provider string, now time.Time) []quota.Sample {
+	var fresh []quota.Sample
 	if a.fetchQuota != nil {
-		return a.fetchQuota(provider, now)
+		fresh = a.fetchQuota(provider, now)
+	} else {
+		fresh = a.liveQuotaSamples(provider, now)
 	}
-	return a.liveQuotaSamples(provider, now)
+	return a.rememberQuota(provider, fresh)
+}
+
+// rememberQuota smooths a transient empty fetch: a non-empty reading becomes the provider's
+// last-good and is returned as-is; an empty reading (a per-refresh network hiccup) falls
+// back to the last-good, so one dropped fetch can't blank a live gauge — which would also
+// reorder the provider under an idle peer. Staleness isn't re-checked here: quota.Tracker
+// .Active already drops any window past its reset at render, so a cached window that expires
+// mid-outage falls off there (one source of truth). The cache is bounded — one entry per
+// provider, overwritten on success. Locked because the menu bar can refresh concurrently
+// (the interval ticker plus a manual Refresh).
+func (a *App) rememberQuota(provider string, fresh []quota.Sample) []quota.Sample {
+	a.quotaCacheMu.Lock()
+	defer a.quotaCacheMu.Unlock()
+	if len(fresh) > 0 {
+		if a.quotaCache == nil {
+			a.quotaCache = map[string][]quota.Sample{}
+		}
+		a.quotaCache[provider] = fresh
+	}
+	return a.quotaCache[provider]
 }
 
 // liveQuotaSamples loads the provider's local OAuth credential and reads its live windows

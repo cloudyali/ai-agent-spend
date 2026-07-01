@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudyali/ai-agent-spend/internal/config"
@@ -70,6 +71,13 @@ type App struct {
 	// (liveQuotaSamples); tests set a stub so unit tests never read the Keychain or hit
 	// the network.
 	fetchQuota func(provider string, now time.Time) []quota.Sample
+	// quotaCache holds the last non-empty quota reading per provider so a transient empty
+	// fetch (a per-refresh network hiccup) can't blank a live gauge — the menu bar re-scans
+	// every ~30s, and Claude has no on-disk fallback, so one dropped fetch would otherwise
+	// flick its bars off and reorder it. Guarded because the menu bar can refresh
+	// concurrently (the interval ticker plus a manual Refresh). See onlineSamples.
+	quotaCacheMu sync.Mutex
+	quotaCache   map[string][]quota.Sample
 }
 
 // Run is the entry point: dispatch args, write to out/err, return an exit code.

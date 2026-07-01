@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudyali/ai-agent-spend/internal/event"
 	"github.com/cloudyali/ai-agent-spend/internal/lines"
+	"github.com/cloudyali/ai-agent-spend/internal/quota"
 )
 
 func TestUsageSnapshots_BuildsProviderSnapshot(t *testing.T) {
@@ -367,5 +368,85 @@ func TestUsageSnapshots_AttachesTrend(t *testing.T) {
 	}
 	if sum != 10_000_000 {
 		t.Errorf("trend sum = %d, want 10_000_000", sum)
+	}
+}
+
+// A transient empty online quota fetch (a per-refresh network hiccup) must not blank a
+// provider's gauge or reorder it below an idle peer: the last-good samples, still valid at
+// now, are reused. Regression for the menu-bar popover oscillating — Claude's Session/
+// Weekly bars flicked off and Claude dropped under idle Codex whenever one 30s fetch of
+// the usage API came back empty (Claude Code persists no on-disk fallback).
+func TestUsageSnapshots_QuotaCacheSurvivesTransientEmptyFetch(t *testing.T) {
+	now := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
+	a := appWithHome(t.TempDir(), &strings.Builder{}, now)
+
+	// Claude has spend today (active → should lead); Codex has none (idle → should trail).
+	st, err := a.openStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := event.USD(12_500_000)
+	if err := st.Upsert([]event.AgentEvent{{
+		EventID: "e1", SessionID: "s1", Provider: "claude_code", Model: "claude-opus-4-8",
+		TSStart: now.Add(-2 * time.Hour), TSEnd: now.Add(-2 * time.Hour),
+		CostViews: event.CostViews{APIEquivalent: &m},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Claude reports a live Session window on the first refresh, then comes back empty (the
+	// hiccup); Codex always reports its idle weekly window.
+	var claudeCalls int
+	a.fetchQuota = func(provider string, _ time.Time) []quota.Sample {
+		switch provider {
+		case "claude":
+			claudeCalls++
+			if claudeCalls == 1 {
+				return []quota.Sample{{Provider: "claude", Window: quota.Window5h, UsedPercent: 12,
+					WindowMinutes: 300, ResetsAt: now.Add(90 * time.Minute), ObservedAt: now}}
+			}
+			return nil
+		case "codex":
+			return []quota.Sample{{Provider: "codex", Window: quota.WindowWeekly, UsedPercent: 5,
+				WindowMinutes: 10080, ResetsAt: now.Add(5 * 24 * time.Hour), ObservedAt: now}}
+		}
+		return nil
+	}
+
+	claudeSnap := func(snaps []lines.Snapshot) *lines.Snapshot {
+		for i := range snaps {
+			if snaps[i].ProviderID == "claude" {
+				return &snaps[i]
+			}
+		}
+		return nil
+	}
+	hasGauge := func(s *lines.Snapshot) bool {
+		if s == nil {
+			return false
+		}
+		for _, ln := range s.Lines {
+			if ln.Type == "progress" {
+				return true
+			}
+		}
+		return false
+	}
+
+	first := a.UsageSnapshots(now)
+	if !hasGauge(claudeSnap(first)) {
+		t.Fatalf("precondition: first refresh should show Claude's gauge: %+v", first)
+	}
+	if first[0].ProviderID != "claude" {
+		t.Fatalf("precondition: active Claude should lead idle Codex: %+v", first)
+	}
+
+	// Second refresh: Claude's fetch is empty, but the gauge and its lead position must hold.
+	second := a.UsageSnapshots(now.Add(time.Minute))
+	if !hasGauge(claudeSnap(second)) {
+		t.Errorf("transient empty fetch blanked Claude's gauge (should reuse last-good): %+v", second)
+	}
+	if second[0].ProviderID != "claude" {
+		t.Errorf("transient empty fetch reordered Claude below idle Codex: %+v", second)
 	}
 }
