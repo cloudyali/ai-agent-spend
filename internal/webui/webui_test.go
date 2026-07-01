@@ -38,6 +38,11 @@ func TestRender_WedgeAndGauges(t *testing.T) {
 	if !strings.ContainsAny(out, "▁▂▃▄▅▆▇█") {
 		t.Error("want a Trend sparkline in the popover")
 	}
+	// The breach pace also shows the absolute run-out instant (local tz), not just the countdown.
+	wantRunOut := now.Add(367200 * time.Second).Local().Format("Mon 3:04 PM")
+	if !strings.Contains(out, "("+wantRunOut+")") {
+		t.Errorf("breach pace should show the absolute run-out time %q in %q", wantRunOut, out)
+	}
 }
 
 func TestRender_IdleCollapsed(t *testing.T) {
@@ -59,7 +64,7 @@ func TestRender_ProjectedPaceAndColorFallback(t *testing.T) {
 			Projection: &lines.Projection{ProjectedUsed: 44}},
 	}}}
 	out := Render(snaps, time.Now())
-	if !strings.Contains(out, "on pace ~44% by reset") {
+	if !strings.Contains(out, "projected ~44% used at reset") {
 		t.Error("projected-pace text missing")
 	}
 	if !strings.Contains(out, "#8a8a8e") {

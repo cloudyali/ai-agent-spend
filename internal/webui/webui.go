@@ -57,7 +57,7 @@ func Render(snaps []lines.Snapshot, now time.Time) string {
 					Width: clampPct(*ln.Used),
 					Color: safeColor(ln.Color),
 					Reset: resetText(ln, now),
-					Pace:  paceText(ln),
+					Pace:  paceText(ln, now),
 				})
 			case ln.Label == "ROI":
 				p.ROI = ln.Value
@@ -151,16 +151,19 @@ func resetText(ln lines.Line, now time.Time) string {
 	return "resets in " + humanDur(ln.ResetsAt.Sub(now))
 }
 
-func paceText(ln lines.Line) string {
+func paceText(ln lines.Line, now time.Time) string {
 	p := ln.Projection
 	if p == nil {
 		return ""
 	}
 	switch {
 	case p.Breaches:
-		return "on pace to run out in " + humanDur(time.Duration(p.ETASeconds)*time.Second)
+		eta := time.Duration(p.ETASeconds) * time.Second
+		// Show the countdown and the absolute instant it lands (local tz — visual times are
+		// local, the ledger stays UTC). Run-out is always <7d out, so weekday+time is unambiguous.
+		return "on pace to run out in " + humanDur(eta) + " (" + now.Add(eta).Local().Format("Mon 3:04 PM") + ")"
 	case p.ProjectedUsed > 0:
-		return fmt.Sprintf("on pace ~%.0f%% by reset", p.ProjectedUsed)
+		return fmt.Sprintf("projected ~%.0f%% used at reset", p.ProjectedUsed)
 	}
 	return ""
 }
