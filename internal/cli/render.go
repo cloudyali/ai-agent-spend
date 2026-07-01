@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/lines"
 	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 )
 
@@ -53,6 +54,8 @@ const (
 	cCacheWrite = "33" // amber / yellow
 	cBold       = "1"
 	cDim        = "2"
+	cWarn       = "33" // amber — gauge heads-up (shares the amber SGR with cache-write)
+	cCrit       = "31" // red — gauge at/near the wall
 )
 
 // paint wraps s in an SGR code when enabled, else returns it unchanged — so a
@@ -62,6 +65,20 @@ func paint(enabled bool, code, s string) string {
 		return s
 	}
 	return "\x1b[" + code + "m" + s + "\x1b[0m"
+}
+
+// severityCode maps a gauge severity to its ANSI SGR code for the hand-rolled
+// surfaces — empty for OK, so a healthy gauge stays neutral (mirroring
+// lines.Severity.Hex on the structured surfaces).
+func severityCode(sev lines.Severity) string {
+	switch sev {
+	case lines.SevWarn:
+		return cWarn
+	case lines.SevCrit:
+		return cCrit
+	default:
+		return ""
+	}
 }
 
 // --- intensity sparkline (block ramp) ---

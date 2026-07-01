@@ -20,6 +20,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/budget"
 	"github.com/cloudyali/ai-agent-spend/internal/chain"
 	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/lines"
 	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 	"github.com/cloudyali/ai-agent-spend/internal/quota"
 	"github.com/cloudyali/ai-agent-spend/internal/termtext"
@@ -219,6 +220,13 @@ type Model struct {
 	quotaFn func() []quota.Sample
 	quota   []quota.Sample
 
+	// wallSpendFn (optional; WithWallSpend) returns the api-equivalent spend inside a
+	// sample's window — used to "dollarize the wall" beside the reported gauge. It is
+	// invoked at refresh (not per render) and cached in wallByKey, so a repaint never
+	// touches the store.
+	wallSpendFn func(quota.Sample) (int64, bool)
+	wallByKey   map[string]int64
+
 	// budget (optional; WithBudget): the monthly api-equivalent pace gauge. budgetFn is
 	// re-read on each refresh (so a watch tick re-paces); off by default → not rendered.
 	budgetFn   func() (budget.Pace, bool)
@@ -295,6 +303,14 @@ func (m Model) WithPlanPicker(providers []ProviderChoice, plans []PlanChoice, to
 func (m Model) WithQuota(fn func() []quota.Sample) Model {
 	m.quotaFn = fn
 	m.refresh()
+	return m
+}
+
+// WithWallSpend enables "dollarize the wall": fn returns the api-equivalent spend
+// inside a sample's window (the cli sums the ledger for that range), shown beside the
+// reported gauge. Off by default; unset leaves the gauge as the window reading alone.
+func (m Model) WithWallSpend(fn func(quota.Sample) (int64, bool)) Model {
+	m.wallSpendFn = fn
 	return m
 }
 
@@ -467,6 +483,8 @@ var (
 	stFaint = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "245"})
 	stBold  = lipgloss.NewStyle().Bold(true)
 	stBar   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "30", Dark: "73"})
+	stWarn  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "130", Dark: "214"})
+	stCrit  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "160", Dark: "203"})
 	stSel   = lipgloss.NewStyle().Bold(true).
 		Foreground(lipgloss.AdaptiveColor{Light: "232", Dark: "231"}).
 		Background(lipgloss.AdaptiveColor{Light: "251", Dark: "238"})
@@ -493,6 +511,14 @@ func (m *Model) refresh() {
 	m.rows = m.buildRows()
 	if m.quotaFn != nil {
 		m.quota = m.quotaFn() // re-read the plan-limit snapshot so a watch tick keeps it fresh
+	}
+	if m.wallSpendFn != nil { // dollarize-the-wall values, computed here so a repaint never hits the store
+		m.wallByKey = map[string]int64{}
+		for _, s := range m.quota {
+			if v, ok := m.wallSpendFn(s); ok {
+				m.wallByKey[quotaKey(s)] = v
+			}
+		}
 	}
 	if m.budgetFn != nil {
 		m.budgetPace, m.budgetSet = m.budgetFn() // re-pace on each refresh / watch tick
@@ -2724,7 +2750,17 @@ func (m Model) quotaLines() []string {
 	var out []string
 	claudeShown := false
 	for _, s := range qt.Active(m.now) {
-		out = append(out, "  "+stBold.Render(quotaProviderTitle(s.Provider))+" "+stFaint.Render(s.Line(m.now)))
+		// Health (level + pace) tints the gauge; the as-of keeps it honest; the
+		// api-equivalent value dollarizes the wall; the pace note forecasts the run-out.
+		st := gaugeStyle(lines.Classify(s.UsedPercent, 100, s.Project(m.now).Breaches))
+		line := "  " + stBold.Render(quotaProviderTitle(s.Provider)) + " " + st.Render(s.Line(m.now)) + " " + stFaint.Render(s.Freshness(m.now))
+		if v, ok := m.wallByKey[quotaKey(s)]; ok {
+			line += " " + stFaint.Render("· ≈ "+money(v)+" at API rates")
+		}
+		if note := s.PaceNote(m.now); note != "" {
+			line += " " + st.Render("· "+note)
+		}
+		out = append(out, line)
 		if s.Provider == "claude" {
 			claudeShown = true
 		}
@@ -2733,6 +2769,23 @@ func (m Model) quotaLines() []string {
 		out = append(out, "  "+stBold.Render("Claude weekly")+" "+stFaint.Render("unknown — no local usage snapshot"))
 	}
 	return out
+}
+
+// quotaKey identifies a gauge by provider+window — the cache key for wall-spend values
+// precomputed at refresh.
+func quotaKey(s quota.Sample) string { return s.Provider + "|" + string(s.Window) }
+
+// gaugeStyle maps a gauge severity to a lipgloss style — faint when healthy, amber on
+// a heads-up, red at/near the wall — the TUI twin of cli.severityCode.
+func gaugeStyle(sev lines.Severity) lipgloss.Style {
+	switch sev {
+	case lines.SevWarn:
+		return stWarn
+	case lines.SevCrit:
+		return stCrit
+	default:
+		return stFaint
+	}
 }
 
 // hasProvider reports whether any session in the current rows came from provider p.

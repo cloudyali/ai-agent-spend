@@ -247,6 +247,7 @@ func (a *App) cmdTui(args []string) int {
 		WithQuota(func() []quota.Sample {
 			return append(a.claudeQuotaSamples(a.Now()), a.codexQuotaSamples(a.Now())...)
 		}).
+		WithWallSpend(func(s quota.Sample) (int64, bool) { return a.wallSpend(s, a.Now()) }).
 		WithPricingStatus(a.pricingStatus). // re-read per refresh so a watch tick reflects a top-up
 		WithSyncStatus(a.lastSyncTime).     // ledger freshness stamp; re-read per refresh so the auto-sync's advance shows live
 		WithBudget(func() (budget.Pace, bool) {

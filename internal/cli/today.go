@@ -17,6 +17,7 @@ import (
 	"github.com/cloudyali/ai-agent-spend/internal/budget"
 	"github.com/cloudyali/ai-agent-spend/internal/config"
 	"github.com/cloudyali/ai-agent-spend/internal/event"
+	"github.com/cloudyali/ai-agent-spend/internal/lines"
 	"github.com/cloudyali/ai-agent-spend/internal/pricing"
 	"github.com/cloudyali/ai-agent-spend/internal/provider"
 	"github.com/cloudyali/ai-agent-spend/internal/provider/codex"
@@ -137,6 +138,37 @@ func (a *App) renderBudget(st *store.FileStore, now time.Time) {
 	}
 }
 
+// wallSpend sums the api-equivalent spend recorded inside a quota window — the dollar
+// value of the work the wall is gating ("dollarize the wall"). It's composed at
+// render and best-effort: it opens the store itself (like budgetPace), and an unknown
+// window, a store error, or no spend yields ok=false so the gauge simply isn't
+// dollarized. The figure is api-equivalent only and sits BESIDE the reported wall —
+// never summed into the quota reading (package quota stays money-free by design).
+func (a *App) wallSpend(s quota.Sample, now time.Time) (int64, bool) {
+	start, ok := s.WindowStart()
+	if !ok {
+		return 0, false
+	}
+	st, err := a.openStore()
+	if err != nil {
+		return 0, false
+	}
+	evs, err := st.Query(store.Filter{Since: start, Until: now})
+	if err != nil {
+		return 0, false
+	}
+	var micros int64
+	for _, e := range evs {
+		if m := e.CostViews.APIEquivalent; m != nil {
+			micros += m.Micros
+		}
+	}
+	if micros <= 0 {
+		return 0, false
+	}
+	return micros, true
+}
+
 func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config.PlanSet, storeTotal int, eng *pricing.Engine) {
 	color := useColor(a.Out)
 	fmt.Fprintf(a.Out, "%s · %s\n\n", paint(color, cBold, "aispend today"), now.Format("Mon Jan 2"))
@@ -222,7 +254,19 @@ func (a *App) renderToday(events []event.AgentEvent, now time.Time, plans config
 	}
 	claudeShown := false
 	for _, s := range qt.Active(now) {
-		fmt.Fprintf(a.Out, "  %s %s · %s\n", paint(color, cBold, quotaProviderLabel(s.Provider)), s.Line(now), s.Freshness(now))
+		// Gauge body + as-of, then the pace forecast ("on pace to run out in 3h")
+		// when the window can be extrapolated — level alone doesn't tell you if
+		// you'll make it to reset. Health (level + pace) tints the bar and the
+		// warning so you see trouble before you hit the wall.
+		code := severityCode(lines.Classify(s.UsedPercent, 100, s.Project(now).Breaches))
+		line := fmt.Sprintf("  %s %s · %s", paint(color, cBold, quotaProviderLabel(s.Provider)), paint(color, code, s.Line(now)), s.Freshness(now))
+		if v, ok := a.wallSpend(s, now); ok {
+			line += " · " + paint(color, cDim, "≈ "+usd(v, "USD")+" at API rates")
+		}
+		if note := s.PaceNote(now); note != "" {
+			line += " · " + paint(color, code, note)
+		}
+		fmt.Fprintln(a.Out, line)
 		if s.Provider == "claude" {
 			claudeShown = true
 		}
