@@ -33,3 +33,49 @@ jobs:
           # Separate PAT (contents:write on cloudyali/homebrew-tap) — the default
           # token cannot push to another repo. Create it, save as this secret.
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  # The menu-bar app (cmd/aispend-bar) is cgo + AppKit: it can't cross-compile on the
+  # Linux goreleaser runner, and OSS goreleaser has no .app/.dmg builder — so it ships
+  # from a companion macOS job via scripts/release-bar.sh (à la OpenUsage's release.sh).
+  # The CLI job above is unchanged.
+  menubar:
+    runs-on: macos-latest
+    needs: goreleaser # the Release for this tag exists; we attach the .dmg to it
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # menuet is macOS-only and kept out of the committed go.mod (the main tool stays
+      # cross-platform + offline); fetch it here just for the bar build.
+      - name: Add the macOS-only menuet dependency
+        run: go get github.com/caseymrm/menuet
+
+      - name: Build the .dmg (universal → .app → dmg)
+        env:
+          VERSION: ${{ github.ref_name }}
+          # Phase 2 (optional): set these repo secrets to Developer-ID-sign + notarize.
+          # Unset → Phase 1 unsigned build (the cask clears quarantine on install).
+          APPLE_SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash scripts/release-bar.sh "${GITHUB_REF_NAME}"
+
+      - name: Attach the .dmg to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/aispend-bar-*.dmg
+
+      - name: Publish the Homebrew cask
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: bash scripts/update-bar-cask.sh "${GITHUB_REF_NAME}"

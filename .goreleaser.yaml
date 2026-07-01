@@ -1,6 +1,11 @@
 # GoReleaser config for aispend — one `git tag` fans out to every outlet.
 # Validate locally with:  goreleaser check   (and:  goreleaser release --snapshot --clean)
 # Schema: GoReleaser v2 (https://goreleaser.com). Requires GoReleaser >= v2.10 for homebrew_casks.
+#
+# NOTE: the macOS menu-bar app (cmd/aispend-bar) is NOT built here. It is cgo + AppKit —
+# goreleaser (OSS) can neither cgo-cross-compile it from this Linux runner nor build a
+# .app/.dmg — so it ships from the companion `menubar` job in .github/workflows/release.yml
+# via scripts/release-bar.sh + scripts/update-bar-cask.sh. This config owns the CLI only.
 version: 2
 
 project_name: aispend
