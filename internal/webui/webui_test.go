@@ -131,3 +131,15 @@ func TestRender_IdleShowsLogo(t *testing.T) {
 		t.Errorf("idle row should carry the provider mark: %s", out)
 	}
 }
+
+// Claude and Codex render the real 100×100 brand glyphs vendored from OpenUsage, not the
+// 24-grid fallback rendition — so a regression to hand-drawn marks is caught.
+func TestRender_UsesVendoredBrandGlyphs(t *testing.T) {
+	for _, id := range []string{"claude", "codex"} {
+		out := Render([]lines.Snapshot{{ProviderID: id, DisplayName: id,
+			Lines: []lines.Line{{Type: "text", Label: "Today", Value: "$1"}}}}, time.Now())
+		if !strings.Contains(out, `viewBox="0 0 100 100"`) {
+			t.Errorf("provider %q should use the vendored 100-grid brand glyph", id)
+		}
+	}
+}

@@ -1,0 +1,17 @@
+AiSpend — third-party notices
+=============================
+
+Provider brand glyphs (internal/webui)
+--------------------------------------
+The Anthropic (Claude) and OpenAI (Codex) marks rendered in the menu-bar popover
+(claudeMarkPath / codexMarkPath in internal/webui/webui.go) are vendored from OpenUsage:
+
+    https://github.com/robinebers/openusage
+    Sources/OpenUsage/Resources/ProviderIcons/{claude,codex}.svg
+
+OpenUsage is distributed under the MIT License. The path coordinates were rounded to the
+100×100 grid (visually identical at menu-bar size).
+
+These marks are trademarks of their respective owners (Anthropic, OpenAI) and are used
+solely to identify each provider's service in the usage display. No affiliation with or
+endorsement by those companies is implied.

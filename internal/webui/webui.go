@@ -83,9 +83,9 @@ func Render(snaps []lines.Snapshot, now time.Time) string {
 func providerLogo(id string) template.HTML {
 	switch strings.ToLower(strings.TrimSpace(id)) {
 	case "claude", "claude_code", "anthropic":
-		return template.HTML(sunburstMark("Anthropic", "#D97757")) // Claude "clay"
+		return template.HTML(markSVG("Anthropic", "#D97757", claudeMarkPath)) // Claude "clay"
 	case "codex", "openai":
-		return template.HTML(blossomMark("OpenAI"))
+		return template.HTML(markSVG("OpenAI", "currentColor", codexMarkPath)) // monochrome → tracks theme
 	case "gemini", "google":
 		return template.HTML(sparkMark("Gemini", "#4285F4"))
 	default:
@@ -93,28 +93,24 @@ func providerLogo(id string) template.HTML {
 	}
 }
 
-// sunburstMark renders the Anthropic-style radiating burst (12 rounded rays) in a brand color.
-func sunburstMark(label, color string) string {
-	var rays strings.Builder
-	for a := 0; a < 360; a += 30 {
-		fmt.Fprintf(&rays, `<line x1="12" y1="2.6" x2="12" y2="8" transform="rotate(%d 12 12)"/>`, a)
-	}
-	return `<svg viewBox="0 0 24 24" role="img" aria-label="` + label + `" stroke="` + color +
-		`" stroke-width="1.7" stroke-linecap="round">` + rays.String() + `</svg>`
+// markSVG wraps a 100×100 provider glyph path in an accessible <svg>. fill may be a hex or
+// "currentColor" (to track the surrounding text); label doubles as the accessible name.
+func markSVG(label, fill, path string) string {
+	return `<svg viewBox="0 0 100 100" role="img" aria-label="` + label + `" fill="` + fill +
+		`"><path d="` + path + `"/></svg>`
 }
 
-// blossomMark renders an OpenAI-style six-petal mark in the current text color (OpenAI's mark
-// is monochrome, so it adapts to light/dark).
-func blossomMark(label string) string {
-	var petals strings.Builder
-	for a := 0; a < 360; a += 60 {
-		fmt.Fprintf(&petals, `<ellipse cx="12" cy="7.4" rx="3" ry="4.6" transform="rotate(%d 12 12)"/>`, a)
-	}
-	return `<svg viewBox="0 0 24 24" role="img" aria-label="` + label +
-		`" fill="none" stroke="currentColor" stroke-width="1.4">` + petals.String() + `</svg>`
-}
+// claudeMarkPath and codexMarkPath are the Anthropic and OpenAI brand glyphs, vendored from
+// OpenUsage (github.com/robinebers/openusage — Sources/OpenUsage/Resources/ProviderIcons,
+// MIT) with coordinates rounded to the 100×100 grid (imperceptible at menu-bar size). The
+// marks are the respective companies' trademarks, used only to identify each service. See NOTICE.
+const (
+	claudeMarkPath = `M26 63L41 54L42 54L41 53H41L38 53L29 53L21 52L14 52L12 52L10 49L10 48L12 47L14 47L19 48L27 48L32 48L40 49H42L42 49L41 48L41 48L33 43L25 37L20 34L18 32L17 31L16 27L18 25L21 25L22 25L25 28L31 33L40 39L41 40L41 39L41 39L41 38L36 30L32 22L29 18L29 16C29 15 28 15 28 14L31 10L32 10L36 10L37 12L39 16L42 24L48 34L49 37L50 40L50 41H51V40L51 34L52 27L53 18L53 16L54 13L57 11L59 12L60 14L60 16L59 22L57 32L56 38H57L58 37L61 33L66 26L69 23L72 20L73 19H77L79 23L78 27L75 31L72 35L68 41L65 45L65 46L66 45L75 43L80 42L87 41L89 43L90 44L89 47L82 48L74 50L63 53L63 53L63 53L68 53L70 54H76L86 54L88 56L90 58L90 60L86 62L80 61L67 57L63 56H62V57L66 60L73 66L81 74L82 76L80 78L79 77L72 72L69 69L63 64H62V65L64 67L72 78L72 82L71 83L69 84L67 84L63 77L58 70L54 63L54 64L51 88L50 89L48 90L46 88L45 86L46 81L47 75L48 70L49 63L50 61L50 61L49 61L44 68L37 77L31 84L30 84L28 83L28 81L29 79L37 69L42 62L45 59L45 58H45L24 72L20 72L18 71L19 68L19 68L26 63L26 63Z`
+	codexMarkPath  = `M84 43C85 40 85 37 85 34C84 32 83 29 82 26C78 19 69 15 60 17C58 14 55 12 52 11C48 10 45 10 41 11C38 11 34 13 32 15C29 18 27 21 26 24C23 25 21 26 18 27C16 29 14 31 13 34C8 41 9 51 15 57C14 60 14 63 14 66C15 69 16 71 17 74C21 81 30 85 39 83C41 85 43 87 45 88C48 89 51 90 54 90C62 90 70 84 73 76C76 75 78 74 81 73C83 71 85 69 86 66C91 59 90 49 84 43ZM54 85C50 85 47 84 44 81L45 81L61 72C61 72 61 71 61 71C62 71 62 70 62 70V47L69 51C69 51 69 51 69 51V70C69 78 62 85 54 85ZM21 71C20 68 19 64 20 61L20 61L36 71C37 71 37 71 37 71C38 71 38 71 39 71L58 59V67C58 67 58 67 58 67C58 67 58 67 58 67L42 77C35 81 26 78 21 71ZM17 36C19 33 22 31 25 30V49C25 49 25 50 26 50C26 50 26 51 26 51L46 62L39 66C39 66 39 66 39 66C39 66 39 66 39 66L23 57C16 53 13 43 17 36V36ZM73 49L53 38L60 34C60 34 60 34 60 34C60 34 60 34 60 34L76 43C79 45 81 47 82 49C83 52 84 55 84 58C83 60 82 63 81 65C79 68 77 69 74 70V51C74 51 74 51 74 50C73 50 73 49 73 49ZM79 39L79 39L63 30C63 29 62 29 62 29C61 29 61 29 60 30L41 41V33C41 33 41 33 41 33C41 33 41 33 41 33L57 24C60 22 62 21 65 22C68 22 71 23 73 24C75 26 77 28 78 31C79 33 80 36 79 39V39H79ZM37 53L30 49C30 49 30 49 30 49C30 49 30 49 30 49V30C30 27 31 25 33 22C34 20 36 18 39 17C42 16 44 15 47 15C50 16 53 17 55 19L54 19L39 28C38 29 38 29 38 29C37 30 37 30 37 31L37 53V53ZM41 45L50 40L58 45V55L50 60L41 55L41 45Z`
+)
 
-// sparkMark renders a four-point Gemini-style spark (concave star) in a brand color.
+// sparkMark renders a four-point Gemini-style spark (concave star) in a brand color. Kept as
+// a rendition — OpenUsage ships no Gemini icon (github.com/robinebers/openusage).
 func sparkMark(label, color string) string {
 	return `<svg viewBox="0 0 24 24" role="img" aria-label="` + label + `"><path fill="` + color +
 		`" d="M12 2c.6 5.2 4.8 9.4 10 10-5.2.6-9.4 4.8-10 10-.6-5.2-4.8-9.4-10-10 5.2-.6 9.4-4.8 10-10Z"/></svg>`
