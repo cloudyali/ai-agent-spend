@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # build-app.sh — package AiSpend into a minimal macOS .app bundle for local use.
 #
-# menuet initializes UNUserNotificationCenter at startup, which THROWS for a loose
-# executable — so the menu-bar app MUST run from inside a .app. LSUIElement=1 makes it
-# a menu-bar agent (no Dock icon).
+# The app is a status-bar agent (NSStatusItem + a WKWebView popover, via cgo to the
+# system Cocoa/WebKit frameworks — no external Go deps). Status-bar apps behave best from
+# inside a .app bundle; LSUIElement=1 makes it a menu-bar agent (no Dock icon).
 #
 # Usage:  cmd/aispend-bar/build-app.sh [OUTPUT_DIR]   # default OUTPUT_DIR = current dir
 #   open ./AiSpend.app            # (first run: xattr -dr com.apple.quarantine ./AiSpend.app)

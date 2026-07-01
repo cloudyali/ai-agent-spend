@@ -1,109 +1,83 @@
 //go:build darwin
 
-// Command aispend-bar is the macOS menu-bar client for aispend. It is **self-contained**:
-// every few seconds it brings the ledger current (a bounded, offline incremental scan)
-// and renders the worst gauge into the menu-bar title, with each provider's windows and
-// the dollarized wall in the dropdown — reading the engine directly, no separate process,
-// no port. (This replaced an earlier HTTP-client design that needed `aispend serve`.)
-//
-// The logic (snapshot assembly + render) is pure and tested (internal/cli, internal/menubar);
-// this file is only the macOS glue behind a darwin build tag, linking the Cocoa-based
-// menuet library via cgo. Build on macOS with cmd/aispend-bar/build-app.sh.
+// Command aispend-bar is the macOS menu-bar client: a status-bar item whose popover is a
+// WKWebView rendering the rich HTML from internal/webui, refreshed from the engine every
+// interval. It talks to the system Cocoa/WebKit frameworks directly via cgo (bar.h +
+// bar_darwin.m) — no external Go UI dependency. The pure pieces (snapshot assembly, the
+// menu-bar title, the popover HTML) live and are tested in internal/{cli,menubar,webui};
+// this file is only the glue that pushes them into AppKit.
 package main
+
+/*
+#cgo darwin CFLAGS: -x objective-c -fobjc-arc
+#cgo darwin LDFLAGS: -framework Cocoa -framework WebKit
+#include <stdlib.h>
+#include "bar.h"
+*/
+import "C"
 
 import (
 	"flag"
 	"io"
-	"sync/atomic"
+	"runtime"
 	"time"
-
-	"github.com/caseymrm/menuet"
+	"unsafe"
 
 	"github.com/cloudyali/ai-agent-spend/internal/cli"
 	"github.com/cloudyali/ai-agent-spend/internal/menubar"
 	"github.com/cloudyali/ai-agent-spend/internal/platform"
+	"github.com/cloudyali/ai-agent-spend/internal/webui"
 )
 
-// current holds the latest rendered menu State so menuet's Children callback paints
-// without doing I/O on the UI thread.
-var current atomic.Pointer[menubar.State]
+// app is the read-only engine handle: set in main before the run loop starts, then read
+// by the refresh goroutine and the exported action callback.
+var app *cli.App
+
+func init() { runtime.LockOSThread() } // AppKit's run loop must own the main OS thread
 
 func main() {
 	interval := flag.Duration("interval", 30*time.Second, "how often to re-scan and refresh")
 	flag.Parse()
 
-	// A read-only App wired to the real environment — the same construction the CLI uses
-	// (cli.Run) — with all output discarded, since the menu bar is the UI.
-	app := &cli.App{
+	app = &cli.App{
 		Resolver: platform.Detect(),
 		Now:      func() time.Time { return time.Now().UTC() },
 		Out:      io.Discard,
 		Err:      io.Discard,
 	}
 
-	refresh := func() {
-		now := app.Now()
-		st := menubar.Render(app.RefreshSnapshots(now), now)
-		current.Store(&st)
-		menuet.App().SetMenuState(&menuet.MenuState{Title: st.Title})
-		menuet.App().MenuChanged()
-	}
-
+	// Refresh off the main thread (the scan + best-effort quota fetch do I/O); the C
+	// helpers marshal the UI updates back onto the main queue.
 	go func() {
-		refresh()
+		doRefresh()
 		for range time.Tick(*interval) {
-			refresh()
+			doRefresh()
 		}
 	}()
 
-	a := menuet.App()
-	a.Name = "AiSpend"
-	a.Label = "io.cloudyali.aispend-bar"
-	a.Children = menuChildren(refresh)
-	a.RunApplication()
+	C.RunBar() // enters [NSApp run]; blocks until QuitBar
 }
 
-// menuChildren builds the dropdown from the latest State, appending a Refresh action.
-// menuet appends its own "Start at Login" / "Quit" footer, so we don't.
-func menuChildren(refresh func()) func() []menuet.MenuItem {
-	return func() []menuet.MenuItem {
-		var out []menuet.MenuItem
-		if st := current.Load(); st != nil {
-			for _, it := range st.Items {
-				out = append(out, toMenuItem(it))
-			}
-		}
-		out = append(out,
-			menuet.MenuItem{Type: menuet.Separator},
-			menuet.MenuItem{Text: "Refresh now", Clicked: refresh},
-		)
-		return out
-	}
+// doRefresh rebuilds the title and popover HTML from a fresh scan and pushes them to the
+// status item and web view. The C strings are copied into NSStrings synchronously inside
+// the helpers, so freeing them here is safe.
+func doRefresh() {
+	now := app.Now()
+	snaps := app.RefreshSnapshots(now)
+	title := C.CString(menubar.Render(snaps, now).Title)
+	html := C.CString(webui.Render(snaps, now))
+	C.SetTitle(title)
+	C.SetHTML(html)
+	C.free(unsafe.Pointer(title))
+	C.free(unsafe.Pointer(html))
 }
 
-// toMenuItem paints one menubar.Item with the After hierarchy: the provider Header is
-// bold, the ROI Hero is semibold, Dim (secondary) rows shrink, a Separator is a divider,
-// and Children become a submenu (a collapsed idle provider's detail, or the Trend spark).
-func toMenuItem(it menubar.Item) menuet.MenuItem {
-	if it.Separator {
-		return menuet.MenuItem{Type: menuet.Separator}
+//export goAction
+func goAction(action *C.char) {
+	switch C.GoString(action) {
+	case "refresh":
+		go doRefresh()
+	case "quit":
+		C.QuitBar()
 	}
-	mi := menuet.MenuItem{Text: it.Text}
-	switch {
-	case it.Header:
-		mi.FontWeight = menuet.WeightBold
-		mi.FontSize = 15
-	case it.Hero:
-		mi.FontWeight = menuet.WeightSemibold
-	case it.Dim:
-		mi.FontSize = 12
-	}
-	if len(it.Children) > 0 {
-		kids := make([]menuet.MenuItem, len(it.Children))
-		for i, c := range it.Children {
-			kids[i] = toMenuItem(c)
-		}
-		mi.Children = func() []menuet.MenuItem { return kids }
-	}
-	return mi
 }
