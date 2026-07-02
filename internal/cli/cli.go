@@ -1143,7 +1143,7 @@ func pickView(e event.AgentEvent, view string) (event.Money, bool) {
 // rest resolve 1:1 via groupKey. Single source of truth shared by the flag help, the
 // --by validation, and the rejection message, so the advertised set, the validator, and
 // the switch below can't drift apart.
-var groupByDimensions = []string{"model", "repo", "provider", "cost_tag", "session", "branch", "commit", "file", "tool", "mcp_server"}
+var groupByDimensions = []string{"model", "repo", "provider", "cost_tag", "session", "branch", "commit", "file", "tool", "mcp_server", "subagent", "hour"}
 
 // reportViews are the valid --view cost lenses, in help/error order. Single source
 // of truth for the flag help, the --view validation, and the rejection message. The
@@ -1180,6 +1180,16 @@ func groupKey(e event.AgentEvent, by string) string {
 			return e.GitSHA
 		}
 		return "(no commit)"
+	case "subagent":
+		if e.SubagentID != "" {
+			return e.SubagentID
+		}
+		return "(main)" // the parent session, not a subagent worker
+	case "hour":
+		if e.TSStart.IsZero() {
+			return "(no time)"
+		}
+		return e.TSStart.Local().Format("15:00") // local hour-of-day bucket (active hours)
 	default:
 		return e.Model
 	}

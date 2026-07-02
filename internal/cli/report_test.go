@@ -334,6 +334,35 @@ func TestAggregateReport_ByToolAndMCPFanOut(t *testing.T) {
 	}
 }
 
+// 1:1 facets: --by subagent buckets subagent workers (the parent session → "(main)") and
+// --by hour buckets by local hour-of-day (active hours). Both reconcile to the total.
+func TestGroupKey_SubagentAndHour(t *testing.T) {
+	ts := time.Date(2026, 7, 1, 15, 30, 0, 0, time.UTC)
+	mk := func(micros int64, sub string) event.AgentEvent {
+		m := event.USD(micros)
+		return event.AgentEvent{
+			Model: "claude-opus-4", Provider: "claude_code", SubagentID: sub, TSStart: ts,
+			CostViews: event.CostViews{APIEquivalent: &m},
+			Evidence:  event.Evidence{CostMethod: "token_priced", ConfidenceScore: 0.95},
+		}
+	}
+	events := []event.AgentEvent{mk(100_000, "agent-1"), mk(50_000, "")}
+
+	bySub := aggregateReport(events, "subagent", "api_equivalent")
+	if r, _ := rowByKey(bySub, "agent-1"); r == nil || r.micros != 100_000 {
+		t.Errorf("agent-1 row = %+v, want 100000", r)
+	}
+	if r, _ := rowByKey(bySub, "(main)"); r == nil || r.micros != 50_000 {
+		t.Errorf("(main) row = %+v, want 50000", r)
+	}
+
+	byHour := aggregateReport(events, "hour", "api_equivalent")
+	wantHour := ts.Local().Format("15:00")
+	if r, _ := rowByKey(byHour, wantHour); r == nil || r.micros != 150_000 {
+		t.Errorf("hour bucket %q = %+v, want 150000", wantHour, r)
+	}
+}
+
 func mustWindow(t *testing.T, spec string) window {
 	t.Helper()
 	w, err := parsePeriod(spec, fixedNow())
