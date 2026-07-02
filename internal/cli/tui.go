@@ -291,6 +291,19 @@ func (a *App) cmdTui(args []string) int {
 				}
 			}
 			return a.buildCommits(evs, trailerName)
+		}).
+		WithFacets(func(dim string, evs []event.AgentEvent) []tui.FacetRow {
+			// Reuse the report aggregation so the breakdown reconciles with `report --by`.
+			agg := aggregateReport(evs, dim, "api_equivalent")
+			rows := make([]tui.FacetRow, len(agg.rows))
+			for i, r := range agg.rows {
+				pct := 0.0
+				if agg.total != 0 {
+					pct = float64(r.micros) / float64(agg.total) * 100
+				}
+				rows[i] = tui.FacetRow{Key: r.key, Micros: r.micros, Count: r.count, Pct: pct}
+			}
+			return rows
 		})
 	// reload is the background sync, run OFF the UI loop by tui.reloadCmd so neither the
 	// log re-scan nor the network price top-up ever blocks the explorer:

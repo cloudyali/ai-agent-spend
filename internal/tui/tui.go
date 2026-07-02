@@ -51,7 +51,43 @@ const (
 	modeTrailers     // the in-explorer [trailers] editor (toggle which trailers attach)
 	modeCommits      // the commit-centric view: per-commit ledger spend (+ optional git enrichment)
 	modeCommitDetail // one commit: full message + cost breakdown
+	modeFacets       // the period-level breakdown explorer: spend by tool/mcp/subagent/hour/model/file
 )
+
+// FacetRow is one row of a period breakdown (a tool, MCP server, subagent, hour, model or
+// file) — the cost charged to it, its share of the period, and how many turns/calls touched
+// it. Built by the injected facetFn (cli reuses its report aggregation); rendered by facetsView.
+type FacetRow struct {
+	Key    string
+	Micros int64
+	Count  int
+	Pct    float64
+}
+
+// facetDims are the breakdown dimensions the facets explorer cycles through with tab, in
+// order. They mirror the CLI's `report --by` fan-out/1:1 dimensions.
+var facetDims = []string{"tool", "mcp_server", "subagent", "hour", "model", "file"}
+
+// facetLabel is the human title for a dimension ("mcp_server" → "MCP server").
+func facetLabel(dim string) string {
+	if dim == "mcp_server" {
+		return "MCP server"
+	}
+	return dim
+}
+
+// nextFacetDim steps the dimension cycle by delta (+1 next, -1 previous), wrapping.
+func nextFacetDim(cur string, delta int) string {
+	i := 0
+	for j, d := range facetDims {
+		if d == cur {
+			i = j
+			break
+		}
+	}
+	n := len(facetDims)
+	return facetDims[((i+delta)%n+n)%n]
+}
 
 // amortizedView is the period-level allocation lens (the subscription-arbitrage
 // half): the prorated plan fee distributed across sessions by api-equivalent
@@ -277,8 +313,16 @@ type Model struct {
 
 	// commit-centric view (optional; WithCommits). commitsFn returns the per-commit
 	// ledger spend (+ optional git enrichment), loaded on demand into commits.
-	commitsFn    func() []Commit
-	commits      []Commit
+	commitsFn func() []Commit
+	commits   []Commit
+
+	// facets explorer (optional; WithFacets). facetFn aggregates the current period's events
+	// into a breakdown for a dimension (cli reuses its report aggregation). facetDim is the
+	// active dimension; facetRows the current breakdown; facetCursor the ↑/↓ position.
+	facetFn      func(dim string, events []event.AgentEvent) []FacetRow
+	facetDim     string
+	facetRows    []FacetRow
+	facetCursor  int
 	commitCursor int
 	selCommit    Commit
 }
@@ -366,6 +410,14 @@ func (m Model) WithPending(fn func() (Pending, bool)) Model {
 // on demand (when the view opens), not per refresh. Off by default.
 func (m Model) WithCommits(fn func() []Commit) Model {
 	m.commitsFn = fn
+	return m
+}
+
+// WithFacets enables the facets explorer (the `f` key): fn aggregates a period's events into
+// a breakdown for a dimension (tool, mcp_server, subagent, hour, model, file). cli wires it to
+// its report aggregation so the numbers reconcile with `report --by`. Off by default.
+func (m Model) WithFacets(fn func(dim string, events []event.AgentEvent) []FacetRow) Model {
+	m.facetFn = fn
 	return m
 }
 
@@ -935,6 +987,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = modeCommits
 			}
 			return m, nil
+		case modeFacets:
+			switch msg.String() {
+			case "esc", "left", "h", "backspace":
+				m.mode = modeList
+			case "up", "k":
+				if m.facetCursor > 0 {
+					m.facetCursor--
+				}
+			case "down", "j":
+				if m.facetCursor < len(m.facetRows)-1 {
+					m.facetCursor++
+				}
+			case "tab":
+				m.facetDim = nextFacetDim(m.facetDim, 1)
+				m.facetRows = m.facetFn(m.facetDim, m.events())
+				m.facetCursor = 0
+			case "shift+tab":
+				m.facetDim = nextFacetDim(m.facetDim, -1)
+				m.facetRows = m.facetFn(m.facetDim, m.events())
+				m.facetCursor = 0
+			}
+			return m, nil
 		default: // modeList
 			switch msg.String() {
 			case "up", "k":
@@ -989,6 +1063,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.commits = m.commitsFn() // load on demand (not per refresh)
 					m.commitCursor = 0
 					m.mode = modeCommits
+				}
+			case "f":
+				if m.facetFn != nil {
+					m.facetDim = facetDims[0]
+					m.facetRows = m.facetFn(m.facetDim, m.events()) // aggregate the current period
+					m.facetCursor = 0
+					m.mode = modeFacets
 				}
 			case "s":
 				// On-demand sync: kick the same background reload the watch tick runs, off
@@ -1046,6 +1127,8 @@ func (m Model) View() string {
 		return m.commitsView()
 	case modeCommitDetail:
 		return m.commitDetailView()
+	case modeFacets:
+		return m.facetsView()
 	default:
 		return m.listView()
 	}
@@ -1159,6 +1242,63 @@ func (m Model) commitWindow(n int) (int, int) {
 	return start, end
 }
 
+// facetsView renders the period breakdown for the active dimension: a cost-sorted list of
+// keys with a bar, dollars, share and touch count. Keys are lifted from session logs
+// (tool/file/MCP names), so each is sanitized at this render boundary (CWE-150).
+func (m Model) facetsView() string {
+	var b strings.Builder
+	b.WriteString(stBold.Render("by "+facetLabel(m.facetDim)) + stFaint.Render(" · "+m.label()) + "\n")
+	b.WriteString(stFaint.Render("  ↑/↓ move · tab/shift+tab dimension · esc back · q quit") + "\n\n")
+	if len(m.facetRows) == 0 {
+		b.WriteString(stFaint.Render("  (no "+facetLabel(m.facetDim)+" activity this period)") + "\n")
+		return b.String()
+	}
+	maxMicros := m.facetRows[0].Micros // rows are cost-sorted, so the first is the max
+	start, end := m.facetWindow(len(m.facetRows))
+	if start > 0 {
+		b.WriteString(stFaint.Render(fmt.Sprintf("     ↑ %d more", start)) + "\n")
+	}
+	for i := start; i < end; i++ {
+		r := m.facetRows[i]
+		cursor := "  "
+		if i == m.facetCursor {
+			cursor = stBold.Render("› ")
+		}
+		key := trunc(termtext.SanitizeLabel(r.Key), 28) // log-derived — neutralize escapes (CWE-150)
+		bar := styleBar(spendBar(r.Micros, maxMicros, 12))
+		row := fmt.Sprintf("%-28s %s %10s %5.1f%%  %4d", key, bar, money(r.Micros), r.Pct, r.Count)
+		b.WriteString(cursor + row + "\n")
+	}
+	if end < len(m.facetRows) {
+		b.WriteString(stFaint.Render(fmt.Sprintf("     ↓ %d more", len(m.facetRows)-end)) + "\n")
+	}
+	return b.String()
+}
+
+// facetWindow returns the [start,end) slice of the breakdown that fits the terminal height,
+// keeping the cursor visible — the list scrolls under the fixed header. Mirrors commitWindow.
+func (m Model) facetWindow(n int) (int, int) {
+	visible := m.h - 5 // header (2) + blank (1) + the two "N more" indicator lines
+	if m.h <= 0 || visible >= n {
+		return 0, n
+	}
+	if visible < 1 {
+		visible = 1
+	}
+	start := 0
+	if m.facetCursor >= visible {
+		start = m.facetCursor - visible + 1
+	}
+	end := start + visible
+	if end > n {
+		end = n
+		if start = end - visible; start < 0 {
+			start = 0
+		}
+	}
+	return start, end
+}
+
 // commitDetailView is one commit: the full message (when git-enriched) and the cost
 // breakdown — ledger spend, reconciled against the in-git trailer when present.
 func (m Model) commitDetailView() string {
@@ -1230,6 +1370,9 @@ func (m Model) listView() string {
 	}
 	if m.commitsFn != nil {
 		parts = append(parts, "c commits")
+	}
+	if m.facetFn != nil {
+		parts = append(parts, "f facets")
 	}
 	if m.reload != nil {
 		parts = append(parts, "s sync")
