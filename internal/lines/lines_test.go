@@ -53,6 +53,18 @@ func TestProject_ZeroElapsedIsSafe(t *testing.T) {
 	}
 }
 
+func TestProject_EarlyWindowDoesNotBreach(t *testing.T) {
+	// 1% used in the first hour of a 7-day window extrapolates to ~168%, but that's too small a
+	// sample to trust — it must not breach (else an idle provider hijacks the menu-bar title).
+	p := Project(1, 100, 1*time.Hour, 168*time.Hour)
+	if p.Breaches {
+		t.Errorf("a tiny early-window sample must not breach: %+v", p)
+	}
+	if p.ProjectedUsed <= 0 {
+		t.Errorf("the projected value should still be reported for display: %+v", p)
+	}
+}
+
 func TestProject_AlreadyOverLimit(t *testing.T) {
 	p := Project(150, 100, 84*time.Hour, 168*time.Hour)
 	if !p.Breaches {

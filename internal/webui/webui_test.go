@@ -148,3 +148,17 @@ func TestRender_UsesVendoredBrandGlyphs(t *testing.T) {
 		}
 	}
 }
+
+// The reset line shows the absolute clock time (local tz), not just the countdown, so the
+// actual reset time is always visible.
+func TestRender_ResetShowsAbsoluteClock(t *testing.T) {
+	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
+	reset := now.Add(3 * time.Hour) // within a day → time-only
+	snaps := []lines.Snapshot{{ProviderID: "claude", DisplayName: "Claude", Lines: []lines.Line{
+		{Type: "progress", Label: "Session", Used: pf(20), Limit: pf(100), ResetsAt: tp(reset)},
+	}}}
+	out := Render(snaps, now)
+	if want := reset.Local().Format("3:04 PM"); !strings.Contains(out, want) {
+		t.Errorf("reset line should show the absolute clock time %q: %s", want, out)
+	}
+}

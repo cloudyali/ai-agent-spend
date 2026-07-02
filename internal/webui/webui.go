@@ -148,7 +148,18 @@ func resetText(ln lines.Line, now time.Time) string {
 	if ln.ResetsAt == nil {
 		return ""
 	}
-	return "resets in " + humanDur(ln.ResetsAt.Sub(now))
+	return "resets in " + humanDur(ln.ResetsAt.Sub(now)) + " · " + clockAt(*ln.ResetsAt, now)
+}
+
+// clockAt renders an absolute instant in local time (visual times are local; the ledger stays
+// UTC): just the clock time when it's within a day, weekday + time when further out (windows
+// are ≤7d, so the weekday stays unambiguous).
+func clockAt(t, now time.Time) string {
+	t = t.Local()
+	if t.Sub(now) < 24*time.Hour {
+		return t.Format("3:04 PM")
+	}
+	return t.Format("Mon 3:04 PM")
 }
 
 func paceText(ln lines.Line, now time.Time) string {
@@ -161,7 +172,7 @@ func paceText(ln lines.Line, now time.Time) string {
 		eta := time.Duration(p.ETASeconds) * time.Second
 		// Show the countdown and the absolute instant it lands (local tz — visual times are
 		// local, the ledger stays UTC). Run-out is always <7d out, so weekday+time is unambiguous.
-		return "on pace to run out in " + humanDur(eta) + " (" + now.Add(eta).Local().Format("Mon 3:04 PM") + ")"
+		return "on pace to run out in " + humanDur(eta) + " (" + clockAt(now.Add(eta), now) + ")"
 	case p.ProjectedUsed > 0:
 		return fmt.Sprintf("projected ~%.0f%% used at reset", p.ProjectedUsed)
 	}

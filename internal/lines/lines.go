@@ -102,7 +102,12 @@ func Project(used, limit float64, elapsed, window time.Duration) Projection {
 	}
 	timeToLimitSec := (limit - used) / rate
 	remainingSec := windowSec - elapsedSec
-	if timeToLimitSec <= remainingSec {
+	// Only trust a run-out projection once enough of the window has been observed. Early on a
+	// tiny sample extrapolates wildly (1% in hour 1 of a week → an implied ~168%), which would
+	// raise severity and let an idle provider hijack the menu-bar title. The projected value is
+	// still reported for display — it just isn't flagged as a breach yet.
+	const minObservedFrac = 0.10
+	if timeToLimitSec <= remainingSec && elapsedSec >= minObservedFrac*windowSec {
 		return Projection{ProjectedUsed: projected, Breaches: true, ETASeconds: int64(timeToLimitSec + 0.5)}
 	}
 	return Projection{ProjectedUsed: projected}
