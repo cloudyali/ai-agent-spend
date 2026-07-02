@@ -56,4 +56,9 @@ PLIST
 codesign --force --sign - "$APP" >/dev/null 2>&1 || echo "note: ad-hoc codesign skipped"
 
 echo "Built $APP"
-echo "Run:  open \"$APP\"    (first run may need:  xattr -dr com.apple.quarantine \"$APP\")"
+
+# Relaunch so you always run the binary you just built. `open` alone re-activates an
+# already-running instance (you'd keep seeing the OLD build in the menu bar), so kill it first.
+killall "$APP_NAME" 2>/dev/null && sleep 0.3
+open "$APP" && echo "Relaunched $APP_NAME" \
+  || echo "Run:  open \"$APP\"    (first run may need:  xattr -dr com.apple.quarantine \"$APP\")"
