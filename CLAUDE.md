@@ -72,7 +72,11 @@ aispend tui [--period P] [--watch]   # interactive explorer: day-grouped session
 aispend report --period <today|yesterday|week|month|"last week"|"last month"|
                          quarter|"this year"|"N days"|"since YYYY-MM-DD"|
                          YYYY-MM-DD..YYYY-MM-DD|all> [--by G] [--view V] [--json]
-                         # --by: model|repo|provider|cost_tag|session|branch|commit|file
+                         # --by: model|repo|provider|cost_tag|session|branch|commit|file|tool|mcp_server
+                         #   file/tool/mcp_server FAN OUT (a turn's cost splits across the files
+                         #   it touched / tools called / MCP servers used; rows still reconcile to
+                         #   the total). tool + mcp_server come from the tool_use names
+                         #   (mcp__<server>__<tool>), already captured per turn in event.{Tools,MCPServers}.
 aispend today                  # arbitrage-first daily glance: ROI, cache savings, hourly spike bar
 aispend budget [set <amt>|clear] [--json] [--strict]
                                 # monthly api-equivalent ceiling (off by default). Bare = month-to-date

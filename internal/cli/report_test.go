@@ -279,6 +279,61 @@ func TestAggregateReport_ByFileSplitRemainder(t *testing.T) {
 	}
 }
 
+// --by tool and --by mcp_server fan out like --by file: a turn's cost splits across the
+// tools / MCP servers it used, the rows still reconcile to the grand total, and a turn using
+// none lands in the sentinel bucket.
+func TestAggregateReport_ByToolAndMCPFanOut(t *testing.T) {
+	mk := func(micros int64, tools, mcp []string) event.AgentEvent {
+		m := event.USD(micros)
+		return event.AgentEvent{
+			Model: "claude-opus-4", Provider: "claude_code", Tools: tools, MCPServers: mcp,
+			CostViews: event.CostViews{APIEquivalent: &m},
+			Evidence:  event.Evidence{CostMethod: "token_priced", ConfidenceScore: 0.95},
+		}
+	}
+	// turn 1: 300k over 3 tools (100k each) + one MCP server; turn 2: 100k on Edit again;
+	// turn 3: 70k with no tools and no MCP.
+	events := []event.AgentEvent{
+		mk(300_000, []string{"Edit", "Bash", "Read"}, []string{"github"}),
+		mk(100_000, []string{"Edit"}, nil),
+		mk(70_000, nil, nil),
+	}
+	const total = int64(470_000)
+
+	byTool := aggregateReport(events, "tool", "api_equivalent")
+	if byTool.total != total {
+		t.Fatalf("tool total %d, want %d", byTool.total, total)
+	}
+	var sum int64
+	for _, r := range byTool.rows {
+		sum += r.micros
+	}
+	if sum != total {
+		t.Errorf("tool rows sum %d != total %d (fan-out must reconcile)", sum, total)
+	}
+	if r, _ := rowByKey(byTool, "Edit"); r == nil || r.micros != 200_000 || r.count != 2 {
+		t.Errorf("Edit row = %+v, want micros=200000 count=2", r)
+	}
+	if r, _ := rowByKey(byTool, "(no tools)"); r == nil || r.micros != 70_000 {
+		t.Errorf("(no tools) row = %+v, want micros=70000", r)
+	}
+
+	byMCP := aggregateReport(events, "mcp_server", "api_equivalent")
+	sum = 0
+	for _, r := range byMCP.rows {
+		sum += r.micros
+	}
+	if sum != total {
+		t.Errorf("mcp rows sum %d != total %d", sum, total)
+	}
+	if r, _ := rowByKey(byMCP, "github"); r == nil || r.micros != 300_000 {
+		t.Errorf("github row = %+v, want micros=300000 (sole server on its turn)", r)
+	}
+	if r, _ := rowByKey(byMCP, "(no MCP)"); r == nil || r.micros != 170_000 {
+		t.Errorf("(no MCP) row = %+v, want micros=170000", r)
+	}
+}
+
 func mustWindow(t *testing.T, spec string) window {
 	t.Helper()
 	w, err := parsePeriod(spec, fixedNow())

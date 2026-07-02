@@ -139,28 +139,53 @@ type contribution struct {
 	amount int64
 }
 
-// groupContributions maps an event to its (group, cost) contributions. Every
-// dimension except "file" is 1:1 — one group, the full amount — so a grouped total
-// reconciles trivially with the by-model total. "file" fans out: a turn that touched
-// N files contributes to each, its cost split N ways (integer division, with the
-// rounding remainder placed on the first — sorted — file) so the file rows still sum
-// to the grand total. A turn that touched no files lands in "(no files)" with its
-// full cost, so the split never drops or duplicates spend.
+// groupContributions maps an event to its (group, cost) contributions. Most dimensions
+// are 1:1 — one group, the full amount — so a grouped total reconciles trivially with the
+// by-model total. The multi-valued dimensions (file, tool, mcp_server) FAN OUT: a turn that
+// touched N of them contributes to each, its cost split N ways (integer division, with the
+// rounding remainder placed on the first) so the rows still sum to the grand total. A turn
+// with none lands in the dimension's sentinel bucket with its full cost, so the split never
+// drops or duplicates spend.
 func groupContributions(e event.AgentEvent, by string, micros int64) []contribution {
-	if by != "file" {
+	if !isFanoutDim(by) {
 		return []contribution{{groupKey(e, by), micros}}
 	}
-	if len(e.Files) == 0 {
-		return []contribution{{"(no files)", micros}}
+	vals, sentinel := fanoutVals(e, by)
+	if len(vals) == 0 {
+		return []contribution{{sentinel, micros}}
 	}
-	n := int64(len(e.Files))
+	n := int64(len(vals))
 	base := micros / n
-	out := make([]contribution, len(e.Files))
-	for i, f := range e.Files {
-		out[i] = contribution{key: f, amount: base}
+	out := make([]contribution, len(vals))
+	for i, v := range vals {
+		out[i] = contribution{key: v, amount: base}
 	}
-	out[0].amount += micros - base*n // exact remainder, deterministically on the first file
+	out[0].amount += micros - base*n // exact remainder, deterministically on the first
 	return out
+}
+
+// isFanoutDim reports whether a --by dimension is multi-valued per turn (splits a turn's
+// cost across several rows) rather than resolving 1:1 via groupKey.
+func isFanoutDim(by string) bool {
+	switch by {
+	case "file", "tool", "mcp_server":
+		return true
+	}
+	return false
+}
+
+// fanoutVals returns a turn's values for a fan-out dimension plus the sentinel bucket used
+// when it has none. Tools/MCPServers are lifted verbatim from the session log (tool_use
+// names; MCP servers parsed from the mcp__<server>__<tool> prefix).
+func fanoutVals(e event.AgentEvent, by string) (vals []string, sentinel string) {
+	switch by {
+	case "tool":
+		return e.Tools, "(no tools)"
+	case "mcp_server":
+		return e.MCPServers, "(no MCP)"
+	default: // file
+		return e.Files, "(no files)"
+	}
 }
 
 // confidence is the spend-weighted mean confidence (0 when nothing priced).
@@ -231,9 +256,10 @@ func attachComponents(res *reportResult, events []event.AgentEvent, by string, e
 		}
 		total = addComponents(total, c)
 		// The per-token-class breakdown reconciles with a row only for 1:1 groupings.
-		// The file view splits a turn's cost across its files, so a per-file token
-		// split would be a fabricated decomposition — omit it (the total still stands).
-		if by != "file" {
+		// A fan-out view (file/tool/mcp_server) splits a turn's cost across several rows,
+		// so a per-row token split would be a fabricated decomposition — omit it (the
+		// total still stands).
+		if !isFanoutDim(by) {
 			g := groupKey(e, by)
 			perGroup[g] = addComponents(perGroup[g], c)
 		}

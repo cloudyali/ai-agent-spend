@@ -1138,11 +1138,12 @@ func pickView(e event.AgentEvent, view string) (event.Money, bool) {
 	return *m, true
 }
 
-// groupByDimensions are the valid report --by values, in help/error order. "file"
-// fans out in groupContributions; the rest resolve 1:1 via groupKey. Single source
-// of truth shared by the flag help, the --by validation, and the rejection message,
-// so the advertised set, the validator, and the switch below can't drift apart.
-var groupByDimensions = []string{"model", "repo", "provider", "cost_tag", "session", "branch", "commit", "file"}
+// groupByDimensions are the valid report --by values, in help/error order. The
+// multi-valued dimensions (file, tool, mcp_server) fan out in groupContributions; the
+// rest resolve 1:1 via groupKey. Single source of truth shared by the flag help, the
+// --by validation, and the rejection message, so the advertised set, the validator, and
+// the switch below can't drift apart.
+var groupByDimensions = []string{"model", "repo", "provider", "cost_tag", "session", "branch", "commit", "file", "tool", "mcp_server"}
 
 // reportViews are the valid --view cost lenses, in help/error order. Single source
 // of truth for the flag help, the --view validation, and the rejection message. The
