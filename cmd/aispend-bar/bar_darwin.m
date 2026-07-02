@@ -93,7 +93,12 @@ void SetTitle(const char *s) {
 
 void SetHTML(const char *s) {
     NSString *h = [NSString stringWithUTF8String:s];
-    dispatch_async(dispatch_get_main_queue(), ^{ [gBar.web loadHTMLString:h baseURL:nil]; });
+    // A real (never-fetched) base URL gives the document a normal origin. With baseURL:nil the
+    // origin is opaque, and WebKit silently drops clicks on our aispend:// links — so the
+    // navigation delegate never fires and Refresh/Quit do nothing. No network happens: the HTML
+    // has no external references, so WebKit never loads this URL.
+    NSURL *base = [NSURL URLWithString:@"https://aispend.local/"];
+    dispatch_async(dispatch_get_main_queue(), ^{ [gBar.web loadHTMLString:h baseURL:base]; });
 }
 
 void QuitBar(void) {
