@@ -93,7 +93,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: dist/aispend-bar-*.dmg
+          # Versioned asset (archival + what the Homebrew cask pins) plus a stable-named
+          # alias so the site can link to /releases/latest/download/AiSpend.dmg.
+          files: |
+            dist/aispend-bar-*.dmg
+            dist/AiSpend.dmg
 
       - name: Publish the Homebrew cask
         env:

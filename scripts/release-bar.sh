@@ -113,3 +113,11 @@ fi
 shasum -a 256 "$DMG" | awk '{print $1}' > "$DMG.sha256"
 echo "Built $DMG"
 echo "sha256: $(cat "$DMG.sha256")"
+
+# 9. Stable-named alias for the website's one-click download button. GitHub resolves
+#    /releases/latest/download/AiSpend.dmg to this asset on every non-prerelease release,
+#    so the landing page links straight to the .dmg without hardcoding a version. It's a
+#    byte-identical copy of the versioned dmg (same sign/staple); the Homebrew cask keeps
+#    pinning the versioned name + sha256.
+cp "$DMG" "$DIST/AiSpend.dmg"
+echo "Aliased $(basename "$DMG") → AiSpend.dmg"
