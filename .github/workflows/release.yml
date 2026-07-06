@@ -56,10 +56,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      # menuet is macOS-only and kept out of the committed go.mod (the main tool stays
-      # cross-platform + offline); fetch it here just for the bar build.
-      - name: Add the macOS-only menuet dependency
-        run: go get github.com/caseymrm/menuet
+      # cmd/aispend-bar is cgo + Cocoa/WebKit (bar.h + bar_darwin.m) and pulls no external
+      # Go UI dependency, so there's nothing extra to fetch — `go build` resolves everything
+      # from go.mod. (The old menuet backend was dropped for the WKWebView popover.)
 
       # Phase 2 — import the Developer ID cert into a temporary keychain. Skipped entirely
       # when the APPLE_CERTIFICATE secret is absent (Phase 1 → unsigned build).

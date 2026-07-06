@@ -28,8 +28,8 @@ command -v lipo >/dev/null || { echo "release-bar: needs macOS (lipo not found)"
 rm -rf "$APP" "$DMG"
 mkdir -p "$MACOS" "$RES"
 
-# 1. Universal binary (Apple Silicon + Intel) via lipo. The macOS-only menuet dep is in
-#    go.mod (CI runs `go get github.com/caseymrm/menuet` first as a safety net).
+# 1. Universal binary (Apple Silicon + Intel) via lipo. cmd/aispend-bar is cgo + Cocoa/WebKit
+#    (bar.h + bar_darwin.m); no external Go UI dep — go build resolves the rest from go.mod.
 for arch in arm64 amd64; do
   ( cd "$ROOT" && CGO_ENABLED=1 GOOS=darwin GOARCH="$arch" \
       go build -trimpath -ldflags "-s -w" -o "$DIST/$APP_NAME-$arch" ./cmd/aispend-bar )
