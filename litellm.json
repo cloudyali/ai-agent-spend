@@ -11106,6 +11106,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -11133,6 +11134,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -11186,6 +11188,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_output_config": true
@@ -11213,6 +11216,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_output_config": true
@@ -11241,6 +11245,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "provider_specific_entry": {
@@ -11275,6 +11280,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "provider_specific_entry": {
@@ -11309,6 +11315,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -11345,6 +11352,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -11381,6 +11389,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -11452,6 +11461,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -11483,6 +11493,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true
@@ -11538,6 +11549,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_native_structured_output": true,
     "supports_max_reasoning_effort": true,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -16057,8 +16069,8 @@
     "rules": [
       {
         "name": "bedrock-claude-ids",
-        "pattern": "anthropic\\.claude-",
-        "description": "Any Bedrock-syntax Claude id: the dotted anthropic.claude- segment appears in bare (anthropic.claude-...), region-prefixed (us./eu./au./jp./apac.) and global.-prefixed ids, for every version. Routes these to bedrock before the bare-id Anthropic rule is consulted.",
+        "pattern": "^(?:[a-z-]+\\.)?anthropic\\.claude-",
+        "description": "A Bedrock-syntax Claude id, for every version: anthropic.claude- at the start of the name, optionally behind a single dotted geo segment (us./eu./au./jp./apac./global./us-gov.). Anchored to the start because routing rules see the raw request string and provider inference feeds the proxy's provider/* wildcard access checks: an id under an unrecognized namespace such as bedrockz/anthropic.claude-... must stay unroutable rather than resolve to bedrock and slip through a bedrock/* key. Routes to bedrock before the bare-id Anthropic rule is consulted.",
         "model_info": {
           "litellm_provider": "bedrock"
         }
@@ -20868,6 +20880,37 @@
     },
     "gemini_native_audio": true
   },
+  "gemini-omni-flash-preview": {
+    "input_cost_per_audio_token": 1.5e-06,
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "vertex_ai-language-models",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65535,
+    "max_tokens": 65535,
+    "mode": "chat",
+    "output_cost_per_reasoning_token": 9e-06,
+    "output_cost_per_token": 9e-06,
+    "output_cost_per_video_token": 1.75e-05,
+    "source": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/omni-flash-preview",
+    "supported_endpoints": [
+      "/v1/chat/completions"
+    ],
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text",
+      "video"
+    ],
+    "supports_audio_input": true,
+    "supports_reasoning": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true
+  },
   "gemini-pro-latest": {
     "cache_read_input_token_cost": 1.25e-07,
     "cache_read_input_token_cost_above_200k_tokens": 2.5e-07,
@@ -21763,7 +21806,8 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
-    "web_search_billing_unit": "per_query"
+    "web_search_billing_unit": "per_query",
+    "supports_reasoning": false
   },
   "gemini/gemini-3-pro-image-preview": {
     "input_cost_per_image": 0.0011,
@@ -21796,6 +21840,7 @@
     ],
     "supports_function_calling": false,
     "supports_prompt_caching": true,
+    "supports_reasoning": false,
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_vision": true,
@@ -21893,6 +21938,7 @@
     ],
     "supports_function_calling": false,
     "supports_prompt_caching": true,
+    "supports_reasoning": false,
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_vision": true,
@@ -21934,6 +21980,7 @@
     ],
     "supports_function_calling": false,
     "supports_prompt_caching": true,
+    "supports_reasoning": false,
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_vision": true,
@@ -22511,6 +22558,39 @@
       "search_context_size_high": 0.035
     },
     "gemini_native_audio": true
+  },
+  "gemini/gemini-omni-flash-preview": {
+    "input_cost_per_audio_token": 1.5e-06,
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 65535,
+    "max_tokens": 65535,
+    "mode": "chat",
+    "output_cost_per_reasoning_token": 9e-06,
+    "output_cost_per_token": 9e-06,
+    "output_cost_per_video_token": 1.75e-05,
+    "rpm": 2000,
+    "source": "https://ai.google.dev/gemini-api/docs/pricing",
+    "supported_endpoints": [
+      "/v1/chat/completions"
+    ],
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text",
+      "video"
+    ],
+    "supports_audio_input": true,
+    "supports_reasoning": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "tpm": 800000
   },
   "gemini/gemini-pro-latest": {
     "cache_read_input_token_cost": 1.25e-07,
@@ -42366,6 +42446,7 @@
     "supports_parallel_function_calling": true,
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
+    "supports_reasoning": false,
     "supports_response_schema": true,
     "supports_system_messages": true,
     "supports_tool_choice": true,
@@ -42436,6 +42517,7 @@
     "output_cost_per_image_token": 0.00012,
     "output_cost_per_token": 1.2e-05,
     "output_cost_per_token_batches": 6e-06,
+    "supports_reasoning": false,
     "source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro-image"
   },
   "vertex_ai/gemini-3-pro-image-preview": {
@@ -42451,6 +42533,7 @@
     "output_cost_per_image_token": 0.00012,
     "output_cost_per_token": 1.2e-05,
     "output_cost_per_token_batches": 6e-06,
+    "supports_reasoning": false,
     "source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro-image"
   },
   "vertex_ai/gemini-3-pro-preview": {
@@ -42519,6 +42602,7 @@
     "output_cost_per_image": 0.0672,
     "output_cost_per_image_token": 6e-05,
     "output_cost_per_token": 3e-06,
+    "supports_reasoning": false,
     "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing#gemini-models"
   },
   "vertex_ai/gemini-3.1-flash-image-preview": {
@@ -42532,6 +42616,7 @@
     "output_cost_per_image": 0.0672,
     "output_cost_per_image_token": 6e-05,
     "output_cost_per_token": 3e-06,
+    "supports_reasoning": false,
     "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing#gemini-models"
   },
   "vertex_ai/gemini-3.1-flash-lite": {
