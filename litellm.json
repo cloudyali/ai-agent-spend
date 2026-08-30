@@ -41,7 +41,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "1024-x-1024/max-steps/stability.stable-diffusion-xl-v1": {
     "litellm_provider": "bedrock",
@@ -71,7 +72,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "1536-x-1024/gpt-image-1.5": {
     "deprecation_date": "2026-12-01",
@@ -94,7 +96,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "256-x-256/dall-e-2": {
     "deprecation_date": "2026-05-12",
@@ -2237,7 +2240,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/eu/gpt-5.1-chat": {
     "cache_read_input_token_cost": 1.4e-07,
@@ -2272,7 +2276,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/eu/gpt-5.1-codex": {
     "deprecation_date": "2027-05-15",
@@ -2372,6 +2377,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -2411,6 +2417,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -2903,7 +2910,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/global/gpt-5.1-chat": {
     "cache_read_input_token_cost": 1.25e-07,
@@ -2938,7 +2946,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/global/gpt-5.1-codex": {
     "deprecation_date": "2027-05-15",
@@ -4071,7 +4080,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/gpt-5.1-2025-11-13": {
     "cache_read_input_token_cost": 1.25e-07,
@@ -4109,6 +4119,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_minimal_reasoning_effort": true
   },
   "azure/gpt-5.1-chat": {
@@ -4144,7 +4155,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/gpt-5.1-chat-2025-11-13": {
     "cache_read_input_token_cost": 1.25e-07,
@@ -4181,7 +4193,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": false,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/gpt-5.1-codex": {
     "deprecation_date": "2027-05-15",
@@ -4696,6 +4709,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -4741,6 +4755,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -4783,6 +4798,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-mini-2026-03-17": {
@@ -4824,6 +4840,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-nano": {
@@ -4865,6 +4882,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-nano-2026-03-17": {
@@ -4906,6 +4924,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-pro": {
@@ -6771,7 +6790,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/us/gpt-5.1-chat": {
     "cache_read_input_token_cost": 1.4e-07,
@@ -6806,7 +6826,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/us/gpt-5.1-codex": {
     "deprecation_date": "2027-05-15",
@@ -6906,6 +6927,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -6945,6 +6967,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -8624,6 +8647,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -8671,6 +8695,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -8712,6 +8737,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -8753,6 +8779,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -8794,6 +8821,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -8835,6 +8863,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -11380,8 +11409,11 @@
   },
   "bedrock_mantle/openai.gpt-5.4": {
     "input_cost_per_token": 2.75e-06,
+    "input_cost_per_token_above_272k_tokens": 5.5e-06,
     "cache_read_input_token_cost": 2.75e-07,
+    "cache_read_input_token_cost_above_272k_tokens": 5.5e-07,
     "output_cost_per_token": 1.65e-05,
+    "output_cost_per_token_above_272k_tokens": 2.475e-05,
     "litellm_provider": "bedrock_mantle",
     "max_input_tokens": 1050000,
     "max_output_tokens": 128000,
@@ -11407,8 +11439,11 @@
   },
   "bedrock_mantle/openai.gpt-5.5": {
     "input_cost_per_token": 5.5e-06,
+    "input_cost_per_token_above_272k_tokens": 1.1e-05,
     "cache_read_input_token_cost": 5.5e-07,
+    "cache_read_input_token_cost_above_272k_tokens": 1.1e-06,
     "output_cost_per_token": 3.3e-05,
+    "output_cost_per_token_above_272k_tokens": 4.95e-05,
     "litellm_provider": "bedrock_mantle",
     "max_input_tokens": 1050000,
     "max_output_tokens": 128000,
@@ -11494,14 +11529,14 @@
     "supports_vision": true
   },
   "bedrock_mantle/openai.gpt-5.6-sol": {
-    "input_cost_per_token": 4.4e-06,
-    "input_cost_per_token_above_272k_tokens": 8.8e-06,
-    "cache_creation_input_token_cost": 5.5e-06,
-    "cache_creation_input_token_cost_above_272k_tokens": 1.1e-05,
-    "cache_read_input_token_cost": 4.4e-07,
-    "cache_read_input_token_cost_above_272k_tokens": 8.8e-07,
-    "output_cost_per_token": 2.2e-05,
-    "output_cost_per_token_above_272k_tokens": 3.3e-05,
+    "input_cost_per_token": 5.5e-06,
+    "input_cost_per_token_above_272k_tokens": 1.1e-05,
+    "cache_creation_input_token_cost": 6.875e-06,
+    "cache_creation_input_token_cost_above_272k_tokens": 1.375e-05,
+    "cache_read_input_token_cost": 5.5e-07,
+    "cache_read_input_token_cost_above_272k_tokens": 1.1e-06,
+    "output_cost_per_token": 3.3e-05,
+    "output_cost_per_token_above_272k_tokens": 4.95e-05,
     "litellm_provider": "bedrock_mantle",
     "max_input_tokens": 1050000,
     "max_output_tokens": 128000,
@@ -12216,7 +12251,8 @@
     },
     "supports_output_config": true,
     "prompt_cache_min_tokens": 512,
-    "supports_native_structured_output": true
+    "supports_native_structured_output": true,
+    "source": "https://docs.anthropic.com/en/docs/about-claude/models/overview"
   },
   "claude-haiku-4-5": {
     "deprecation_date": "2026-10-15",
@@ -12717,7 +12753,8 @@
     },
     "supports_output_config": true,
     "supports_speed": true,
-    "prompt_cache_min_tokens": 512
+    "prompt_cache_min_tokens": 512,
+    "source": "https://docs.anthropic.com/en/docs/about-claude/models/overview"
   },
   "claude-sonnet-4-20250514": {
     "deprecation_date": "2026-06-15",
@@ -12923,7 +12960,8 @@
       "us": 1.1
     },
     "supports_output_config": true,
-    "prompt_cache_min_tokens": 1024
+    "prompt_cache_min_tokens": 1024,
+    "source": "https://docs.anthropic.com/en/docs/about-claude/models/overview"
   },
   "cloudflare/@cf/aisingapore/gemma-sea-lion-v4-27b-it": {
     "input_cost_per_token": 3.51e-07,
@@ -15168,6 +15206,29 @@
     "supports_reasoning": true,
     "supports_tool_choice": true,
     "supports_vision": false
+  },
+  "databricks/databricks-glm-5-3-flash": {
+    "litellm_provider": "databricks",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 131072,
+    "max_tokens": 131072,
+    "metadata": {
+      "notes": "Databricks has not published pay-per-token DBU rates for this model yet (not on the foundation-model-serving pricing page as of 2026-08-27), so cost fields are omitted until rates are published."
+    },
+    "mode": "chat",
+    "source": "https://docs.databricks.com/aws/en/machine-learning/foundation-model-apis/supported-models",
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
   },
   "databricks/databricks-gpt-5": {
     "cache_creation_input_token_cost": 1.24999e-06,
@@ -21115,6 +21176,22 @@
     "supports_tool_choice": true,
     "supports_vision": false
   },
+  "fireworks_ai/accounts/fireworks/models/glm-5p3": {
+    "cache_read_input_token_cost": 2.6e-07,
+    "input_cost_per_token": 1.4e-06,
+    "litellm_provider": "fireworks_ai",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 128000,
+    "max_tokens": 128000,
+    "mode": "chat",
+    "output_cost_per_token": 4.4e-06,
+    "source": "https://docs.fireworks.ai/serverless/pricing",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": false
+  },
   "fireworks_ai/accounts/fireworks/models/gpt-oss-120b": {
     "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
@@ -22662,6 +22739,16 @@
     "output_cost_per_token": 0.0,
     "litellm_provider": "fireworks_ai",
     "mode": "embedding"
+  },
+  "fireworks_ai/accounts/fireworks/models/qwen3-embedding-8b": {
+    "input_cost_per_token": 1e-07,
+    "output_cost_per_token": 0.0,
+    "litellm_provider": "fireworks_ai",
+    "max_input_tokens": 40960,
+    "max_output_tokens": 40960,
+    "max_tokens": 40960,
+    "mode": "embedding",
+    "source": "https://docs.fireworks.ai/serverless/pricing"
   },
   "fireworks_ai/accounts/fireworks/models/qwen3-next-80b-a3b-instruct": {
     "max_tokens": 4096,
@@ -25418,7 +25505,8 @@
     "output_cost_per_token": 2e-06,
     "source": "https://cloud.google.com/vertex-ai/generative-ai/pricing",
     "supported_endpoints": [
-      "/vertex_ai/live"
+      "/vertex_ai/live",
+      "/v1/realtime"
     ],
     "supported_modalities": [
       "text",
@@ -27494,13 +27582,13 @@
     },
     "gemini_native_audio": true
   },
-  "gemini/gemini-omni-flash-preview": {
+  "gemini/gemini-omni-1.1-flash": {
     "input_cost_per_audio_token": 1.5e-06,
     "input_cost_per_token": 1.5e-06,
     "litellm_provider": "gemini",
-    "max_input_tokens": 1048576,
-    "max_output_tokens": 65535,
-    "max_tokens": 65535,
+    "max_input_tokens": 131072,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
     "mode": "chat",
     "output_cost_per_reasoning_token": 9e-06,
     "output_cost_per_token": 9e-06,
@@ -27508,7 +27596,7 @@
     "rpm": 2000,
     "source": "https://ai.google.dev/gemini-api/docs/pricing",
     "supported_endpoints": [
-      "/v1/chat/completions"
+      "/v1beta/interactions"
     ],
     "supported_modalities": [
       "text",
@@ -27526,6 +27614,40 @@
     "supports_video_input": true,
     "supports_vision": true,
     "tpm": 800000
+  },
+  "gemini/gemini-omni-flash-preview": {
+    "input_cost_per_audio_token": 1.5e-06,
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 131072,
+    "max_output_tokens": 65536,
+    "max_tokens": 65536,
+    "mode": "chat",
+    "output_cost_per_reasoning_token": 9e-06,
+    "output_cost_per_token": 9e-06,
+    "output_cost_per_video_token": 1.75e-05,
+    "rpm": 2000,
+    "source": "https://ai.google.dev/gemini-api/docs/pricing",
+    "supported_endpoints": [
+      "/v1beta/interactions"
+    ],
+    "supported_modalities": [
+      "text",
+      "image",
+      "audio",
+      "video"
+    ],
+    "supported_output_modalities": [
+      "text",
+      "video"
+    ],
+    "supports_audio_input": true,
+    "supports_reasoning": true,
+    "supports_system_messages": true,
+    "supports_video_input": true,
+    "supports_vision": true,
+    "tpm": 800000,
+    "deprecation_date": "2026-09-30"
   },
   "gemini/gemini-pro-latest": {
     "cache_read_input_token_cost": 1.25e-07,
@@ -27771,6 +27893,38 @@
     "supports_tool_choice": true,
     "supports_vision": true
   },
+  "gemini/gemma-4-26b-a4b-it": {
+    "input_cost_per_token": 0.0,
+    "output_cost_per_token": 0.0,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 32768,
+    "max_tokens": 32768,
+    "mode": "chat",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_system_messages": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "source": "https://ai.google.dev/gemini-api/docs/pricing"
+  },
+  "gemini/gemma-4-31b-it": {
+    "input_cost_per_token": 0.0,
+    "output_cost_per_token": 0.0,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 32768,
+    "max_tokens": 32768,
+    "mode": "chat",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_system_messages": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "source": "https://ai.google.dev/gemini-api/docs/pricing"
+  },
   "gemini/imagen-3.0-fast-generate-001": {
     "litellm_provider": "gemini",
     "mode": "image_generation",
@@ -27887,6 +28041,49 @@
     "supports_system_messages": false,
     "supports_vision": false,
     "supports_web_search": false
+  },
+  "gemini/nano-banana-pro-preview": {
+    "input_cost_per_image": 0.0011,
+    "input_cost_per_token": 2e-06,
+    "input_cost_per_token_batches": 1e-06,
+    "litellm_provider": "gemini",
+    "max_input_tokens": 131072,
+    "max_output_tokens": 32768,
+    "max_tokens": 32768,
+    "mode": "image_generation",
+    "output_cost_per_image": 0.134,
+    "output_cost_per_image_token": 0.00012,
+    "output_cost_per_token": 1.2e-05,
+    "rpm": 1000,
+    "tpm": 4000000,
+    "output_cost_per_token_batches": 6e-06,
+    "source": "https://ai.google.dev/gemini-api/docs/pricing",
+    "supported_endpoints": [
+      "/v1/chat/completions",
+      "/v1/completions",
+      "/v1/batch"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "text",
+      "image"
+    ],
+    "supports_function_calling": false,
+    "supports_prompt_caching": true,
+    "supports_reasoning": false,
+    "supports_response_schema": true,
+    "supports_system_messages": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "search_context_cost_per_query": {
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014,
+      "search_context_size_high": 0.014
+    },
+    "web_search_billing_unit": "per_query"
   },
   "gemini/veo-2.0-generate-001": {
     "deprecation_date": "2026-06-30",
@@ -28894,7 +29091,7 @@
     "max_tokens": 500000,
     "mode": "chat",
     "supports_function_calling": true,
-    "supports_prompt_caching": true,
+    "supports_prompt_caching": false,
     "supports_reasoning": true,
     "supports_tool_choice": true,
     "supports_vision": true
@@ -30668,6 +30865,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true
   },
@@ -30712,6 +30910,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true
   },
@@ -30757,6 +30956,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true
   },
@@ -30928,6 +31128,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -30973,6 +31174,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -31272,6 +31474,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -31320,6 +31523,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -31371,6 +31575,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -31422,6 +31627,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -31470,6 +31676,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -31518,6 +31725,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -33224,6 +33432,21 @@
     "supports_tool_choice": true,
     "supports_vision": true
   },
+  "groq/qwen/qwen3.8-27b": {
+    "input_cost_per_token": 8e-07,
+    "litellm_provider": "groq",
+    "max_input_tokens": 131042,
+    "max_output_tokens": 16384,
+    "max_tokens": 16384,
+    "mode": "chat",
+    "output_cost_per_token": 4e-06,
+    "source": "https://console.groq.com/docs/model/qwen/qwen3.8-27b",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "groq/whisper-large-v3": {
     "input_cost_per_second": 3.083e-05,
     "litellm_provider": "groq",
@@ -33329,7 +33552,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "high/1024-x-1536/gpt-image-1": {
     "deprecation_date": "2026-10-23",
@@ -33363,7 +33587,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "high/1536-x-1024/gpt-image-1": {
     "deprecation_date": "2026-10-23",
@@ -33397,7 +33622,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "hyperbolic/NousResearch/Hermes-3-Llama-3.1-70B": {
     "input_cost_per_token": 1.2e-07,
@@ -34725,7 +34951,24 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
+  },
+  "low/1024-x-1024/grok-imagine-image-2.0": {
+    "input_cost_per_image": 0.04,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
   },
   "low/1024-x-1536/gpt-image-1": {
     "deprecation_date": "2026-10-23",
@@ -34768,7 +35011,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "low/1536-x-1024/gpt-image-1": {
     "deprecation_date": "2026-10-23",
@@ -34811,7 +35055,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "max-x-max/50-steps/stability.stable-diffusion-xl-v0": {
     "litellm_provider": "bedrock",
@@ -34868,7 +35113,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "medium/1024-x-1536/gpt-image-1": {
     "deprecation_date": "2026-10-23",
@@ -34911,7 +35157,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "medium/1536-x-1024/gpt-image-1": {
     "deprecation_date": "2026-10-23",
@@ -34954,7 +35201,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "medlm-large": {
     "input_cost_per_character": 5e-06,
@@ -35659,6 +35907,7 @@
     "supports_tool_choice": true
   },
   "mistral/codestral-2508": {
+    "cache_read_input_token_cost": 3e-08,
     "input_cost_per_token": 3e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 128000,
@@ -35673,6 +35922,7 @@
     "supports_tool_choice": true
   },
   "mistral/codestral-embed": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 8192,
@@ -35680,6 +35930,7 @@
     "mode": "embedding"
   },
   "mistral/codestral-embed-2505": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 8192,
@@ -35687,6 +35938,7 @@
     "mode": "embedding"
   },
   "mistral/codestral-latest": {
+    "cache_read_input_token_cost": 3e-08,
     "input_cost_per_token": 3e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 128000,
@@ -35694,11 +35946,11 @@
     "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 9e-07,
-    "supports_assistant_prefill": true,
-    "supports_response_schema": true,
-    "supports_tool_choice": true,
     "source": "https://docs.mistral.ai/models/model-cards/codestral-25-08",
-    "supports_function_calling": true
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true
   },
   "mistral/codestral-mamba-latest": {
     "input_cost_per_token": 2.5e-07,
@@ -35859,6 +36111,19 @@
     "supports_response_schema": true,
     "supports_tool_choice": true
   },
+  "mistral/labs-leanstral-1-5-1": {
+    "input_cost_per_token": 0.0,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 131072,
+    "max_tokens": 131072,
+    "mode": "chat",
+    "output_cost_per_token": 0.0,
+    "source": "https://docs.mistral.ai/models/model-cards/leanstral-1-5",
+    "supports_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true
+  },
   "mistral/magistral-medium-1-2-2509": {
     "deprecation_date": "2026-07-31",
     "input_cost_per_token": 2e-06,
@@ -36000,6 +36265,7 @@
     "supports_vision": true
   },
   "mistral/ministral-3-14b-2512": {
+    "cache_read_input_token_cost": 2e-08,
     "input_cost_per_token": 2e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36015,6 +36281,7 @@
     "supports_vision": true
   },
   "mistral/ministral-3-3b-2512": {
+    "cache_read_input_token_cost": 1e-08,
     "input_cost_per_token": 1e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 131072,
@@ -36030,6 +36297,7 @@
     "supports_vision": true
   },
   "mistral/ministral-3-8b-2512": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36075,6 +36343,7 @@
     "supports_vision": true
   },
   "mistral/ministral-8b-2512": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36090,6 +36359,7 @@
     "supports_vision": true
   },
   "mistral/ministral-8b-latest": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36103,6 +36373,50 @@
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true
+  },
+  "mistral/mistral-code-agent-latest": {
+    "input_cost_per_token": 4e-07,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 256000,
+    "max_output_tokens": 256000,
+    "max_tokens": 256000,
+    "mode": "chat",
+    "output_cost_per_token": 2e-06,
+    "source": "https://mistral.ai/news/devstral-2-vibe-cli",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true
+  },
+  "mistral/mistral-code-fim-latest": {
+    "cache_read_input_token_cost": 3e-08,
+    "input_cost_per_token": 3e-07,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 128000,
+    "max_tokens": 128000,
+    "mode": "chat",
+    "output_cost_per_token": 9e-07,
+    "source": "https://docs.mistral.ai/models/model-cards/codestral-25-08",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true
+  },
+  "mistral/mistral-code-latest": {
+    "cache_read_input_token_cost": 3e-08,
+    "input_cost_per_token": 3e-07,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 128000,
+    "max_tokens": 128000,
+    "mode": "chat",
+    "output_cost_per_token": 9e-07,
+    "source": "https://docs.mistral.ai/models/model-cards/codestral-25-08",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true
   },
   "mistral/mistral-embed": {
     "input_cost_per_token": 1e-07,
@@ -36162,6 +36476,7 @@
     "supports_tool_choice": true
   },
   "mistral/mistral-large-2512": {
+    "cache_read_input_token_cost": 5e-08,
     "input_cost_per_token": 5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36177,6 +36492,7 @@
     "supports_vision": true
   },
   "mistral/mistral-large-3": {
+    "cache_read_input_token_cost": 5e-08,
     "input_cost_per_token": 5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36192,6 +36508,7 @@
     "supports_vision": true
   },
   "mistral/mistral-large-latest": {
+    "cache_read_input_token_cost": 5e-08,
     "input_cost_per_token": 5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36262,6 +36579,7 @@
     "supports_vision": true
   },
   "mistral/mistral-medium-2604": {
+    "cache_read_input_token_cost": 1.5e-07,
     "input_cost_per_token": 1.5e-06,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36310,6 +36628,24 @@
     "supports_vision": true
   },
   "mistral/mistral-medium-3-5": {
+    "cache_read_input_token_cost": 1.5e-07,
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 262144,
+    "max_tokens": 262144,
+    "mode": "chat",
+    "output_cost_per_token": 7.5e-06,
+    "source": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
+  "mistral/mistral-medium-3.5": {
+    "cache_read_input_token_cost": 1.5e-07,
     "input_cost_per_token": 1.5e-06,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36326,6 +36662,7 @@
     "supports_vision": true
   },
   "mistral/mistral-medium-latest": {
+    "cache_read_input_token_cost": 1.5e-07,
     "input_cost_per_token": 1.5e-06,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36369,6 +36706,36 @@
       "/v1/ocr"
     ],
     "source": "https://mistral.ai/pricing#api-pricing"
+  },
+  "mistral/mistral-ocr-3": {
+    "litellm_provider": "mistral",
+    "ocr_cost_per_page": 0.002,
+    "annotation_cost_per_page": 0.003,
+    "mode": "ocr",
+    "supported_endpoints": [
+      "/v1/ocr"
+    ],
+    "source": "https://mistral.ai/pricing#api-pricing"
+  },
+  "mistral/mistral-ocr-3-0": {
+    "litellm_provider": "mistral",
+    "ocr_cost_per_page": 0.002,
+    "annotation_cost_per_page": 0.003,
+    "mode": "ocr",
+    "supported_endpoints": [
+      "/v1/ocr"
+    ],
+    "source": "https://mistral.ai/pricing#api-pricing"
+  },
+  "mistral/mistral-ocr-4": {
+    "annotation_cost_per_page": 0.005,
+    "litellm_provider": "mistral",
+    "mode": "ocr",
+    "ocr_cost_per_page": 0.004,
+    "source": "https://docs.mistral.ai/models/model-cards/ocr-4-1",
+    "supported_endpoints": [
+      "/v1/ocr"
+    ]
   },
   "mistral/mistral-ocr-4-0": {
     "litellm_provider": "mistral",
@@ -36414,6 +36781,7 @@
     "supports_tool_choice": true
   },
   "mistral/mistral-small-2603": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36446,6 +36814,7 @@
     "supports_vision": true
   },
   "mistral/mistral-small-latest": {
+    "cache_read_input_token_cost": 1.5e-08,
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "mistral",
     "max_input_tokens": 262144,
@@ -36456,9 +36825,9 @@
     "source": "https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03",
     "supports_assistant_prefill": true,
     "supports_function_calling": true,
+    "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
-    "supports_reasoning": true,
     "supports_vision": true
   },
   "mistral/mistral-tiny": {
@@ -36472,6 +36841,57 @@
     "supports_assistant_prefill": true,
     "supports_response_schema": true,
     "supports_tool_choice": true
+  },
+  "mistral/mistral-vibe-cli-fast": {
+    "cache_read_input_token_cost": 1.5e-08,
+    "input_cost_per_token": 1.5e-07,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 262144,
+    "max_tokens": 262144,
+    "mode": "chat",
+    "output_cost_per_token": 6e-07,
+    "source": "https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
+  "mistral/mistral-vibe-cli-latest": {
+    "cache_read_input_token_cost": 1.5e-07,
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 262144,
+    "max_tokens": 262144,
+    "mode": "chat",
+    "output_cost_per_token": 7.5e-06,
+    "source": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
+  "mistral/mistral-vibe-cli-with-tools": {
+    "cache_read_input_token_cost": 1.5e-07,
+    "input_cost_per_token": 1.5e-06,
+    "litellm_provider": "mistral",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 262144,
+    "max_tokens": 262144,
+    "mode": "chat",
+    "output_cost_per_token": 7.5e-06,
+    "source": "https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04",
+    "supports_assistant_prefill": true,
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
   },
   "mistral/open-codestral-mamba": {
     "deprecation_date": "2025-06-06",
@@ -36603,6 +37023,54 @@
     "litellm_provider": "mistral",
     "mode": "audio_transcription",
     "source": "https://docs.mistral.ai/models/model-cards/voxtral-mini-transcribe-26-02",
+    "supported_endpoints": [
+      "/v1/audio/transcriptions"
+    ],
+    "supported_modalities": [
+      "audio"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true
+  },
+  "mistral/voxtral-mini-latest": {
+    "input_cost_per_second": 5e-05,
+    "litellm_provider": "mistral",
+    "mode": "audio_transcription",
+    "source": "https://docs.mistral.ai/models/model-cards/voxtral-mini-transcribe-26-02",
+    "supported_endpoints": [
+      "/v1/audio/transcriptions"
+    ],
+    "supported_modalities": [
+      "audio"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true
+  },
+  "mistral/voxtral-mini-realtime-2602": {
+    "input_cost_per_second": 0.0001,
+    "litellm_provider": "mistral",
+    "mode": "audio_transcription",
+    "source": "https://docs.mistral.ai/models/model-cards/voxtral-mini-transcribe-realtime-26-02",
+    "supported_endpoints": [
+      "/v1/audio/transcriptions"
+    ],
+    "supported_modalities": [
+      "audio"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true
+  },
+  "mistral/voxtral-mini-realtime-latest": {
+    "input_cost_per_second": 0.0001,
+    "litellm_provider": "mistral",
+    "mode": "audio_transcription",
+    "source": "https://docs.mistral.ai/models/model-cards/voxtral-mini-transcribe-realtime-26-02",
     "supported_endpoints": [
       "/v1/audio/transcriptions"
     ],
@@ -36842,6 +37310,24 @@
     "output_cost_per_token": 4e-06,
     "source": "https://platform.kimi.ai/docs/pricing/chat-k26",
     "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_video_input": true,
+    "supports_vision": true
+  },
+  "moonshot/kimi-k2.7-code": {
+    "cache_read_input_token_cost": 1.9e-07,
+    "input_cost_per_token": 9.5e-07,
+    "litellm_provider": "moonshot",
+    "max_input_tokens": 262144,
+    "max_output_tokens": 262144,
+    "max_tokens": 262144,
+    "mode": "chat",
+    "output_cost_per_token": 4e-06,
+    "source": "https://platform.kimi.ai/docs/pricing/chat-k27-code",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
@@ -45850,7 +46336,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "standard/1024-x-1536/gpt-image-1.5": {
     "deprecation_date": "2026-12-01",
@@ -45873,7 +46360,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "standard/1024-x-1792/dall-e-3": {
     "deprecation_date": "2026-05-12",
@@ -45903,7 +46391,8 @@
       "/v1/images/edits"
     ],
     "supports_vision": true,
-    "supports_pdf_input": true
+    "supports_pdf_input": true,
+    "deprecation_date": "2026-12-01"
   },
   "standard/1792-x-1024/dall-e-3": {
     "deprecation_date": "2026-05-12",
@@ -46401,7 +46890,6 @@
     "input_cost_per_token": 3e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 524288,
-    "max_output_tokens": 524288,
     "max_tokens": 524288,
     "mode": "chat",
     "output_cost_per_token": 1.2e-06,
@@ -46418,7 +46906,6 @@
     "input_cost_per_token": 0.0,
     "litellm_provider": "together_ai",
     "max_input_tokens": 262144,
-    "max_output_tokens": 262144,
     "max_tokens": 262144,
     "mode": "chat",
     "output_cost_per_token": 0.0,
@@ -46543,7 +47030,6 @@
     "input_cost_per_token": 1.7e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 262144,
-    "max_output_tokens": 262144,
     "max_tokens": 262144,
     "mode": "chat",
     "output_cost_per_token": 2.5e-07,
@@ -46559,7 +47045,6 @@
     "input_cost_per_token": 5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1000000,
-    "max_output_tokens": 1000000,
     "max_tokens": 1000000,
     "mode": "chat",
     "output_cost_per_token": 3e-06,
@@ -46571,7 +47056,6 @@
     "input_cost_per_token": 2.5e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1000000,
-    "max_output_tokens": 1000000,
     "max_tokens": 1000000,
     "mode": "chat",
     "output_cost_per_token": 7.5e-06,
@@ -46582,7 +47066,6 @@
     "input_cost_per_token": 3.2e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1000000,
-    "max_output_tokens": 1000000,
     "max_tokens": 1000000,
     "mode": "chat",
     "output_cost_per_token": 1.28e-06,
@@ -46593,7 +47076,6 @@
     "input_cost_per_token": 2.5e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1010000,
-    "max_output_tokens": 1010000,
     "max_tokens": 1010000,
     "mode": "chat",
     "output_cost_per_token": 6.25e-06,
@@ -46604,7 +47086,6 @@
     "input_cost_per_token": 1e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 32768,
-    "max_output_tokens": 32768,
     "max_tokens": 32768,
     "mode": "chat",
     "output_cost_per_token": 1e-07,
@@ -46687,7 +47168,6 @@
     "input_cost_per_token": 1.4e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1048576,
-    "max_output_tokens": 1048576,
     "max_tokens": 1048576,
     "mode": "chat",
     "output_cost_per_token": 2.8e-07,
@@ -46704,7 +47184,6 @@
     "input_cost_per_token": 1.74e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 512000,
-    "max_output_tokens": 512000,
     "max_tokens": 512000,
     "mode": "chat",
     "output_cost_per_token": 3.48e-06,
@@ -46721,7 +47200,6 @@
     "input_cost_per_token": 1.32e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1048576,
-    "max_output_tokens": 1048576,
     "max_tokens": 1048576,
     "mode": "chat",
     "output_cost_per_token": 3.96e-06,
@@ -46737,7 +47215,6 @@
     "input_cost_per_token": 6e-08,
     "litellm_provider": "together_ai",
     "max_input_tokens": 32768,
-    "max_output_tokens": 32768,
     "max_tokens": 32768,
     "mode": "chat",
     "output_cost_per_token": 1.2e-07,
@@ -46747,7 +47224,6 @@
     "input_cost_per_token": 3.9e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 262144,
-    "max_output_tokens": 262144,
     "max_tokens": 262144,
     "mode": "chat",
     "output_cost_per_token": 9.7e-07,
@@ -46781,7 +47257,6 @@
     "input_cost_per_token": 1.04e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 131072,
-    "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
     "output_cost_per_token": 1.04e-06,
@@ -46829,7 +47304,6 @@
     "input_cost_per_token": 2e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1048576,
-    "max_output_tokens": 1048576,
     "max_tokens": 1048576,
     "mode": "chat",
     "output_cost_per_token": 2e-07,
@@ -46873,7 +47347,6 @@
     "input_cost_per_token": 3.5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 131072,
-    "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
     "output_cost_per_token": 1.5e-06,
@@ -46942,7 +47415,6 @@
     "input_cost_per_token": 5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 256000,
-    "max_output_tokens": 256000,
     "max_tokens": 256000,
     "metadata": {
       "successor": "together_ai/moonshotai/Kimi-K3"
@@ -46961,7 +47433,6 @@
     "input_cost_per_token": 9.5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 262144,
-    "max_output_tokens": 262144,
     "max_tokens": 262144,
     "mode": "chat",
     "output_cost_per_token": 4e-06,
@@ -46978,7 +47449,6 @@
     "input_cost_per_token": 3e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1048576,
-    "max_output_tokens": 1048576,
     "max_tokens": 1048576,
     "mode": "chat",
     "output_cost_per_token": 1.5e-05,
@@ -47002,7 +47472,6 @@
     "input_cost_per_token": 6e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 512288,
-    "max_output_tokens": 512288,
     "max_tokens": 512288,
     "mode": "chat",
     "output_cost_per_token": 3.6e-06,
@@ -47018,7 +47487,6 @@
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 131072,
-    "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
     "output_cost_per_token": 6e-07,
@@ -47032,7 +47500,7 @@
   "together_ai/openai/gpt-oss-20b": {
     "input_cost_per_token": 5e-08,
     "litellm_provider": "together_ai",
-    "max_input_tokens": 128000,
+    "max_input_tokens": 131072,
     "mode": "chat",
     "output_cost_per_token": 2e-07,
     "source": "https://www.together.ai/models/gpt-oss-20b",
@@ -47046,7 +47514,6 @@
     "input_cost_per_token": 2.8e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 262144,
-    "max_output_tokens": 262144,
     "max_tokens": 262144,
     "mode": "chat",
     "output_cost_per_token": 8.6e-07,
@@ -47057,7 +47524,6 @@
     "input_cost_per_token": 1e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 524288,
-    "max_output_tokens": 524288,
     "max_tokens": 524288,
     "mode": "chat",
     "output_cost_per_token": 4.05e-06,
@@ -47073,7 +47539,6 @@
     "input_cost_per_token": 5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 524288,
-    "max_output_tokens": 524288,
     "max_tokens": 524288,
     "mode": "chat",
     "output_cost_per_token": 1.2e-06,
@@ -47104,7 +47569,6 @@
     "input_cost_per_token": 6e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 200000,
-    "max_output_tokens": 200000,
     "max_tokens": 200000,
     "metadata": {
       "successor": "together_ai/zai-org/GLM-5.2"
@@ -47122,7 +47586,6 @@
     "input_cost_per_token": 4.5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 200000,
-    "max_output_tokens": 200000,
     "max_tokens": 200000,
     "metadata": {
       "successor": "together_ai/zai-org/GLM-5.2"
@@ -47140,8 +47603,25 @@
     "input_cost_per_token": 1.4e-06,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1048575,
-    "max_output_tokens": 1048575,
-    "max_tokens": 1048575,
+    "max_output_tokens": 128000,
+    "max_tokens": 128000,
+    "mode": "chat",
+    "output_cost_per_token": 4.4e-06,
+    "source": "https://docs.together.ai/docs/serverless-models",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true
+  },
+  "together_ai/zai-org/GLM-5.3": {
+    "cache_read_input_token_cost": 2.6e-07,
+    "input_cost_per_token": 1.4e-06,
+    "litellm_provider": "together_ai",
+    "max_input_tokens": 1048575,
+    "max_output_tokens": 128000,
+    "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 4.4e-06,
     "source": "https://docs.together.ai/docs/serverless-models",
@@ -47157,8 +47637,8 @@
     "input_cost_per_token": 1.5e-07,
     "litellm_provider": "together_ai",
     "max_input_tokens": 1048575,
-    "max_output_tokens": 1048575,
-    "max_tokens": 1048575,
+    "max_output_tokens": 128000,
+    "max_tokens": 128000,
     "mode": "chat",
     "output_cost_per_token": 5e-07,
     "source": "https://docs.together.ai/docs/serverless-models",
@@ -48207,7 +48687,7 @@
     "max_tokens": 500000,
     "mode": "chat",
     "supports_function_calling": true,
-    "supports_prompt_caching": true,
+    "supports_prompt_caching": false,
     "supports_reasoning": true,
     "supports_tool_choice": true,
     "supports_vision": true
@@ -51201,6 +51681,43 @@
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
   },
+  "vertex_ai/gemini-3.5-transcribe-live-preview": {
+    "input_cost_per_audio_token": 3.5e-06,
+    "input_cost_per_token": 3.5e-06,
+    "litellm_provider": "vertex_ai",
+    "mode": "audio_transcription",
+    "output_cost_per_token": 2.1e-05,
+    "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+    "supported_endpoints": [
+      "/v1/realtime"
+    ],
+    "supported_modalities": [
+      "audio"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true
+  },
+  "vertex_ai/gemini-3.5-transcribe-preview": {
+    "input_cost_per_audio_token": 2.5e-06,
+    "input_cost_per_token": 2.5e-06,
+    "litellm_provider": "vertex_ai",
+    "mode": "audio_transcription",
+    "output_cost_per_token": 1.2e-05,
+    "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
+    "supported_endpoints": [
+      "/v1/audio/transcriptions"
+    ],
+    "supported_modalities": [
+      "text",
+      "audio"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_audio_input": true
+  },
   "vertex_ai/gemini-3.6-flash": {
     "prompt_cache_min_tokens": 4096,
     "cache_read_input_token_cost": 7.5e-08,
@@ -52006,6 +52523,22 @@
     "source": "https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/veo",
     "supported_modalities": [
       "text"
+    ],
+    "supported_output_modalities": [
+      "video"
+    ]
+  },
+  "vertex_ai/veo-3.1-lite-generate-001": {
+    "litellm_provider": "vertex_ai-video-models",
+    "max_input_tokens": 1024,
+    "max_tokens": 1024,
+    "mode": "video_generation",
+    "output_cost_per_second": 0.05,
+    "output_cost_per_second_1080p": 0.08,
+    "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing#veo",
+    "supported_modalities": [
+      "text",
+      "image"
     ],
     "supported_output_modalities": [
       "video"
@@ -53241,234 +53774,278 @@
     "supports_pdf_input": true
   },
   "xai/grok-3": {
-    "cache_read_input_token_cost": 7.5e-07,
-    "input_cost_per_token": 3e-06,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 1.5e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-beta": {
-    "cache_read_input_token_cost": 7.5e-07,
-    "input_cost_per_token": 3e-06,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 1.5e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-fast-beta": {
-    "cache_read_input_token_cost": 1.25e-06,
-    "input_cost_per_token": 5e-06,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 2.5e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-fast-latest": {
-    "cache_read_input_token_cost": 1.25e-06,
-    "input_cost_per_token": 5e-06,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 2.5e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-latest": {
-    "cache_read_input_token_cost": 7.5e-07,
-    "input_cost_per_token": 3e-06,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 1.5e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-mini": {
-    "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost": 2e-07,
     "deprecation_date": "2026-02-28",
-    "input_cost_per_token": 3e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-mini-beta": {
-    "cache_read_input_token_cost": 7.5e-08,
+    "cache_read_input_token_cost": 2e-07,
     "deprecation_date": "2026-02-28",
-    "input_cost_per_token": 3e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-mini-fast": {
-    "cache_read_input_token_cost": 1.5e-07,
-    "input_cost_per_token": 6e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 4e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-02-28",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-mini-fast-beta": {
-    "cache_read_input_token_cost": 1.5e-07,
-    "input_cost_per_token": 6e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 4e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-02-28",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-mini-fast-latest": {
-    "cache_read_input_token_cost": 1.5e-07,
-    "input_cost_per_token": 6e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 4e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-02-28",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-3-mini-latest": {
-    "cache_read_input_token_cost": 7.5e-08,
-    "input_cost_per_token": 3e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 131072,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://x.ai/api#pricing",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": false,
     "supports_tool_choice": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-02-28",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4": {
-    "input_cost_per_token": 3e-06,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 256000,
     "max_output_tokens": 256000,
     "max_tokens": 256000,
     "mode": "chat",
-    "output_cost_per_token": 1.5e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-0709": {
-    "input_cost_per_token": 3e-06,
-    "input_cost_per_token_above_128k_tokens": 6e-06,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 256000,
     "max_output_tokens": 256000,
     "max_tokens": 256000,
     "mode": "chat",
-    "output_cost_per_token": 1.5e-05,
-    "output_cost_per_token_above_128k_tokens": 3e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-1-fast": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models/grok-4-1-fast-reasoning",
     "supports_audio_input": true,
     "supports_function_calling": true,
@@ -53477,19 +54054,21 @@
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_web_search": true
+    "supports_web_search": true,
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-1-fast-non-reasoning": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models/grok-4-1-fast-non-reasoning",
     "supports_audio_input": true,
     "supports_function_calling": true,
@@ -53498,19 +54077,20 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-1-fast-non-reasoning-latest": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models/grok-4-1-fast-non-reasoning",
     "supports_audio_input": true,
     "supports_function_calling": true,
@@ -53519,19 +54099,20 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-1-fast-reasoning": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models/grok-4-1-fast-reasoning",
     "supports_audio_input": true,
     "supports_function_calling": true,
@@ -53541,19 +54122,20 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-1-fast-reasoning-latest": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models/grok-4-1-fast-reasoning",
     "supports_audio_input": true,
     "supports_function_calling": true,
@@ -53563,60 +54145,88 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-fast-non-reasoning": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-fast-reasoning": {
-    "cache_read_input_token_cost": 5e-08,
-    "input_cost_per_token": 2e-07,
-    "input_cost_per_token_above_128k_tokens": 4e-07,
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 2000000.0,
     "max_output_tokens": 2000000.0,
     "max_tokens": 2000000.0,
     "mode": "chat",
-    "output_cost_per_token": 5e-07,
-    "output_cost_per_token_above_128k_tokens": 1e-06,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
   },
   "xai/grok-4-latest": {
-    "input_cost_per_token": 3e-06,
-    "input_cost_per_token_above_128k_tokens": 6e-06,
+    "input_cost_per_token": 1.25e-06,
     "litellm_provider": "xai",
     "max_input_tokens": 256000,
     "max_output_tokens": 256000,
     "max_tokens": 256000,
     "mode": "chat",
-    "output_cost_per_token": 1.5e-05,
-    "output_cost_per_token_above_128k_tokens": 3e-05,
+    "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_tool_choice": true,
     "supports_web_search": true,
-    "deprecation_date": "2026-05-15"
+    "deprecation_date": "2026-05-15",
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07
+  },
+  "xai/grok-4.20": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_prompt_caching": true,
+    "supports_response_schema": true
   },
   "xai/grok-4.20-0309-non-reasoning": {
     "cache_read_input_token_cost": 2e-07,
@@ -53700,6 +54310,30 @@
     "cache_read_input_token_cost_above_200k_tokens": 4e-07,
     "supports_response_schema": true
   },
+  "xai/grok-4.20-multi-agent": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "responses",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/responses"
+    ],
+    "supports_function_calling": false,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": false,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_response_schema": true
+  },
   "xai/grok-4.20-multi-agent-0309": {
     "cache_read_input_token_cost": 2e-07,
     "input_cost_per_token": 1.25e-06,
@@ -53710,10 +54344,10 @@
     "mode": "responses",
     "output_cost_per_token": 2.5e-06,
     "source": "https://docs.x.ai/docs/models",
-    "supports_function_calling": true,
+    "supports_function_calling": false,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
-    "supports_tool_choice": true,
+    "supports_tool_choice": false,
     "supports_vision": true,
     "supports_web_search": true,
     "input_cost_per_token_above_200k_tokens": 2.5e-06,
@@ -53747,6 +54381,112 @@
     "supported_endpoints": [
       "/v1/responses"
     ]
+  },
+  "xai/grok-4.20-multi-agent-latest": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "responses",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/responses"
+    ],
+    "supports_function_calling": false,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": false,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_response_schema": true
+  },
+  "xai/grok-4.20-non-reasoning": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_response_schema": true
+  },
+  "xai/grok-4.20-non-reasoning-latest": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_response_schema": true
+  },
+  "xai/grok-4.20-reasoning": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_prompt_caching": true,
+    "supports_response_schema": true
+  },
+  "xai/grok-4.20-reasoning-latest": {
+    "cache_read_input_token_cost": 2e-07,
+    "input_cost_per_token": 1.25e-06,
+    "litellm_provider": "xai",
+    "max_input_tokens": 1000000,
+    "max_output_tokens": 1000000,
+    "max_tokens": 1000000,
+    "mode": "chat",
+    "output_cost_per_token": 2.5e-06,
+    "source": "https://docs.x.ai/docs/models",
+    "supports_function_calling": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "supports_vision": true,
+    "supports_web_search": true,
+    "input_cost_per_token_above_200k_tokens": 2.5e-06,
+    "output_cost_per_token_above_200k_tokens": 5e-06,
+    "cache_read_input_token_cost_above_200k_tokens": 4e-07,
+    "supports_prompt_caching": true,
+    "supports_response_schema": true
   },
   "xai/grok-4.3": {
     "cache_read_input_token_cost": 2e-07,
@@ -53935,6 +54675,119 @@
     "supports_response_schema": true,
     "supports_vision": true,
     "deprecation_date": "2026-05-15"
+  },
+  "xai/grok-imagine-image": {
+    "input_cost_per_image": 0.02,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
+  },
+  "xai/grok-imagine-image-2.0": {
+    "input_cost_per_image": 0.06,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
+  },
+  "xai/grok-imagine-image-2026-03-02": {
+    "input_cost_per_image": 0.02,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
+  },
+  "xai/grok-imagine-image-pro": {
+    "input_cost_per_image": 0.05,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ],
+    "deprecation_date": "2026-05-15"
+  },
+  "xai/grok-imagine-image-quality": {
+    "input_cost_per_image": 0.05,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
+  },
+  "xai/grok-imagine-image-quality-20260403": {
+    "input_cost_per_image": 0.05,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
+  },
+  "xai/grok-imagine-image-quality-latest": {
+    "input_cost_per_image": 0.05,
+    "litellm_provider": "xai",
+    "mode": "image_generation",
+    "source": "https://docs.x.ai/docs/models",
+    "supported_endpoints": [
+      "/v1/images/generations"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "image"
+    ]
   },
   "you_com/search": {
     "input_cost_per_query": 0.0,
@@ -54166,5 +55019,21 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_tool_choice": true
+  },
+  "zai/glm-5.3-flash": {
+    "cache_creation_input_token_cost": 0,
+    "cache_read_input_token_cost": 3e-08,
+    "input_cost_per_token": 1.5e-07,
+    "output_cost_per_token": 5e-07,
+    "litellm_provider": "zai",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 128000,
+    "mode": "chat",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "source": "https://docs.z.ai/guides/overview/pricing",
+    "supports_vision": true
   }
 }
