@@ -604,6 +604,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_vision": true,
     "supports_web_search": true
   },
@@ -621,6 +622,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_vision": true,
     "supports_web_search": true
   },
@@ -4137,6 +4139,26 @@
     "output_cost_per_token_batches": 2.2e-07,
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
   },
+  "azure/eu/gpt-4o": {
+    "deprecation_date": "2027-04-14",
+    "cache_creation_input_token_cost": 1.38e-06,
+    "cache_read_input_token_cost": 1.375e-06,
+    "input_cost_per_token": 2.75e-06,
+    "input_cost_per_token_batches": 1.375e-06,
+    "litellm_provider": "azure",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384,
+    "max_tokens": 16384,
+    "mode": "chat",
+    "output_cost_per_token": 1.1e-05,
+    "output_cost_per_token_batches": 5.5e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "azure/eu/gpt-4o-2024-05-13": {
     "deprecation_date": "2026-12-09",
     "input_cost_per_token": 5.5e-06,
@@ -4186,6 +4208,25 @@
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supports_function_calling": true,
     "supports_parallel_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
+  "azure/eu/gpt-4o-mini": {
+    "cache_read_input_token_cost": 8.3e-08,
+    "deprecation_date": "2027-04-14",
+    "input_cost_per_token": 1.65e-07,
+    "input_cost_per_token_batches": 8.3e-08,
+    "litellm_provider": "azure",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384,
+    "max_tokens": 16384,
+    "mode": "chat",
+    "output_cost_per_token": 6.6e-07,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true
@@ -5396,6 +5437,25 @@
     "supports_web_search": true,
     "supports_xhigh_reasoning_effort": true
   },
+  "azure/eu/o1": {
+    "cache_read_input_token_cost": 8.25e-06,
+    "deprecation_date": "2026-11-19",
+    "input_cost_per_token": 1.65e-05,
+    "input_cost_per_token_batches": 8.25e-06,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 6.6e-05,
+    "output_cost_per_token_batches": 3.3e-05,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "azure/eu/o1-2024-12-17": {
     "cache_read_input_token_cost": 8.25e-06,
     "deprecation_date": "2026-11-19",
@@ -5458,6 +5518,20 @@
     ],
     "supports_prompt_caching": true
   },
+  "azure/eu/o3": {
+    "deprecation_date": "2026-11-19",
+    "cache_read_input_token_cost": 5.5e-07,
+    "input_cost_per_token": 2.2e-06,
+    "input_cost_per_token_batches": 1.1e-06,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 8.8e-06,
+    "output_cost_per_token_batches": 4.4e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
+  },
   "azure/eu/o3-2025-04-16": {
     "deprecation_date": "2026-11-19",
     "cache_read_input_token_cost": 5.5e-07,
@@ -5481,6 +5555,24 @@
     "output_cost_per_token": 4.4e-05,
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
   },
+  "azure/eu/o3-mini": {
+    "cache_read_input_token_cost": 6.05e-07,
+    "deprecation_date": "2026-11-19",
+    "input_cost_per_token": 1.21e-06,
+    "input_cost_per_token_batches": 6.05e-07,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 4.84e-06,
+    "output_cost_per_token_batches": 2.42e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "supports_vision": false
+  },
   "azure/eu/o3-mini-2025-01-31": {
     "cache_read_input_token_cost": 6.05e-07,
     "deprecation_date": "2026-11-19",
@@ -5498,6 +5590,20 @@
     "supports_reasoning": true,
     "supports_tool_choice": true,
     "supports_vision": false
+  },
+  "azure/eu/o4-mini": {
+    "deprecation_date": "2026-11-19",
+    "cache_read_input_token_cost": 3.03e-07,
+    "input_cost_per_token": 1.21e-06,
+    "input_cost_per_token_batches": 6.05e-07,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 4.84e-06,
+    "output_cost_per_token_batches": 2.42e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
   },
   "azure/eu/o4-mini-2025-04-16": {
     "deprecation_date": "2026-11-19",
@@ -10545,6 +10651,26 @@
     "supports_tool_choice": true,
     "supports_vision": true
   },
+  "azure/us/gpt-4o": {
+    "deprecation_date": "2027-04-14",
+    "cache_creation_input_token_cost": 1.38e-06,
+    "cache_read_input_token_cost": 1.375e-06,
+    "input_cost_per_token": 2.75e-06,
+    "input_cost_per_token_batches": 1.375e-06,
+    "litellm_provider": "azure",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384,
+    "max_tokens": 16384,
+    "mode": "chat",
+    "output_cost_per_token": 1.1e-05,
+    "output_cost_per_token_batches": 5.5e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "azure/us/gpt-4o-2024-05-13": {
     "deprecation_date": "2026-12-09",
     "input_cost_per_token": 5.5e-06,
@@ -10594,6 +10720,25 @@
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supports_function_calling": true,
     "supports_parallel_function_calling": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
+  "azure/us/gpt-4o-mini": {
+    "cache_read_input_token_cost": 8.3e-08,
+    "deprecation_date": "2027-04-14",
+    "input_cost_per_token": 1.65e-07,
+    "input_cost_per_token_batches": 8.3e-08,
+    "litellm_provider": "azure",
+    "max_input_tokens": 128000,
+    "max_output_tokens": 16384,
+    "max_tokens": 16384,
+    "mode": "chat",
+    "output_cost_per_token": 6.6e-07,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true
@@ -11854,6 +11999,25 @@
     "supports_vision": true,
     "supports_web_search": true
   },
+  "azure/us/o1": {
+    "cache_read_input_token_cost": 8.25e-06,
+    "deprecation_date": "2026-11-19",
+    "input_cost_per_token": 1.65e-05,
+    "input_cost_per_token_batches": 8.25e-06,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 6.6e-05,
+    "output_cost_per_token_batches": 3.3e-05,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "azure/us/o1-2024-12-17": {
     "cache_read_input_token_cost": 8.25e-06,
     "deprecation_date": "2026-11-19",
@@ -11916,6 +12080,39 @@
     ],
     "supports_prompt_caching": true
   },
+  "azure/us/o3": {
+    "deprecation_date": "2026-11-19",
+    "cache_read_input_token_cost": 5.5e-07,
+    "input_cost_per_token": 2.2e-06,
+    "input_cost_per_token_batches": 1.1e-06,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 8.8e-06,
+    "output_cost_per_token_batches": 4.4e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supported_endpoints": [
+      "/v1/chat/completions",
+      "/v1/batch",
+      "/v1/responses"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": false,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "azure/us/o3-2025-04-16": {
     "deprecation_date": "2026-11-19",
     "cache_read_input_token_cost": 5.5e-07,
@@ -11958,6 +12155,24 @@
     "output_cost_per_token": 4.4e-05,
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
   },
+  "azure/us/o3-mini": {
+    "cache_read_input_token_cost": 6.05e-07,
+    "deprecation_date": "2026-11-19",
+    "input_cost_per_token": 1.21e-06,
+    "input_cost_per_token_batches": 6.05e-07,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 4.84e-06,
+    "output_cost_per_token_batches": 2.42e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": true,
+    "supports_vision": false
+  },
   "azure/us/o3-mini-2025-01-31": {
     "cache_read_input_token_cost": 6.05e-07,
     "deprecation_date": "2026-11-19",
@@ -11975,6 +12190,27 @@
     "supports_reasoning": true,
     "supports_tool_choice": true,
     "supports_vision": false
+  },
+  "azure/us/o4-mini": {
+    "cache_read_input_token_cost": 3.03e-07,
+    "deprecation_date": "2026-11-19",
+    "input_cost_per_token": 1.21e-06,
+    "input_cost_per_token_batches": 6.05e-07,
+    "litellm_provider": "azure",
+    "max_input_tokens": 200000,
+    "max_output_tokens": 100000,
+    "max_tokens": 100000,
+    "mode": "chat",
+    "output_cost_per_token": 4.84e-06,
+    "output_cost_per_token_batches": 2.42e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supports_function_calling": true,
+    "supports_parallel_function_calling": false,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
   },
   "azure/us/o4-mini-2025-04-16": {
     "cache_read_input_token_cost": 3.03e-07,
@@ -12601,6 +12837,34 @@
     "output_cost_per_token": 7.8e-07,
     "source": "https://azure.microsoft.com/en-us/blog/introducing-the-llama-4-herd-in-azure-ai-foundry-and-azure-databricks/",
     "supports_function_calling": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
+  "azure_ai/MAI-Code-1.1-Flash": {
+    "cache_read_input_token_cost": 2e-08,
+    "deprecation_date": "2026-12-09",
+    "input_cost_per_token": 2e-07,
+    "litellm_provider": "azure_ai",
+    "max_input_tokens": 256000,
+    "max_output_tokens": 64000,
+    "max_tokens": 64000,
+    "mode": "chat",
+    "output_cost_per_token": 1.2e-06,
+    "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
+    "supported_endpoints": [
+      "/v1/chat/completions",
+      "/v1/responses"
+    ],
+    "supported_modalities": [
+      "text",
+      "image"
+    ],
+    "supported_output_modalities": [
+      "text"
+    ],
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -15241,14 +15505,14 @@
     "supports_vision": false
   },
   "baseten/reflection/Beam-1.0": {
-    "cache_read_input_token_cost": 1.3e-07,
-    "input_cost_per_token": 1.3e-06,
+    "cache_read_input_token_cost": 4e-08,
+    "input_cost_per_token": 4e-07,
     "litellm_provider": "baseten",
     "max_input_tokens": 1048576,
     "max_output_tokens": 131072,
     "max_tokens": 131072,
     "mode": "chat",
-    "output_cost_per_token": 4.3e-06,
+    "output_cost_per_token": 1.2e-06,
     "source": "https://inference.baseten.co/v1/models",
     "supports_function_calling": true,
     "supports_prompt_caching": true,
@@ -21528,6 +21792,15 @@
     "output_cost_per_token": 5.55e-07,
     "rpm": 300
   },
+  "cloudflare/@cf/cloudflare/clairic": {
+    "input_cost_per_token": 1e-07,
+    "litellm_provider": "cloudflare",
+    "max_input_tokens": 65536,
+    "mode": "extraction",
+    "output_cost_per_token": 0.0,
+    "source": "https://developers.cloudflare.com/workers-ai/models/clairic/",
+    "supports_vision": true
+  },
   "cloudflare/@cf/cloudflare/clef": {
     "input_cost_per_token": 2.4e-07,
     "litellm_provider": "cloudflare",
@@ -21896,6 +22169,15 @@
     "mode": "chat",
     "output_cost_per_token": 1.923e-06,
     "rpm": 300
+  },
+  "cloudflare/clairic": {
+    "input_cost_per_token": 1e-07,
+    "litellm_provider": "cloudflare",
+    "max_input_tokens": 65536,
+    "mode": "extraction",
+    "output_cost_per_token": 0.0,
+    "source": "https://developers.cloudflare.com/workers-ai/models/clairic/",
+    "supports_vision": true
   },
   "cloudflare/clef": {
     "input_cost_per_token": 2.4e-07,
@@ -24475,6 +24757,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -24506,6 +24789,7 @@
     "supports_function_calling": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
+    "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -24530,6 +24814,7 @@
     ],
     "supports_function_calling": true,
     "supports_reasoning": true,
+    "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -24554,6 +24839,7 @@
     ],
     "supports_function_calling": true,
     "supports_reasoning": true,
+    "supports_sampling_params": false,
     "supports_tool_choice": true,
     "supports_vision": true
   },
@@ -27156,6 +27442,7 @@
     "supports_tool_choice": true,
     "supports_response_schema": true,
     "supports_reasoning": true,
+    "supports_sampling_params": false,
     "supports_vision": true,
     "source": "https://deepinfra.com/pricing",
     "supports_audio_input": true
@@ -32880,6 +33167,26 @@
     "supports_tool_choice": true,
     "supports_vision": true
   },
+  "fireworks_ai/accounts/fireworks/models/deepseek-v4p1-flash-1017-us": {
+    "cache_read_input_token_cost": 9e-09,
+    "cache_read_input_token_cost_priority": 1.125e-08,
+    "input_cost_per_token": 4.5e-07,
+    "input_cost_per_token_priority": 5.625e-07,
+    "litellm_provider": "fireworks_ai",
+    "max_input_tokens": 1048576,
+    "max_output_tokens": 393216,
+    "max_tokens": 393216,
+    "mode": "chat",
+    "output_cost_per_token": 1.8e-06,
+    "output_cost_per_token_priority": 2.25e-06,
+    "source": "https://docs.fireworks.ai/serverless/us-only-serverless",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": true
+  },
   "fireworks_ai/accounts/fireworks/models/devstral-small-2505": {
     "max_tokens": 131072,
     "max_input_tokens": 131072,
@@ -34110,13 +34417,17 @@
   },
   "fireworks_ai/accounts/fireworks/models/muse-spark-open": {
     "cache_read_input_token_cost": 1.5e-07,
+    "cache_read_input_token_cost_priority": 2.25e-07,
     "input_cost_per_token": 1.25e-06,
+    "input_cost_per_token_priority": 1.875e-06,
     "litellm_provider": "fireworks_ai",
     "max_input_tokens": 1048576,
     "mode": "chat",
     "output_cost_per_token": 4.25e-06,
-    "source": "https://fireworks.ai/models/fireworks/muse-spark-open",
+    "output_cost_per_token_priority": 6.375e-06,
+    "source": "https://docs.fireworks.ai/serverless/pricing",
     "supports_function_calling": true,
+    "supports_reasoning": true,
     "supports_vision": true
   },
   "fireworks_ai/accounts/fireworks/models/mythomax-l2-13b": {
@@ -35314,6 +35625,7 @@
   "fireworks_ai/accounts/fireworks/routers/glm-5p3-flash-us": {
     "cache_read_input_token_cost": 4.5e-08,
     "cache_read_input_token_cost_priority": 5.625e-08,
+    "deprecation_date": "2026-11-07",
     "input_cost_per_token": 2.25e-07,
     "input_cost_per_token_priority": 2.8125e-07,
     "litellm_provider": "fireworks_ai",
@@ -35704,6 +36016,7 @@
   "fireworks_ai/glm-5p3-flash-us": {
     "cache_read_input_token_cost": 4.5e-08,
     "cache_read_input_token_cost_priority": 5.625e-08,
+    "deprecation_date": "2026-11-07",
     "input_cost_per_token": 2.25e-07,
     "input_cost_per_token_priority": 2.8125e-07,
     "litellm_provider": "fireworks_ai",
@@ -36600,6 +36913,11 @@
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
     },
+    "search_free_requests": {
+      "count": 1500,
+      "period": "day",
+      "shared_group": "gemini-2-flash"
+    },
     "google_maps_grounding_cost_per_query": 0.025,
     "input_cost_per_audio_token_batches": 5e-07,
     "input_cost_per_token_batches": 1.5e-07,
@@ -36707,6 +37025,11 @@
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
     },
+    "search_free_requests": {
+      "count": 1500,
+      "period": "day",
+      "shared_group": "gemini-2-flash"
+    },
     "google_maps_grounding_cost_per_query": 0.025,
     "input_cost_per_audio_token_batches": 5e-08,
     "input_cost_per_token_batches": 5e-08,
@@ -36760,6 +37083,11 @@
       "search_context_size_low": 0.035,
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
+    },
+    "search_free_requests": {
+      "count": 1500,
+      "period": "day",
+      "shared_group": "gemini-2-flash"
     },
     "google_maps_grounding_cost_per_query": 0.025,
     "supports_image_size": false
@@ -36890,6 +37218,11 @@
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
     },
+    "search_free_requests": {
+      "count": 1500,
+      "period": "day",
+      "shared_group": "gemini-2-flash"
+    },
     "google_maps_grounding_cost_per_query": 0.025,
     "supports_image_size": false
   },
@@ -36962,6 +37295,11 @@
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
     },
+    "search_free_requests": {
+      "count": 10000,
+      "period": "day",
+      "shared_group": "gemini-2.5-pro"
+    },
     "google_maps_grounding_cost_per_query": 0.025,
     "input_cost_per_token_above_200k_tokens_priority": 4.5e-06,
     "input_cost_per_token_batches": 6.25e-07,
@@ -37032,6 +37370,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
@@ -37117,6 +37460,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query"
   },
   "gemini-3-pro-image-preview": {
@@ -37169,6 +37517,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query"
   },
   "gemini-3.1-flash-image": {
@@ -37219,6 +37572,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query"
   },
   "gemini-3.1-flash-image-preview": {
@@ -37261,6 +37619,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query"
   },
@@ -37321,6 +37684,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
@@ -37419,6 +37787,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
   },
@@ -37489,6 +37862,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
@@ -37570,6 +37948,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
   },
@@ -37626,6 +38009,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_token_batches": 7.5e-07,
@@ -37677,6 +38065,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -37688,6 +38077,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -37732,6 +38126,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -37747,6 +38142,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -37792,6 +38192,7 @@
     "supports_reasoning": true,
     "supports_minimal_reasoning_effort": false,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -37807,6 +38208,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -37837,6 +38243,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
       "/v1/chat/completions",
@@ -37862,6 +38273,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -37911,6 +38323,7 @@
     "supports_reasoning": true,
     "supports_minimal_reasoning_effort": false,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": false,
     "supports_url_context": false,
@@ -38307,12 +38720,10 @@
   "gemini-nano-banana-2.1": {
     "cache_read_input_token_cost": 1.5e-07,
     "cache_read_input_token_cost_batches": 7.5e-08,
-    "cache_read_input_token_cost_flex": 7.5e-08,
     "cache_read_input_token_cost_priority": 2.7e-07,
     "input_cost_per_image": 0.00168,
     "input_cost_per_token": 1.5e-06,
     "input_cost_per_token_batches": 7.5e-07,
-    "input_cost_per_token_flex": 7.5e-07,
     "input_cost_per_token_priority": 2.7e-06,
     "litellm_provider": "vertex_ai-language-models",
     "max_input_tokens": 131072,
@@ -38323,7 +38734,6 @@
     "output_cost_per_image_token": 3e-05,
     "output_cost_per_token": 7.5e-06,
     "output_cost_per_token_batches": 3.75e-06,
-    "output_cost_per_token_flex": 3.75e-06,
     "output_cost_per_token_priority": 1.35e-05,
     "search_context_cost_per_query": {
       "search_context_size_low": 0.014,
@@ -38755,6 +39165,11 @@
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
     },
+    "search_free_requests": {
+      "count": 1500,
+      "period": "day",
+      "shared_group": "gemini-2-flash"
+    },
     "google_maps_grounding_cost_per_query": 0.025,
     "input_cost_per_audio_token_batches": 5e-07,
     "input_cost_per_audio_token_priority": 1.8e-06,
@@ -38870,6 +39285,11 @@
       "search_context_size_low": 0.035,
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
+    },
+    "search_free_requests": {
+      "count": 1500,
+      "period": "day",
+      "shared_group": "gemini-2-flash"
     },
     "google_maps_grounding_cost_per_query": 0.025,
     "input_cost_per_audio_token_batches": 1.5e-07,
@@ -39049,6 +39469,11 @@
       "search_context_size_medium": 0.035,
       "search_context_size_high": 0.035
     },
+    "search_free_requests": {
+      "count": 10000,
+      "period": "day",
+      "shared_group": "gemini-2.5-pro"
+    },
     "google_maps_grounding_cost_per_query": 0.025,
     "input_cost_per_token_batches": 6.25e-07,
     "input_cost_per_token_flex": 6.25e-07,
@@ -39147,6 +39572,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_audio_token_batches": 5e-07,
@@ -39201,6 +39631,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "supports_reasoning": true
   },
@@ -39249,6 +39684,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "supports_reasoning": false
   },
@@ -39270,6 +39710,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "source": "https://ai.google.dev/gemini-api/docs/pricing",
     "supported_endpoints": [
@@ -39337,6 +39782,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query"
   },
   "gemini/gemini-3.1-flash-lite": {
@@ -39397,6 +39847,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
@@ -39499,6 +39954,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
@@ -39624,6 +40084,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_token_flex": 1e-06,
@@ -39687,6 +40152,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_token_flex": 1e-06,
@@ -39746,6 +40216,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_token_batches": 7.5e-07,
@@ -39797,6 +40272,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -39809,6 +40285,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -39932,6 +40413,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -39947,6 +40429,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -39993,6 +40480,7 @@
     "supports_reasoning": true,
     "supports_minimal_reasoning_effort": false,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -40008,6 +40496,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -40054,6 +40547,7 @@
     "supports_reasoning": true,
     "supports_minimal_reasoning_effort": false,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -40069,6 +40563,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -41493,6 +41992,7 @@
     "supports_function_calling": true,
     "supports_parallel_function_calling": true,
     "supports_reasoning": true,
+    "supports_sampling_params": false,
     "supports_vision": true
   },
   "github_copilot/gemini-3.8-flash": {
@@ -41511,6 +42011,7 @@
     "supports_function_calling": true,
     "supports_parallel_function_calling": true,
     "supports_reasoning": true,
+    "supports_sampling_params": false,
     "supports_vision": true
   },
   "github_copilot/gemini-4-argon": {
@@ -58463,6 +58964,7 @@
   "perplexity/google/gemini-3.5-flash-lite": {
     "litellm_provider": "perplexity",
     "mode": "responses",
+    "supports_sampling_params": false,
     "supports_web_search": true,
     "supports_function_calling": true,
     "input_cost_per_token": 3e-07,
@@ -58473,6 +58975,7 @@
   "perplexity/google/gemini-3.6-flash": {
     "litellm_provider": "perplexity",
     "mode": "responses",
+    "supports_sampling_params": false,
     "supports_web_search": true,
     "supports_function_calling": true,
     "input_cost_per_token": 1.5e-06,
@@ -58483,6 +58986,7 @@
   "perplexity/google/gemini-3.7-flash": {
     "litellm_provider": "perplexity",
     "mode": "responses",
+    "supports_sampling_params": false,
     "supports_web_search": true,
     "supports_function_calling": true,
     "input_cost_per_token": 7.5e-07,
@@ -58493,6 +58997,7 @@
   "perplexity/google/gemini-3.8-flash": {
     "litellm_provider": "perplexity",
     "mode": "responses",
+    "supports_sampling_params": false,
     "input_cost_per_token": 7.5e-07,
     "output_cost_per_token": 3.75e-06,
     "cache_read_input_token_cost": 7.5e-08,
@@ -71364,6 +71869,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
       "/v1/chat/completions",
@@ -71516,6 +72026,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query"
   },
   "vertex_ai/gemini-3.1-flash-image": {
@@ -71633,6 +72148,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_audio_token_batches": 2.5e-07
@@ -71730,6 +72250,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
   },
@@ -71772,6 +72297,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
@@ -71859,6 +72389,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
   },
@@ -71915,6 +72450,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014,
     "input_cost_per_token_batches": 7.5e-07,
@@ -71967,6 +72507,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -71978,6 +72519,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -72097,6 +72643,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -72112,6 +72659,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -72157,6 +72709,7 @@
     "supports_reasoning": true,
     "supports_minimal_reasoning_effort": false,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -72172,6 +72725,11 @@
       "search_context_size_low": 0.014,
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
+    },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
     "google_maps_grounding_cost_per_query": 0.014
@@ -72203,6 +72761,11 @@
       "search_context_size_medium": 0.014,
       "search_context_size_high": 0.014
     },
+    "search_free_requests": {
+      "count": 5000,
+      "period": "month",
+      "shared_group": "gemini-3"
+    },
     "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
       "/v1/chat/completions",
@@ -72227,6 +72790,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_url_context": true,
@@ -72276,6 +72840,7 @@
     "supports_reasoning": true,
     "supports_minimal_reasoning_effort": false,
     "supports_response_schema": true,
+    "supports_sampling_params": false,
     "supports_system_messages": true,
     "supports_tool_choice": false,
     "supports_url_context": false,
@@ -72514,12 +73079,10 @@
   "vertex_ai/gemini-nano-banana-2.1": {
     "cache_read_input_token_cost": 1.5e-07,
     "cache_read_input_token_cost_batches": 7.5e-08,
-    "cache_read_input_token_cost_flex": 7.5e-08,
     "cache_read_input_token_cost_priority": 2.7e-07,
     "input_cost_per_image": 0.00168,
     "input_cost_per_token": 1.5e-06,
     "input_cost_per_token_batches": 7.5e-07,
-    "input_cost_per_token_flex": 7.5e-07,
     "input_cost_per_token_priority": 2.7e-06,
     "litellm_provider": "vertex_ai-language-models",
     "max_input_tokens": 131072,
@@ -72530,7 +73093,6 @@
     "output_cost_per_image_token": 3e-05,
     "output_cost_per_token": 7.5e-06,
     "output_cost_per_token_batches": 3.75e-06,
-    "output_cost_per_token_flex": 3.75e-06,
     "output_cost_per_token_priority": 1.35e-05,
     "search_context_cost_per_query": {
       "search_context_size_low": 0.014,
@@ -73872,11 +74434,46 @@
       }
     ]
   },
+  "volcengine/doubao-seed-2-1-lite-260915": {
+    "cache_read_input_audio_token_cost": 3.45e-07,
+    "cache_read_input_token_cost": 2.3e-08,
+    "input_cost_per_audio_token": 1.725e-06,
+    "input_cost_per_token": 1.15e-07,
+    "litellm_provider": "volcengine",
+    "max_input_tokens": 1024000,
+    "max_output_tokens": 256000,
+    "max_tokens": 256000,
+    "mode": "chat",
+    "output_cost_per_token": 3.88126e-07,
+    "source": "https://www.volcengine.com/docs/82379/1544106",
+    "supports_audio_input": true,
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": false,
+    "supports_vision": true
+  },
   "volcengine/doubao-seed-2-1-pro-260628": {
     "cache_read_input_token_cost": 1.725e-07,
     "input_cost_per_token": 8.625e-07,
     "litellm_provider": "volcengine",
     "max_input_tokens": 256000,
+    "max_output_tokens": 256000,
+    "max_tokens": 256000,
+    "mode": "chat",
+    "output_cost_per_token": 4.3125e-06,
+    "source": "https://www.volcengine.com/docs/82379/1544106",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_tool_choice": false,
+    "supports_vision": true
+  },
+  "volcengine/doubao-seed-2-1-pro-260915": {
+    "cache_read_input_token_cost": 1.725e-07,
+    "input_cost_per_token": 8.625e-07,
+    "litellm_provider": "volcengine",
+    "max_input_tokens": 1024000,
     "max_output_tokens": 256000,
     "max_tokens": 256000,
     "mode": "chat",
@@ -74710,6 +75307,21 @@
     "mode": "chat",
     "source": "https://wandb.ai/site/pricing/tokens/"
   },
+  "wandb/reflection/Beam-1.0-501B-A23B": {
+    "cache_read_input_token_cost": 1e-07,
+    "input_cost_per_token": 1e-06,
+    "litellm_provider": "wandb",
+    "max_input_tokens": 1049000,
+    "mode": "chat",
+    "output_cost_per_token": 3e-06,
+    "source": "https://www.coreweave.com/products/coreweave-forge/serverless-inference",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": false
+  },
   "wandb/zai-org/GLM-5.2": {
     "supports_reasoning": true,
     "max_tokens": 262144,
@@ -74722,6 +75334,21 @@
     "mode": "chat",
     "supports_vision": false,
     "source": "https://wandb.ai/site/pricing/tokens/"
+  },
+  "wandb/zai-org/GLM-5.3": {
+    "cache_read_input_token_cost": 1.9e-07,
+    "input_cost_per_token": 1.2e-06,
+    "litellm_provider": "wandb",
+    "max_input_tokens": 1049000,
+    "mode": "chat",
+    "output_cost_per_token": 4e-06,
+    "source": "https://www.coreweave.com/products/coreweave-forge/serverless-inference",
+    "supports_function_calling": true,
+    "supports_prompt_caching": true,
+    "supports_reasoning": true,
+    "supports_response_schema": true,
+    "supports_tool_choice": true,
+    "supports_vision": false
   },
   "wandb/zai-org/GLM-5.3-Flash": {
     "cache_read_input_token_cost": 5e-08,
