@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-27T11:26:08Z",
-  "model_count": 2414,
+  "generated_at": "2026-10-28T11:57:51Z",
+  "model_count": 2425,
   "files": {
-    "litellm.json": "31aea4009d635505ea27b1f81b74c1f31eb9c6f7987b34dda62c25f6ff53352c"
+    "litellm.json": "2864bb6963437bd324de5b2a80cf1b008254900461ac9e06530b80ac5c02c50d"
   }
 }
